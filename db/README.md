@@ -93,8 +93,3 @@ Write new migration:
 ```bash
 dbmate new <migration_name>
 ```
-
-Seed database:
-```bash
-psql $DATABASE_URL < db/seed.sql
-```
