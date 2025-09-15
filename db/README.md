@@ -36,42 +36,43 @@ sudo systemctl restart postgresql.service
 
 ## Database Setup
 
-1. Create user:
+1. Create database for the application:
 ```bash
-sudo -u postgres createuser shinzo_app_user
+sudo -u postgres createdb shinzo_platform
 ```
 
-2. Create database:
+2. Create user (optional - you can use postgres user):
 ```bash
-sudo -u postgres createdb shinzo_app_db
+sudo -u postgres createuser shinzo_user
 ```
 
-3. Open `psql` terminal in `shinzo_app_db` as `postgres` user:
+3. Open `psql` terminal in `shinzo_platform` as `postgres` user:
 ```bash
-sudo -u postgres psql shinzo_app_db
+sudo -u postgres psql shinzo_platform
 ```
 
-4. Give user password:
+4. Give user password (if using custom user):
 ```bash
-alter user shinzo_app_user with encrypted password 'shinzo_app_user_password';
+alter user shinzo_user with encrypted password 'your_secure_password';
 ```
 
-5. Grant all privileges on `shinzo_app_db` to `shinzo_app_user`:
+5. Grant all privileges on `shinzo_platform` to user:
 ```bash
-grant all privileges on database shinzo_app_db to shinzo_app_user;
+grant all privileges on database shinzo_platform to shinzo_user;
 ```
 
-6. Add `pgcrypto` extension:
+## Environment Configuration
+
+Update your environment variables to point to your external database:
+
 ```bash
-create extension pgcrypto;
+# In backend/.env or your environment
+DATABASE_URL=postgresql://postgres:password@localhost:5432/shinzo_platform
+# Or for custom user:
+# DATABASE_URL=postgresql://shinzo_user:your_secure_password@localhost:5432/shinzo_platform
 ```
 
 ## Database Operations (from root directory)
-
-Reset database (runs most below commands):
-```bash
-./db/scripts/reset-db.sh
-```
 
 Migrate database:
 ```bash

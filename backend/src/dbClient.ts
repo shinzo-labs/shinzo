@@ -19,7 +19,7 @@ export const sequelize = new Sequelize(DATABASE_URL, {
     supportBigNumbers: true,
     bigNumberStrings: true
   },
-  timezone: TZ,
+  timezone: TZ || 'UTC',
   logging: logger.debug.bind(logger),
   benchmark: true,
   logQueryParameters: true,
