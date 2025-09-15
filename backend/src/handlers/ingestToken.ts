@@ -1,0 +1,120 @@
+import * as yup from 'yup'
+import { IngestToken } from '../models/open_telemetry/IngestToken'
+import { logger } from '../logger'
+import * as crypto from 'crypto'
+
+function generateIngestToken(): string {
+  // Generate a secure 32-character alphanumeric token
+  return crypto.randomBytes(16).toString('hex')
+}
+
+export const handleGenerateIngestToken = async (userUuid: string) => {
+  try {
+    // Deprecate existing live tokens for this user
+    await IngestToken.update(
+      { status: 'deprecated' },
+      { where: { user_uuid: userUuid, status: 'live' } }
+    )
+
+    // Generate new token
+    const newTokenValue = generateIngestToken()
+
+    const newToken = await IngestToken.create({
+      user_uuid: userUuid,
+      ingest_token: newTokenValue,
+      status: 'live',
+    })
+
+    logger.info({ message: 'Ingest token generated successfully', userUuid, tokenUuid: newToken.uuid })
+
+    return {
+      response: {
+        message: 'Ingest token generated successfully',
+        token: newToken.ingest_token,
+        uuid: newToken.uuid,
+        status: newToken.status,
+        created_at: newToken.created_at
+      },
+      status: 201
+    }
+
+  } catch (error) {
+    logger.error({ message: 'Error generating ingest token', error, userUuid })
+    return {
+      response: 'Error generating ingest token',
+      error: true,
+      status: 500
+    }
+  }
+}
+
+export const handleFetchIngestTokens = async (userUuid: string) => {
+  try {
+    const tokens = await IngestToken.findAll({
+      where: { user_uuid: userUuid },
+      order: [['created_at', 'DESC']],
+      attributes: ['uuid', 'ingest_token', 'status', 'created_at', 'updated_at']
+    })
+
+    return {
+      response: {
+        tokens: tokens.map(token => ({
+          uuid: token.uuid,
+          ingest_token: token.ingest_token,
+          status: token.status,
+          created_at: token.created_at,
+          updated_at: token.updated_at
+        }))
+      },
+      status: 200
+    }
+
+  } catch (error) {
+    logger.error({ message: 'Error fetching ingest tokens', error, userUuid })
+    return {
+      response: 'Error fetching ingest tokens',
+      error: true,
+      status: 500
+    }
+  }
+}
+
+export const handleRevokeIngestToken = async (userUuid: string, tokenUuid: string) => {
+  try {
+    const token = await IngestToken.findOne({
+      where: {
+        uuid: tokenUuid,
+        user_uuid: userUuid
+      }
+    })
+
+    if (!token) {
+      return {
+        response: 'Token not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    await token.update({ status: 'deprecated' })
+
+    logger.info({ message: 'Ingest token revoked successfully', userUuid, tokenUuid })
+
+    return {
+      response: {
+        message: 'Ingest token revoked successfully',
+        uuid: token.uuid,
+        status: token.status
+      },
+      status: 200
+    }
+
+  } catch (error) {
+    logger.error({ message: 'Error revoking ingest token', error, userUuid, tokenUuid })
+    return {
+      response: 'Error revoking ingest token',
+      error: true,
+      status: 500
+    }
+  }
+}

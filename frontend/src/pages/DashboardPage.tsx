@@ -1,7 +1,7 @@
 import React from 'react'
 import { useQuery } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
-import { Button } from '../components/ui/Button'
+import { Button, Card, Flex, Text, Heading, Badge, Grid, Box } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
@@ -33,10 +33,10 @@ export const DashboardPage: React.FC = () => {
 
   // Mock stats since we don't have aggregation endpoints yet
   const stats: DashboardStats = {
-    totalTraces: 0, // Would come from aggregated traces data
+    totalTraces: 0,
     activeServices: resources.length,
-    errorRate: 0, // Would be calculated from trace status
-    avgResponseTime: 0, // Would be calculated from span durations
+    errorRate: 0,
+    avgResponseTime: 0,
   }
 
   const statCards = [
@@ -76,148 +76,155 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <Flex direction="column" gap="6">
         {/* Page header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-600">
+        <Flex justify="between" align="center">
+          <Box>
+            <Heading size="6">Dashboard</Heading>
+            <Text color="gray">
               Overview of your telemetry data and system health
-            </p>
-          </div>
+            </Text>
+          </Box>
           <Button variant="outline">
-            <Icons.ReloadIcon className="mr-2 h-4 w-4" />
+            <Icons.ReloadIcon />
             Refresh
           </Button>
-        </div>
+        </Flex>
 
         {/* Quick stats cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Grid columns={{ initial: '1', sm: '2', lg: '4' }} gap="4">
           {statCards.map((stat) => {
             const Icon = stat.icon
             return (
-              <div
-                key={stat.title}
-                className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm"
-              >
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-blue-600" />
-                    </div>
-                  </div>
-                  <div className="ml-4 flex-1">
-                    <p className="text-sm font-medium text-gray-600">{stat.title}</p>
-                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center justify-between">
-                  <p className="text-sm text-gray-500">{stat.subtitle}</p>
-                  <span
-                    className={`text-sm font-medium ${
-                      stat.trendUp ? 'text-green-600' : 'text-red-600'
-                    }`}
+              <Card key={stat.title}>
+                <Flex align="center" gap="3">
+                  <Flex
+                    align="center"
+                    justify="center"
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      backgroundColor: 'var(--blue-3)',
+                      borderRadius: 'var(--radius-2)',
+                      color: 'var(--blue-9)'
+                    }}
+                  >
+                    <Icon width="20" height="20" />
+                  </Flex>
+                  <Box style={{ flex: 1 }}>
+                    <Text size="2" color="gray" weight="medium">{stat.title}</Text>
+                    <Text size="6" weight="bold">{stat.value}</Text>
+                  </Box>
+                </Flex>
+                <Flex justify="between" align="center" style={{ marginTop: '16px' }}>
+                  <Text size="2" color="gray">{stat.subtitle}</Text>
+                  <Text
+                    size="2"
+                    weight="medium"
+                    color={stat.trendUp ? 'green' : 'red'}
                   >
                     {stat.trend}
-                  </span>
-                </div>
-              </div>
+                  </Text>
+                </Flex>
+              </Card>
             )
           })}
-        </div>
+        </Grid>
 
         {/* Service overview */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Grid columns={{ initial: '1', lg: '2' }} gap="6">
           {/* Services list */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">Services</h3>
-              <p className="text-sm text-gray-500">Active services and their status</p>
-            </div>
-            <div className="p-6">
-              {resourcesLoading ? (
-                <div className="space-y-3">
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} className="loading-skeleton h-16 rounded"></div>
-                  ))}
-                </div>
-              ) : resources.length > 0 ? (
-                <div className="space-y-4">
-                  {resources.slice(0, 5).map((resource: any) => (
-                    <div key={resource.uuid} className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                        <div className="ml-3">
-                          <p className="text-sm font-medium text-gray-900">
-                            {resource.service_name}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {resource.service_version || 'No version'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-gray-500">
+          <Card>
+            <Flex direction="column" gap="4">
+              <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
+                <Heading size="4">Services</Heading>
+                <Text size="2" color="gray">Active services and their status</Text>
+              </Box>
+              <Box>
+                {resourcesLoading ? (
+                  <Flex direction="column" gap="3">
+                    {[...Array(3)].map((_, i) => (
+                      <Box key={i} className="loading-skeleton" style={{ height: '64px', borderRadius: 'var(--radius-2)' }} />
+                    ))}
+                  </Flex>
+                ) : resources.length > 0 ? (
+                  <Flex direction="column" gap="4">
+                    {resources.slice(0, 5).map((resource: any) => (
+                      <Flex key={resource.uuid} justify="between" align="center">
+                        <Flex align="center" gap="3">
+                          <Badge color="green" variant="soft" style={{ width: '8px', height: '8px', padding: 0 }} />
+                          <Box>
+                            <Text size="2" weight="medium">
+                              {resource.service_name}
+                            </Text>
+                            <Text size="1" color="gray">
+                              {resource.service_version || 'No version'}
+                            </Text>
+                          </Box>
+                        </Flex>
+                        <Text size="1" color="gray">
                           Last seen: {new Date(resource.last_seen).toLocaleTimeString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                  {resources.length > 5 && (
-                    <Button variant="ghost" className="w-full mt-4">
-                      View all {resources.length} services
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Icons.ComponentInstanceIcon className="mx-auto h-12 w-12 text-gray-400" />
-                  <p className="mt-2 text-sm text-gray-600">No services found</p>
-                  <p className="text-xs text-gray-500">
-                    Services will appear here once telemetry data is ingested
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+                        </Text>
+                      </Flex>
+                    ))}
+                    {resources.length > 5 && (
+                      <Button variant="ghost" style={{ width: '100%', marginTop: '16px' }}>
+                        View all {resources.length} services
+                      </Button>
+                    )}
+                  </Flex>
+                ) : (
+                  <Flex direction="column" align="center" justify="center" style={{ padding: '32px 0', textAlign: 'center' }}>
+                    <Icons.ComponentInstanceIcon width="48" height="48" color="var(--gray-8)" />
+                    <Text size="2" color="gray" style={{ marginTop: '8px' }}>No services found</Text>
+                    <Text size="1" color="gray">
+                      Services will appear here once telemetry data is ingested
+                    </Text>
+                  </Flex>
+                )}
+              </Box>
+            </Flex>
+          </Card>
 
           {/* Recent activity */}
-          <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">Recent Activity</h3>
-              <p className="text-sm text-gray-500">Latest traces and system events</p>
-            </div>
-            <div className="p-6">
-              <div className="text-center py-8">
-                <Icons.ActivityLogIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <p className="mt-2 text-sm text-gray-600">No recent activity</p>
-                <p className="text-xs text-gray-500">
+          <Card>
+            <Flex direction="column" gap="4">
+              <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
+                <Heading size="4">Recent Activity</Heading>
+                <Text size="2" color="gray">Latest traces and system events</Text>
+              </Box>
+              <Flex direction="column" align="center" justify="center" style={{ padding: '32px 0', textAlign: 'center' }}>
+                <Icons.ActivityLogIcon width="48" height="48" color="var(--gray-8)" />
+                <Text size="2" color="gray" style={{ marginTop: '8px' }}>No recent activity</Text>
+                <Text size="1" color="gray">
                   Activity will appear here once traces are received
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+                </Text>
+              </Flex>
+            </Flex>
+          </Card>
+        </Grid>
 
         {/* Quick actions */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Button variant="outline" className="justify-start">
-              <Icons.PlusIcon className="mr-2 h-4 w-4" />
-              Generate Ingest Token
-            </Button>
-            <Button variant="outline" className="justify-start">
-              <Icons.FileTextIcon className="mr-2 h-4 w-4" />
-              View Documentation
-            </Button>
-            <Button variant="outline" className="justify-start">
-              <Icons.DownloadIcon className="mr-2 h-4 w-4" />
-              Export Data
-            </Button>
-          </div>
-        </div>
-      </div>
+        <Card>
+          <Flex direction="column" gap="4">
+            <Heading size="4">Quick Actions</Heading>
+            <Grid columns={{ initial: '1', sm: '3' }} gap="4">
+              <Button variant="outline" style={{ justifyContent: 'flex-start' }}>
+                <Icons.PlusIcon />
+                Generate Ingest Token
+              </Button>
+              <Button variant="outline" style={{ justifyContent: 'flex-start' }}>
+                <Icons.FileTextIcon />
+                View Documentation
+              </Button>
+              <Button variant="outline" style={{ justifyContent: 'flex-start' }}>
+                <Icons.DownloadIcon />
+                Export Data
+              </Button>
+            </Grid>
+          </Flex>
+        </Card>
+      </Flex>
     </AppLayout>
   )
 }

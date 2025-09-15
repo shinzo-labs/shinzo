@@ -30,6 +30,12 @@ import {
   verifyIngestToken
 } from './handlers/ingest'
 
+import {
+  handleGenerateIngestToken,
+  handleFetchIngestTokens,
+  handleRevokeIngestToken
+} from './handlers/ingestToken'
+
 // Create Fastify instance
 const app = fastify({
   logger: pinoConfig('backend'),
@@ -128,6 +134,47 @@ app.get('/auth/fetch_user', async (request: AuthenticatedRequest, reply: Fastify
   }
 })
 
+// Ingest token management endpoints
+app.post('/auth/generate_ingest_token', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleGenerateIngestToken(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Generate ingest token error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.get('/auth/fetch_ingest_tokens', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleFetchIngestTokens(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch ingest tokens error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.post('/auth/revoke_ingest_token/:tokenUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { tokenUuid } = request.params as { tokenUuid: string }
+    const result = await handleRevokeIngestToken(request.user!.uuid, tokenUuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Revoke ingest token error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
 // Telemetry data retrieval endpoints
 app.get('/telemetry/fetch_resources', async (request: AuthenticatedRequest, reply: FastifyReply) => {
   const authenticated = await authenticateJWT(request, reply)
@@ -211,17 +258,17 @@ app.get('/telemetry/fetch_metrics', async (request: AuthenticatedRequest, reply:
 // Telemetry ingestion endpoints
 app.post('/telemetry/ingest_http', async (request: FastifyRequest, reply: FastifyReply) => {
   try {
-    const ingestTokenHeader = request.headers['ingest-token'] as string
+    const ingestTokenHeader = request.headers['Authorization'] as string
 
     if (!ingestTokenHeader) {
-      reply.status(401).send({ error: 'Missing ingest-token header' })
+      reply.status(401).send({ error: 'Missing Authorization header' })
       return
     }
 
     const ingestToken = await verifyIngestToken(ingestTokenHeader)
 
     if (!ingestToken) {
-      reply.status(401).send({ error: 'Invalid or inactive ingest token' })
+      reply.status(401).send({ error: 'Invalid or inactive Authorization token' })
       return
     }
 

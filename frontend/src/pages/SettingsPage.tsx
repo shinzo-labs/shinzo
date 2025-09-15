@@ -1,12 +1,8 @@
 import React, { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
-import { Button } from '../components/ui/Button'
-import { Input } from '../components/ui/Input'
+import { Button, TextField, Card, Flex, Text, Heading, Select, Box, Tabs, Switch } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
-import * as Switch from '@radix-ui/react-switch'
-import * as Select from '@radix-ui/react-select'
-import * as Tabs from '@radix-ui/react-tabs'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -34,6 +30,14 @@ interface Settings {
     enabled: boolean
     rate: number
   }
+}
+
+interface IngestToken {
+  uuid: string
+  ingest_token: string
+  status: 'live' | 'deprecated'
+  created_at: string
+  updated_at: string
 }
 
 export const SettingsPage: React.FC = () => {
@@ -78,6 +82,22 @@ export const SettingsPage: React.FC = () => {
     { enabled: !!token }
   )
 
+  const { data: ingestTokens, isLoading: tokensLoading } = useQuery(
+    ['ingestTokens'],
+    async () => {
+      const response = await fetch(`${API_BASE_URL}/auth/fetch_ingest_tokens`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      if (!response.ok) throw new Error('Failed to fetch ingest tokens')
+      const result = await response.json()
+      return result.tokens || []
+    },
+    { enabled: !!token }
+  )
+
   const updateSettingsMutation = useMutation(
     async (newSettings: Partial<Settings>) => {
       const response = await fetch(`${API_BASE_URL}/api/settings`, {
@@ -115,6 +135,44 @@ export const SettingsPage: React.FC = () => {
       onSuccess: () => {
         setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
         setIsChangingPassword(false)
+      },
+    }
+  )
+
+  const generateTokenMutation = useMutation(
+    async () => {
+      const response = await fetch(`${API_BASE_URL}/auth/generate_ingest_token`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      if (!response.ok) throw new Error('Failed to generate ingest token')
+      return response.json()
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['ingestTokens'])
+      },
+    }
+  )
+
+  const revokeTokenMutation = useMutation(
+    async (tokenUuid: string) => {
+      const response = await fetch(`${API_BASE_URL}/auth/revoke_ingest_token/${tokenUuid}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      if (!response.ok) throw new Error('Failed to revoke ingest token')
+      return response.json()
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['ingestTokens'])
       },
     }
   )
@@ -161,391 +219,440 @@ export const SettingsPage: React.FC = () => {
     changePasswordMutation.mutate(passwordForm)
   }
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+  }
+
   const isLoading = profileLoading || settingsLoading
 
   return (
     <AppLayout>
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Settings</h1>
+      <Flex direction="column" gap="6">
+        <Heading size="6">Settings</Heading>
 
-        <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <Tabs.List className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6">
-            <Tabs.Trigger
-              value="profile"
-              className="flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900"
-            >
-              <Icons.PersonIcon className="h-4 w-4 mr-2" />
+        <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
+          <Tabs.List>
+            <Tabs.Trigger value="profile">
+              <Icons.PersonIcon />
               Profile
             </Tabs.Trigger>
-            <Tabs.Trigger
-              value="notifications"
-              className="flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900"
-            >
-              <Icons.BellIcon className="h-4 w-4 mr-2" />
+            <Tabs.Trigger value="notifications">
+              <Icons.BellIcon />
               Notifications
             </Tabs.Trigger>
-            <Tabs.Trigger
-              value="data"
-              className="flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900"
-            >
-              <Icons.ArchiveIcon className="h-4 w-4 mr-2" />
+            <Tabs.Trigger value="tokens">
+              <Icons.TokensIcon />
+              Ingest Tokens
+            </Tabs.Trigger>
+            <Tabs.Trigger value="data">
+              <Icons.ArchiveIcon />
               Data & Retention
             </Tabs.Trigger>
           </Tabs.List>
 
-          <Tabs.Content value="profile" className="space-y-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Profile Information</h2>
+          <Tabs.Content value="profile">
+            <Flex direction="column" gap="6">
+              <Card>
+                <Flex direction="column" gap="4">
+                  <Heading size="4">Profile Information</Heading>
 
-              {isLoading ? (
-                <div className="animate-pulse space-y-4">
-                  <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                  <div className="h-10 bg-gray-200 rounded"></div>
-                  <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                  <div className="h-10 bg-gray-200 rounded"></div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email
-                    </label>
-                    <Input
-                      type="email"
-                      value={profile?.email || ''}
-                      disabled
-                      className="bg-gray-50"
-                    />
-                  </div>
+                  {isLoading ? (
+                    <Flex direction="column" gap="4">
+                      <Box className="animate-pulse">
+                        <Box style={{ height: '16px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '33%', marginBottom: '8px' }} />
+                        <Box style={{ height: '40px', backgroundColor: 'var(--gray-3)', borderRadius: '4px' }} />
+                      </Box>
+                      <Box className="animate-pulse">
+                        <Box style={{ height: '16px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '33%', marginBottom: '8px' }} />
+                        <Box style={{ height: '40px', backgroundColor: 'var(--gray-3)', borderRadius: '4px' }} />
+                      </Box>
+                    </Flex>
+                  ) : (
+                    <Flex direction="column" gap="4">
+                      <Flex direction="column" gap="2">
+                        <Text size="2" weight="medium">Email</Text>
+                        <TextField.Root
+                          type="email"
+                          value={profile?.email || ''}
+                          disabled
+                          style={{ backgroundColor: 'var(--gray-2)' }}
+                        />
+                      </Flex>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Name
-                    </label>
-                    <Input
-                      type="text"
-                      value={profile?.name || ''}
-                      placeholder="Your name"
-                    />
-                  </div>
+                      <Flex direction="column" gap="2">
+                        <Text size="2" weight="medium">Name</Text>
+                        <TextField.Root
+                          type="text"
+                          value={profile?.name || ''}
+                          placeholder="Your name"
+                        />
+                      </Flex>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Organization
-                    </label>
-                    <Input
-                      type="text"
-                      value={profile?.organization || ''}
-                      placeholder="Your organization"
-                    />
-                  </div>
+                      <Flex direction="column" gap="2">
+                        <Text size="2" weight="medium">Organization</Text>
+                        <TextField.Root
+                          type="text"
+                          value={profile?.organization || ''}
+                          placeholder="Your organization"
+                        />
+                      </Flex>
 
-                  <div className="pt-4">
-                    <Button>Save Changes</Button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Change Password</h2>
-
-              {!isChangingPassword ? (
-                <Button
-                  variant="outline"
-                  onClick={() => setIsChangingPassword(true)}
-                >
-                  Change Password
-                </Button>
-              ) : (
-                <form onSubmit={handlePasswordChange} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Current Password
-                    </label>
-                    <Input
-                      type="password"
-                      value={passwordForm.current_password}
-                      onChange={(e) => setPasswordForm(prev => ({ ...prev, current_password: e.target.value }))}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      New Password
-                    </label>
-                    <Input
-                      type="password"
-                      value={passwordForm.new_password}
-                      onChange={(e) => setPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Confirm New Password
-                    </label>
-                    <Input
-                      type="password"
-                      value={passwordForm.confirm_password}
-                      onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
-                      required
-                    />
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      type="submit"
-                      disabled={changePasswordMutation.isLoading}
-                    >
-                      {changePasswordMutation.isLoading ? 'Changing...' : 'Change Password'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => {
-                        setIsChangingPassword(false)
-                        setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Account Actions</h2>
-              <Button
-                variant="destructive"
-                onClick={logout}
-                className="flex items-center gap-2"
-              >
-                <Icons.ExitIcon className="h-4 w-4" />
-                Sign Out
-              </Button>
-            </div>
-          </Tabs.Content>
-
-          <Tabs.Content value="notifications" className="space-y-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Notification Preferences</h2>
-
-              {isLoading ? (
-                <div className="animate-pulse space-y-4">
-                  {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="flex items-center justify-between">
-                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                      <div className="h-6 bg-gray-200 rounded w-10"></div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium text-gray-900">Email Alerts</label>
-                      <p className="text-sm text-gray-500">Receive important notifications via email</p>
-                    </div>
-                    <Switch.Root
-                      checked={settings?.notifications?.email_alerts || false}
-                      onCheckedChange={(checked) => handleNotificationChange('email_alerts', checked)}
-                      className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-600 outline-none cursor-pointer"
-                    >
-                      <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform duration-100 transform data-[state=checked]:translate-x-5 will-change-transform" />
-                    </Switch.Root>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium text-gray-900">Trace Errors</label>
-                      <p className="text-sm text-gray-500">Get notified when traces have errors</p>
-                    </div>
-                    <Switch.Root
-                      checked={settings?.notifications?.trace_errors || false}
-                      onCheckedChange={(checked) => handleNotificationChange('trace_errors', checked)}
-                      className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-600 outline-none cursor-pointer"
-                    >
-                      <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform duration-100 transform data-[state=checked]:translate-x-5 will-change-transform" />
-                    </Switch.Root>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium text-gray-900">Performance Alerts</label>
-                      <p className="text-sm text-gray-500">Receive alerts for performance issues</p>
-                    </div>
-                    <Switch.Root
-                      checked={settings?.notifications?.performance_alerts || false}
-                      onCheckedChange={(checked) => handleNotificationChange('performance_alerts', checked)}
-                      className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-600 outline-none cursor-pointer"
-                    >
-                      <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform duration-100 transform data-[state=checked]:translate-x-5 will-change-transform" />
-                    </Switch.Root>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium text-gray-900">Weekly Reports</label>
-                      <p className="text-sm text-gray-500">Get weekly summary reports</p>
-                    </div>
-                    <Switch.Root
-                      checked={settings?.notifications?.weekly_reports || false}
-                      onCheckedChange={(checked) => handleNotificationChange('weekly_reports', checked)}
-                      className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-600 outline-none cursor-pointer"
-                    >
-                      <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform duration-100 transform data-[state=checked]:translate-x-5 will-change-transform" />
-                    </Switch.Root>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Tabs.Content>
-
-          <Tabs.Content value="data" className="space-y-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Data Retention</h2>
-
-              {isLoading ? (
-                <div className="animate-pulse space-y-4">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="flex items-center justify-between">
-                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                      <div className="h-10 bg-gray-200 rounded w-20"></div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium text-gray-900">Traces Retention (days)</label>
-                      <p className="text-sm text-gray-500">How long to keep trace data</p>
-                    </div>
-                    <Select.Root
-                      value={settings?.data_retention?.traces_days?.toString() || '30'}
-                      onValueChange={(value) => handleRetentionChange('traces_days', parseInt(value))}
-                    >
-                      <Select.Trigger className="inline-flex items-center justify-between px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[100px]">
-                        <Select.Value />
-                        <Select.Icon>
-                          <Icons.ChevronDownIcon className="h-4 w-4" />
-                        </Select.Icon>
-                      </Select.Trigger>
-                      <Select.Portal>
-                        <Select.Content className="bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                          <Select.Viewport className="p-1">
-                            {[7, 14, 30, 60, 90, 180].map((days) => (
-                              <Select.Item
-                                key={days}
-                                value={days.toString()}
-                                className="relative flex items-center px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded data-[highlighted]:bg-blue-100 data-[highlighted]:outline-none"
-                              >
-                                <Select.ItemText>{days} days</Select.ItemText>
-                                <Select.ItemIndicator className="absolute right-2">
-                                  <Icons.CheckIcon className="h-4 w-4" />
-                                </Select.ItemIndicator>
-                              </Select.Item>
-                            ))}
-                          </Select.Viewport>
-                        </Select.Content>
-                      </Select.Portal>
-                    </Select.Root>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium text-gray-900">Metrics Retention (days)</label>
-                      <p className="text-sm text-gray-500">How long to keep metrics data</p>
-                    </div>
-                    <Select.Root
-                      value={settings?.data_retention?.metrics_days?.toString() || '90'}
-                      onValueChange={(value) => handleRetentionChange('metrics_days', parseInt(value))}
-                    >
-                      <Select.Trigger className="inline-flex items-center justify-between px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[100px]">
-                        <Select.Value />
-                        <Select.Icon>
-                          <Icons.ChevronDownIcon className="h-4 w-4" />
-                        </Select.Icon>
-                      </Select.Trigger>
-                      <Select.Portal>
-                        <Select.Content className="bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                          <Select.Viewport className="p-1">
-                            {[30, 60, 90, 180, 365].map((days) => (
-                              <Select.Item
-                                key={days}
-                                value={days.toString()}
-                                className="relative flex items-center px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded data-[highlighted]:bg-blue-100 data-[highlighted]:outline-none"
-                              >
-                                <Select.ItemText>{days} days</Select.ItemText>
-                                <Select.ItemIndicator className="absolute right-2">
-                                  <Icons.CheckIcon className="h-4 w-4" />
-                                </Select.ItemIndicator>
-                              </Select.Item>
-                            ))}
-                          </Select.Viewport>
-                        </Select.Content>
-                      </Select.Portal>
-                    </Select.Root>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Sampling Configuration</h2>
-
-              {isLoading ? (
-                <div className="animate-pulse space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                    <div className="h-6 bg-gray-200 rounded w-10"></div>
-                  </div>
-                  <div className="h-10 bg-gray-200 rounded"></div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="text-sm font-medium text-gray-900">Enable Sampling</label>
-                      <p className="text-sm text-gray-500">Reduce data volume by sampling traces</p>
-                    </div>
-                    <Switch.Root
-                      checked={settings?.sampling?.enabled || false}
-                      onCheckedChange={(checked) => handleSamplingChange('enabled', checked)}
-                      className="w-11 h-6 bg-gray-200 rounded-full relative data-[state=checked]:bg-blue-600 outline-none cursor-pointer"
-                    >
-                      <Switch.Thumb className="block w-5 h-5 bg-white rounded-full transition-transform duration-100 transform data-[state=checked]:translate-x-5 will-change-transform" />
-                    </Switch.Root>
-                  </div>
-
-                  {settings?.sampling?.enabled && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Sampling Rate (%)
-                      </label>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={settings?.sampling?.rate || 10}
-                        onChange={(e) => handleSamplingChange('rate', parseInt(e.target.value))}
-                        className="w-32"
-                      />
-                      <p className="text-sm text-gray-500 mt-1">
-                        Percentage of traces to keep
-                      </p>
-                    </div>
+                      <Box style={{ paddingTop: '16px' }}>
+                        <Button>Save Changes</Button>
+                      </Box>
+                    </Flex>
                   )}
-                </div>
-              )}
-            </div>
+                </Flex>
+              </Card>
+
+              <Card>
+                <Flex direction="column" gap="4">
+                  <Heading size="4">Change Password</Heading>
+
+                  {!isChangingPassword ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsChangingPassword(true)}
+                    >
+                      Change Password
+                    </Button>
+                  ) : (
+                    <form onSubmit={handlePasswordChange}>
+                      <Flex direction="column" gap="4">
+                        <Flex direction="column" gap="2">
+                          <Text size="2" weight="medium">Current Password</Text>
+                          <TextField.Root
+                            type="password"
+                            value={passwordForm.current_password}
+                            onChange={(e) => setPasswordForm(prev => ({ ...prev, current_password: e.target.value }))}
+                            required
+                          />
+                        </Flex>
+
+                        <Flex direction="column" gap="2">
+                          <Text size="2" weight="medium">New Password</Text>
+                          <TextField.Root
+                            type="password"
+                            value={passwordForm.new_password}
+                            onChange={(e) => setPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
+                            required
+                          />
+                        </Flex>
+
+                        <Flex direction="column" gap="2">
+                          <Text size="2" weight="medium">Confirm New Password</Text>
+                          <TextField.Root
+                            type="password"
+                            value={passwordForm.confirm_password}
+                            onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
+                            required
+                          />
+                        </Flex>
+
+                        <Flex gap="2">
+                          <Button
+                            type="submit"
+                            disabled={changePasswordMutation.isLoading}
+                          >
+                            {changePasswordMutation.isLoading ? 'Changing...' : 'Change Password'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => {
+                              setIsChangingPassword(false)
+                              setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </Flex>
+                      </Flex>
+                    </form>
+                  )}
+                </Flex>
+              </Card>
+
+              <Card>
+                <Flex direction="column" gap="4">
+                  <Heading size="4">Account Actions</Heading>
+                  <Button
+                    color="red"
+                    onClick={logout}
+                  >
+                    <Icons.ExitIcon />
+                    Sign Out
+                  </Button>
+                </Flex>
+              </Card>
+            </Flex>
+          </Tabs.Content>
+
+          <Tabs.Content value="notifications">
+            <Card>
+              <Flex direction="column" gap="4">
+                <Heading size="4">Notification Preferences</Heading>
+
+                {isLoading ? (
+                  <Flex direction="column" gap="4">
+                    {[1, 2, 3, 4].map(i => (
+                      <Flex key={i} justify="between" align="center">
+                        <Box style={{ height: '16px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '50%' }} />
+                        <Box style={{ height: '24px', backgroundColor: 'var(--gray-3)', borderRadius: '12px', width: '40px' }} />
+                      </Flex>
+                    ))}
+                  </Flex>
+                ) : (
+                  <Flex direction="column" gap="4">
+                    <Flex justify="between" align="center">
+                      <Box>
+                        <Text size="2" weight="medium">Email Alerts</Text>
+                        <Text size="2" color="gray">Receive important notifications via email</Text>
+                      </Box>
+                      <Switch
+                        checked={settings?.notifications?.email_alerts || false}
+                        onCheckedChange={(checked) => handleNotificationChange('email_alerts', checked)}
+                      />
+                    </Flex>
+
+                    <Flex justify="between" align="center">
+                      <Box>
+                        <Text size="2" weight="medium">Trace Errors</Text>
+                        <Text size="2" color="gray">Get notified when traces have errors</Text>
+                      </Box>
+                      <Switch
+                        checked={settings?.notifications?.trace_errors || false}
+                        onCheckedChange={(checked) => handleNotificationChange('trace_errors', checked)}
+                      />
+                    </Flex>
+
+                    <Flex justify="between" align="center">
+                      <Box>
+                        <Text size="2" weight="medium">Performance Alerts</Text>
+                        <Text size="2" color="gray">Receive alerts for performance issues</Text>
+                      </Box>
+                      <Switch
+                        checked={settings?.notifications?.performance_alerts || false}
+                        onCheckedChange={(checked) => handleNotificationChange('performance_alerts', checked)}
+                      />
+                    </Flex>
+
+                    <Flex justify="between" align="center">
+                      <Box>
+                        <Text size="2" weight="medium">Weekly Reports</Text>
+                        <Text size="2" color="gray">Get weekly summary reports</Text>
+                      </Box>
+                      <Switch
+                        checked={settings?.notifications?.weekly_reports || false}
+                        onCheckedChange={(checked) => handleNotificationChange('weekly_reports', checked)}
+                      />
+                    </Flex>
+                  </Flex>
+                )}
+              </Flex>
+            </Card>
+          </Tabs.Content>
+
+          <Tabs.Content value="tokens">
+            <Card>
+              <Flex direction="column" gap="4">
+                <Flex justify="between" align="center">
+                  <Heading size="4">Ingest Tokens</Heading>
+                  <Button
+                    onClick={() => generateTokenMutation.mutate()}
+                    disabled={generateTokenMutation.isLoading}
+                  >
+                    <Icons.PlusIcon />
+                    {generateTokenMutation.isLoading ? 'Generating...' : 'Generate New Token'}
+                  </Button>
+                </Flex>
+
+                <Text size="2" color="gray">
+                  Ingest tokens are used to authenticate your applications when sending telemetry data to Shinzo.
+                </Text>
+
+                {tokensLoading ? (
+                  <Flex direction="column" gap="4">
+                    {[1, 2].map(i => (
+                      <Box key={i} className="animate-pulse" style={{ padding: '16px', backgroundColor: 'var(--gray-2)', borderRadius: '8px' }}>
+                        <Box style={{ height: '16px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '60%', marginBottom: '8px' }} />
+                        <Box style={{ height: '12px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '40%' }} />
+                      </Box>
+                    ))}
+                  </Flex>
+                ) : ingestTokens && ingestTokens.length > 0 ? (
+                  <Flex direction="column" gap="3">
+                    {ingestTokens.map((token: IngestToken) => (
+                      <Card key={token.uuid} style={{ backgroundColor: token.status === 'live' ? 'var(--green-2)' : 'var(--gray-3)' }}>
+                        <Flex direction="column" gap="3">
+                          <Flex justify="between" align="center">
+                            <Flex direction="column" gap="1">
+                              <Flex align="center" gap="2">
+                                <Text size="2" weight="medium">
+                                  {token.status === 'live' ? '🟢' : '🔴'}
+                                  {token.status === 'live' ? 'Active Token' : 'Deprecated Token'}
+                                </Text>
+                                {token.status === 'live' && (
+                                  <Text size="1" style={{ backgroundColor: 'var(--green-9)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>
+                                    LIVE
+                                  </Text>
+                                )}
+                              </Flex>
+                              <Text size="1" color="gray">
+                                Created: {new Date(token.created_at).toLocaleDateString()}
+                              </Text>
+                            </Flex>
+                            <Flex gap="2">
+                              <Button
+                                size="1"
+                                variant="ghost"
+                                onClick={() => copyToClipboard(token.ingest_token)}
+                              >
+                                <Icons.CopyIcon />
+                                Copy
+                              </Button>
+                              {token.status === 'live' && (
+                                <Button
+                                  size="1"
+                                  color="red"
+                                  variant="ghost"
+                                  onClick={() => revokeTokenMutation.mutate(token.uuid)}
+                                  disabled={revokeTokenMutation.isLoading}
+                                >
+                                  <Icons.TrashIcon />
+                                  Revoke
+                                </Button>
+                              )}
+                            </Flex>
+                          </Flex>
+                          <Box style={{ backgroundColor: 'var(--gray-1)', padding: '8px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all' }}>
+                            {token.ingest_token}
+                          </Box>
+                        </Flex>
+                      </Card>
+                    ))}
+                  </Flex>
+                ) : (
+                  <Box style={{ textAlign: 'center', padding: '32px' }}>
+                    <Text size="3" color="gray">No ingest tokens found</Text>
+                    <br />
+                    <Text size="2" color="gray">Generate your first token to start sending telemetry data</Text>
+                  </Box>
+                )}
+              </Flex>
+            </Card>
+          </Tabs.Content>
+
+          <Tabs.Content value="data">
+            <Flex direction="column" gap="6">
+              <Card>
+                <Flex direction="column" gap="4">
+                  <Heading size="4">Data Retention</Heading>
+
+                  {isLoading ? (
+                    <Flex direction="column" gap="4">
+                      {[1, 2, 3].map(i => (
+                        <Flex key={i} justify="between" align="center">
+                          <Box style={{ height: '16px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '50%' }} />
+                          <Box style={{ height: '40px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '80px' }} />
+                        </Flex>
+                      ))}
+                    </Flex>
+                  ) : (
+                    <Flex direction="column" gap="4">
+                      <Flex justify="between" align="center">
+                        <Box>
+                          <Text size="2" weight="medium">Traces Retention (days)</Text>
+                          <Text size="2" color="gray">How long to keep trace data</Text>
+                        </Box>
+                        <Select.Root
+                          value={settings?.data_retention?.traces_days?.toString() || '30'}
+                          onValueChange={(value) => handleRetentionChange('traces_days', parseInt(value))}
+                        >
+                          <Select.Trigger style={{ minWidth: '100px' }} />
+                          <Select.Content>
+                            {[7, 14, 30, 60, 90, 180].map((days) => (
+                              <Select.Item key={days} value={days.toString()}>
+                                {days} days
+                              </Select.Item>
+                            ))}
+                          </Select.Content>
+                        </Select.Root>
+                      </Flex>
+
+                      <Flex justify="between" align="center">
+                        <Box>
+                          <Text size="2" weight="medium">Metrics Retention (days)</Text>
+                          <Text size="2" color="gray">How long to keep metrics data</Text>
+                        </Box>
+                        <Select.Root
+                          value={settings?.data_retention?.metrics_days?.toString() || '90'}
+                          onValueChange={(value) => handleRetentionChange('metrics_days', parseInt(value))}
+                        >
+                          <Select.Trigger style={{ minWidth: '100px' }} />
+                          <Select.Content>
+                            {[30, 60, 90, 180, 365].map((days) => (
+                              <Select.Item key={days} value={days.toString()}>
+                                {days} days
+                              </Select.Item>
+                            ))}
+                          </Select.Content>
+                        </Select.Root>
+                      </Flex>
+                    </Flex>
+                  )}
+                </Flex>
+              </Card>
+
+              <Card>
+                <Flex direction="column" gap="4">
+                  <Heading size="4">Sampling Configuration</Heading>
+
+                  {isLoading ? (
+                    <Flex direction="column" gap="4">
+                      <Flex justify="between" align="center">
+                        <Box style={{ height: '16px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '50%' }} />
+                        <Box style={{ height: '24px', backgroundColor: 'var(--gray-3)', borderRadius: '12px', width: '40px' }} />
+                      </Flex>
+                      <Box style={{ height: '40px', backgroundColor: 'var(--gray-3)', borderRadius: '4px' }} />
+                    </Flex>
+                  ) : (
+                    <Flex direction="column" gap="4">
+                      <Flex justify="between" align="center">
+                        <Box>
+                          <Text size="2" weight="medium">Enable Sampling</Text>
+                          <Text size="2" color="gray">Reduce data volume by sampling traces</Text>
+                        </Box>
+                        <Switch
+                          checked={settings?.sampling?.enabled || false}
+                          onCheckedChange={(checked) => handleSamplingChange('enabled', checked)}
+                        />
+                      </Flex>
+
+                      {settings?.sampling?.enabled && (
+                        <Flex direction="column" gap="2">
+                          <Text size="2" weight="medium">Sampling Rate (%)</Text>
+                          <TextField.Root
+                            type="number"
+                            min="1"
+                            max="100"
+                            value={settings?.sampling?.rate || 10}
+                            onChange={(e) => handleSamplingChange('rate', parseInt(e.target.value))}
+                            style={{ width: '128px' }}
+                          />
+                          <Text size="1" color="gray">
+                            Percentage of traces to keep
+                          </Text>
+                        </Flex>
+                      )}
+                    </Flex>
+                  )}
+                </Flex>
+              </Card>
+            </Flex>
           </Tabs.Content>
         </Tabs.Root>
-      </div>
+      </Flex>
     </AppLayout>
   )
 }

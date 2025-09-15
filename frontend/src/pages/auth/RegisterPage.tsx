@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
+import { Button, TextField, Checkbox, Text, Heading, Card, Flex, Callout, Progress } from '@radix-ui/themes'
+import { CheckIcon, ExclamationTriangleIcon } from '@radix-ui/react-icons'
 
 export const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -29,7 +29,7 @@ export const RegisterPage: React.FC = () => {
 
   const passwordStrength = getPasswordStrength(password)
   const passwordStrengthLabels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong']
-  const passwordStrengthColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-blue-500', 'bg-green-500']
+  const passwordStrengthColors = ['red', 'orange', 'yellow', 'blue', 'green']
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -66,154 +66,167 @@ export const RegisterPage: React.FC = () => {
   if (success) {
     return (
       <div className="auth-page">
-        <div className="auth-card">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Account Created!
-            </h1>
-            <p className="text-gray-600 mb-6">
-              We've sent a verification email to <strong>{email}</strong>.
-              Please check your inbox and click the verification link.
-            </p>
+        <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
+          <Flex direction="column" gap="6" align="center">
+            <Flex
+              justify="center"
+              align="center"
+              style={{
+                width: '64px',
+                height: '64px',
+                backgroundColor: 'var(--green-3)',
+                borderRadius: '50%',
+                color: 'var(--green-9)'
+              }}
+            >
+              <CheckIcon width="32" height="32" />
+            </Flex>
 
-            <div className="bg-gray-50 border border-gray-200 rounded p-4 mb-6">
-              <p className="text-sm text-gray-700 mb-2">
-                <strong>For development purposes, your verification token is:</strong>
-              </p>
-              <code className="text-xs bg-white border border-gray-300 rounded px-2 py-1 font-mono">
-                {verificationToken}
-              </code>
-            </div>
+            <Flex direction="column" gap="2" align="center">
+              <Heading size="6">Account Created!</Heading>
+              <Text size="2" color="gray" align="center">
+                We've sent a verification email to <Text weight="bold">{email}</Text>.
+                Please check your inbox and click the verification link.
+              </Text>
+            </Flex>
 
-            <div className="space-y-4">
+            <Callout.Root color="gray" style={{ width: '100%' }}>
+              <Callout.Text>
+                <Text size="2" weight="bold">For development purposes, your verification token is:</Text>
+                <br />
+                <Text size="1" style={{ fontFamily: 'monospace', backgroundColor: 'var(--gray-2)', padding: '4px 8px', borderRadius: '4px' }}>
+                  {verificationToken}
+                </Text>
+              </Callout.Text>
+            </Callout.Root>
+
+            <Flex direction="column" gap="4" style={{ width: '100%' }}>
               <Button
+                size="3"
+                style={{ width: '100%' }}
                 onClick={() => navigate('/verify', { state: { email } })}
-                className="w-full"
               >
                 Verify Email Now
               </Button>
 
-              <p className="text-sm text-gray-600">
+              <Text size="2" color="gray" align="center">
                 Didn't receive the email?{' '}
-                <button className="text-blue-600 hover:text-blue-500 font-medium">
+                <Text style={{ color: 'var(--accent-9)', cursor: 'pointer' }}>
                   Resend verification email
-                </button>
-              </p>
-            </div>
-          </div>
-        </div>
+                </Text>
+              </Text>
+            </Flex>
+          </Flex>
+        </Card>
       </div>
     )
   }
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Create Account
-          </h1>
-          <p className="text-gray-600">
-            Get started with Shinzo platform
-          </p>
-        </div>
+      <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
+        <Flex direction="column" gap="6">
+          <Flex direction="column" gap="2" align="center">
+            <Heading size="6">Create Account</Heading>
+            <Text size="2" color="gray">
+              Get started with Shinzo platform
+            </Text>
+          </Flex>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email"
-            required
-          />
+          <form onSubmit={handleSubmit}>
+            <Flex direction="column" gap="4">
+              <Flex direction="column" gap="2">
+                <Text size="2" weight="medium">Email</Text>
+                <TextField.Root
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  required
+                />
+              </Flex>
 
-          <div className="space-y-2">
-            <Input
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Create a password"
-              required
-            />
-            {password && (
-              <div className="space-y-1">
-                <div className="flex items-center space-x-1">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-1 w-full rounded ${
-                        i < passwordStrength ? passwordStrengthColors[passwordStrength - 1] : 'bg-gray-200'
-                      }`}
+              <Flex direction="column" gap="2">
+                <Text size="2" weight="medium">Password</Text>
+                <TextField.Root
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a password"
+                  required
+                />
+                {password && (
+                  <Flex direction="column" gap="1">
+                    <Progress
+                      value={(passwordStrength / 5) * 100}
+                      color={passwordStrengthColors[passwordStrength - 1] as any}
+                      size="1"
                     />
-                  ))}
-                </div>
-                <p className="text-xs text-gray-600">
-                  Password strength: {passwordStrength > 0 ? passwordStrengthLabels[passwordStrength - 1] : 'None'}
-                </p>
-              </div>
-            )}
-          </div>
+                    <Text size="1" color="gray">
+                      Password strength: {passwordStrength > 0 ? passwordStrengthLabels[passwordStrength - 1] : 'None'}
+                    </Text>
+                  </Flex>
+                )}
+              </Flex>
 
-          <Input
-            label="Confirm Password"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="Confirm your password"
-            required
-          />
+              <Flex direction="column" gap="2">
+                <Text size="2" weight="medium">Confirm Password</Text>
+                <TextField.Root
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  required
+                />
+              </Flex>
 
-          <div className="flex items-start">
-            <input
-              id="agree-terms"
-              type="checkbox"
-              checked={agreeToTerms}
-              onChange={(e) => setAgreeToTerms(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-0.5"
-            />
-            <label htmlFor="agree-terms" className="ml-2 text-sm text-gray-700">
-              I agree to the{' '}
-              <Link to="/terms" className="text-blue-600 hover:text-blue-500">
-                Terms of Service
-              </Link>{' '}
-              and{' '}
-              <Link to="/privacy" className="text-blue-600 hover:text-blue-500">
-                Privacy Policy
-              </Link>
-            </label>
-          </div>
+              <Flex align="start" gap="2">
+                <Checkbox
+                  id="agree-terms"
+                  checked={agreeToTerms}
+                  onCheckedChange={(checked) => setAgreeToTerms(checked === true)}
+                  style={{ marginTop: '2px' }}
+                />
+                <Text size="2" color="gray">
+                  I agree to the{' '}
+                  <Link to="/terms" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link to="/privacy" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
+                    Privacy Policy
+                  </Link>
+                </Text>
+              </Flex>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
+              {error && (
+                <Callout.Root color="red">
+                  <Callout.Icon>
+                    <ExclamationTriangleIcon />
+                  </Callout.Icon>
+                  <Callout.Text>{error}</Callout.Text>
+                </Callout.Root>
+              )}
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading}
-          >
-            {loading ? 'Creating account...' : 'Create account'}
-          </Button>
-        </form>
+              <Button
+                type="submit"
+                size="3"
+                style={{ width: '100%' }}
+                disabled={loading}
+              >
+                {loading ? 'Creating account...' : 'Create account'}
+              </Button>
+            </Flex>
+          </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
+          <Text size="2" color="gray" align="center">
             Already have an account?{' '}
-            <Link to="/login" className="text-blue-600 hover:text-blue-500 font-medium">
+            <Link to="/login" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
               Sign in
             </Link>
-          </p>
-        </div>
-      </div>
+          </Text>
+        </Flex>
+      </Card>
     </div>
   )
 }

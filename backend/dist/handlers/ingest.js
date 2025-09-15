@@ -6,9 +6,10 @@ const logger_1 = require("../logger");
 const dbClient_1 = require("../dbClient");
 const verifyIngestToken = async (token) => {
     try {
+        const tokenWithoutBearer = token.replace('Bearer ', '');
         const ingestToken = await models_1.IngestToken.findOne({
             where: {
-                ingest_token: token,
+                ingest_token: tokenWithoutBearer,
                 status: 'live'
             }
         });

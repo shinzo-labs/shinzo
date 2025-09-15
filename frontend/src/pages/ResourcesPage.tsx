@@ -1,10 +1,8 @@
 import React, { useState } from 'react'
 import { useQuery } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
-import { Button } from '../components/ui/Button'
-import { Input } from '../components/ui/Input'
+import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
-import * as Select from '@radix-ui/react-select'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -87,190 +85,170 @@ export const ResourcesPage: React.FC = () => {
 
   return (
     <AppLayout>
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Resources</h1>
-          <div className="text-sm text-gray-500">
+      <Flex direction="column" gap="6">
+        <Flex justify="between" align="center">
+          <Heading size="6">Resources</Heading>
+          <Text size="2" color="gray">
             {totalCount} total resources
-          </div>
-        </div>
+          </Text>
+        </Flex>
 
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Icons.MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="text"
-                    placeholder="Search resources by name or attributes..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
+        <Card>
+          <Flex direction="column" gap="4">
+            <Text size="3" weight="medium">Search Resources</Text>
+            <Flex gap="4" align="end" wrap="wrap">
+              <Flex direction="column" gap="2" style={{ flex: 1, minWidth: '300px' }}>
+                <Text size="2" weight="medium">Search</Text>
+                <TextField.Root
+                  placeholder="Search resources by name or attributes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                >
+                  <TextField.Slot>
+                    <Icons.MagnifyingGlassIcon height="16" width="16" />
+                  </TextField.Slot>
+                </TextField.Root>
+              </Flex>
 
-              <Select.Root value={selectedType} onValueChange={setSelectedType}>
-                <Select.Trigger className="inline-flex items-center justify-between px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[140px]">
-                  <Select.Value />
-                  <Select.Icon>
-                    <Icons.ChevronDownIcon className="h-4 w-4" />
-                  </Select.Icon>
-                </Select.Trigger>
-                <Select.Portal>
-                  <Select.Content className="bg-white border border-gray-200 rounded-md shadow-lg z-50">
-                    <Select.Viewport className="p-1">
-                      {resourceTypes.map((type) => (
-                        <Select.Item
-                          key={type}
-                          value={type}
-                          className="relative flex items-center px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 rounded data-[highlighted]:bg-blue-100 data-[highlighted]:outline-none"
-                        >
-                          <Select.ItemText>
-                            {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
-                          </Select.ItemText>
-                          <Select.ItemIndicator className="absolute right-2">
-                            <Icons.CheckIcon className="h-4 w-4" />
-                          </Select.ItemIndicator>
-                        </Select.Item>
-                      ))}
-                    </Select.Viewport>
+              <Flex direction="column" gap="2" style={{ minWidth: '140px' }}>
+                <Text size="2" weight="medium">Type</Text>
+                <Select.Root value={selectedType} onValueChange={setSelectedType}>
+                  <Select.Trigger style={{ width: '100%' }} />
+                  <Select.Content>
+                    {resourceTypes.map((type) => (
+                      <Select.Item key={type} value={type}>
+                        {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
+                      </Select.Item>
+                    ))}
                   </Select.Content>
-                </Select.Portal>
-              </Select.Root>
+                </Select.Root>
+              </Flex>
 
-              <Button onClick={handleSearch} className="flex items-center gap-2">
-                <Icons.MagnifyingGlassIcon className="h-4 w-4" />
+              <Button onClick={handleSearch}>
+                <Icons.MagnifyingGlassIcon />
                 Search
               </Button>
-            </div>
-          </div>
+            </Flex>
+          </Flex>
+        </Card>
 
-          <div className="overflow-x-auto">
+        <Card>
+          <Flex direction="column" gap="4">
+            <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
+              <Heading size="4">
+                Resources ({resources.length})
+              </Heading>
+            </Box>
+
             {isLoading ? (
-              <div className="flex items-center justify-center py-12">
+              <Flex justify="center" align="center" style={{ padding: '48px 0' }}>
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
+              </Flex>
             ) : error ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Icons.ExclamationTriangleIcon className="h-12 w-12 text-red-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Error loading resources</h3>
-                  <p className="text-gray-500">Please try again later</p>
-                </div>
-              </div>
+              <Flex direction="column" align="center" justify="center" style={{ padding: '48px 0', textAlign: 'center' }}>
+                <Icons.ExclamationTriangleIcon width="48" height="48" color="var(--red-9)" />
+                <Heading size="4" style={{ marginTop: '16px', marginBottom: '8px' }}>Error loading resources</Heading>
+                <Text color="gray">Please try again later</Text>
+              </Flex>
             ) : resources.length === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <Icons.CubeIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No resources found</h3>
-                  <p className="text-gray-500">
-                    {searchTerm || selectedType !== 'all'
-                      ? 'Try adjusting your search criteria'
-                      : 'No resources have been detected yet'}
-                  </p>
-                </div>
-              </div>
+              <Flex direction="column" align="center" justify="center" style={{ padding: '48px 0', textAlign: 'center' }}>
+                <Icons.CubeIcon width="48" height="48" color="var(--gray-8)" />
+                <Heading size="4" style={{ marginTop: '16px', marginBottom: '8px' }}>No resources found</Heading>
+                <Text color="gray">
+                  {searchTerm || selectedType !== 'all'
+                    ? 'Try adjusting your search criteria'
+                    : 'No resources have been detected yet'}
+                </Text>
+              </Flex>
             ) : (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Attributes
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Created
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+              <Table.Root>
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeaderCell>Name</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Type</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Attributes</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Created</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Actions</Table.ColumnHeaderCell>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
                   {resources.map((resource: Resource) => (
-                    <tr key={resource.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {resource.name}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          ID: {resource.id}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <Table.Row key={resource.id}>
+                      <Table.RowHeaderCell>
+                        <Flex direction="column" gap="1">
+                          <Text size="2" weight="medium">{resource.name}</Text>
+                          <Text size="1" color="gray">ID: {resource.id}</Text>
+                        </Flex>
+                      </Table.RowHeaderCell>
+                      <Table.Cell>
+                        <Badge color="blue" variant="soft">
                           {resource.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 max-w-xs truncate">
-                          {formatAttributes(resource.attributes)}
-                        </div>
-                        {Object.keys(resource.attributes).length > 3 && (
-                          <div className="text-xs text-gray-500">
-                            +{Object.keys(resource.attributes).length - 3} more
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(resource.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-blue-600 hover:text-blue-900"
-                        >
+                        </Badge>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Flex direction="column" gap="1">
+                          <Text size="2" style={{ maxWidth: '300px' }} truncate>
+                            {formatAttributes(resource.attributes)}
+                          </Text>
+                          {Object.keys(resource.attributes).length > 3 && (
+                            <Text size="1" color="gray">
+                              +{Object.keys(resource.attributes).length - 3} more
+                            </Text>
+                          )}
+                        </Flex>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text size="2" color="gray">
+                          {new Date(resource.created_at).toLocaleDateString()}
+                        </Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Button variant="ghost" size="1">
                           View Details
                         </Button>
-                      </td>
-                    </tr>
+                      </Table.Cell>
+                    </Table.Row>
                   ))}
-                </tbody>
-              </table>
+                </Table.Body>
+              </Table.Root>
             )}
-          </div>
+          </Flex>
+        </Card>
 
-          {totalPages > 1 && (
-            <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-between">
-              <div className="text-sm text-gray-700">
+        {totalPages > 1 && (
+          <Card>
+            <Flex justify="between" align="center">
+              <Text size="2" color="gray">
                 Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} results
-              </div>
-              <div className="flex items-center space-x-2">
+              </Text>
+              <Flex align="center" gap="2">
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="1"
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
                 >
-                  <Icons.ChevronLeftIcon className="h-4 w-4" />
+                  <Icons.ChevronLeftIcon />
                   Previous
                 </Button>
-                <span className="text-sm text-gray-700">
+                <Text size="2" color="gray">
                   Page {currentPage} of {totalPages}
-                </span>
+                </Text>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="1"
                   onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
                 >
                   Next
-                  <Icons.ChevronRightIcon className="h-4 w-4" />
+                  <Icons.ChevronRightIcon />
                 </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+              </Flex>
+            </Flex>
+          </Card>
+        )}
+      </Flex>
     </AppLayout>
   )
 }

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
-import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
+import { Button, TextField, Text, Heading, Card, Flex, Callout } from '@radix-ui/themes'
+import { CheckIcon, ExclamationTriangleIcon } from '@radix-ui/react-icons'
 
 export const VerifyPage: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -72,103 +72,116 @@ export const VerifyPage: React.FC = () => {
   if (success) {
     return (
       <div className="auth-page">
-        <div className="auth-card">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Email Verified!
-            </h1>
-            <p className="text-gray-600 mb-6">
-              Your email has been successfully verified. You can now sign in to your account.
-            </p>
-            <p className="text-sm text-gray-500">
-              Redirecting to login page in 3 seconds...
-            </p>
-          </div>
-        </div>
+        <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
+          <Flex direction="column" gap="6" align="center">
+            <Flex
+              justify="center"
+              align="center"
+              style={{
+                width: '64px',
+                height: '64px',
+                backgroundColor: 'var(--green-3)',
+                borderRadius: '50%',
+                color: 'var(--green-9)'
+              }}
+            >
+              <CheckIcon width="32" height="32" />
+            </Flex>
+
+            <Flex direction="column" gap="2" align="center">
+              <Heading size="6">Email Verified!</Heading>
+              <Text size="2" color="gray" align="center">
+                Your email has been successfully verified. You can now sign in to your account.
+              </Text>
+              <Text size="1" color="gray" align="center">
+                Redirecting to login page in 3 seconds...
+              </Text>
+            </Flex>
+          </Flex>
+        </Card>
       </div>
     )
   }
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Verify Your Email
-          </h1>
-          <p className="text-gray-600">
-            Enter your email and verification token to complete account setup
-          </p>
-        </div>
+      <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
+        <Flex direction="column" gap="6">
+          <Flex direction="column" gap="2" align="center">
+            <Heading size="6">Verify Your Email</Heading>
+            <Text size="2" color="gray" align="center">
+              Enter your email and verification token to complete account setup
+            </Text>
+          </Flex>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter your email"
-            required
-          />
+          <form onSubmit={handleSubmit}>
+            <Flex direction="column" gap="4">
+              <Flex direction="column" gap="2">
+                <Text size="2" weight="medium">Email</Text>
+                <TextField.Root
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  required
+                />
+              </Flex>
 
-          <Input
-            label="Verification Token"
-            type="text"
-            value={verificationToken}
-            onChange={(e) => setVerificationToken(e.target.value)}
-            placeholder="Enter verification token"
-            required
-          />
+              <Flex direction="column" gap="2">
+                <Text size="2" weight="medium">Verification Token</Text>
+                <TextField.Root
+                  type="text"
+                  value={verificationToken}
+                  onChange={(e) => setVerificationToken(e.target.value)}
+                  placeholder="Enter verification token"
+                  required
+                />
+              </Flex>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
+              {error && (
+                <Callout.Root color="red">
+                  <Callout.Icon>
+                    <ExclamationTriangleIcon />
+                  </Callout.Icon>
+                  <Callout.Text>{error}</Callout.Text>
+                </Callout.Root>
+              )}
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading}
-          >
-            {loading ? 'Verifying...' : 'Verify Email'}
-          </Button>
-        </form>
+              <Button
+                type="submit"
+                size="3"
+                style={{ width: '100%' }}
+                disabled={loading}
+              >
+                {loading ? 'Verifying...' : 'Verify Email'}
+              </Button>
+            </Flex>
+          </form>
 
-        <div className="mt-6 space-y-4">
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
+          <Flex direction="column" gap="4" align="center">
+            <Text size="2" color="gray" align="center">
               Didn't receive the verification email?{' '}
-              <button className="text-blue-600 hover:text-blue-500 font-medium">
+              <Text style={{ color: 'var(--accent-9)', cursor: 'pointer' }}>
                 Resend verification email
-              </button>
-            </p>
-          </div>
+              </Text>
+            </Text>
 
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
+            <Text size="2" color="gray" align="center">
               Need help?{' '}
-              <Link to="/support" className="text-blue-600 hover:text-blue-500 font-medium">
+              <Link to="/support" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
                 Contact support
               </Link>
-            </p>
-          </div>
+            </Text>
 
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
+            <Text size="2" color="gray" align="center">
               Want to use a different email?{' '}
-              <Link to="/register" className="text-blue-600 hover:text-blue-500 font-medium">
+              <Link to="/register" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
                 Create new account
               </Link>
-            </p>
-          </div>
-        </div>
-      </div>
+            </Text>
+          </Flex>
+        </Flex>
+      </Card>
     </div>
   )
 }

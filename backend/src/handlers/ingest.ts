@@ -15,9 +15,10 @@ import { sequelize } from '../dbClient'
 
 export const verifyIngestToken = async (token: string): Promise<IngestToken | null> => {
   try {
+    const tokenWithoutBearer = token.replace('Bearer ', '')
     const ingestToken = await IngestToken.findOne({
       where: {
-        ingest_token: token,
+        ingest_token: tokenWithoutBearer,
         status: 'live'
       }
     })

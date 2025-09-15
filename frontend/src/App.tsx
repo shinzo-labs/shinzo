@@ -1,9 +1,9 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from 'react-query'
+import { Theme } from '@radix-ui/themes'
 import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { Toast } from './components/ui/Toast'
 
 // Auth pages
 import { LoginPage } from './pages/auth/LoginPage'
@@ -32,56 +32,57 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
-          <div className="App">
-            <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/verify" element={<VerifyPage />} />
+    <Theme>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <Router>
+            <div className="App">
+              <Routes>
+                {/* Public routes */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/verify" element={<VerifyPage />} />
 
-              {/* Protected routes */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <DashboardPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/traces" element={
-                <ProtectedRoute>
-                  <TracesPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/spans" element={
-                <ProtectedRoute>
-                  <SpansPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/metrics" element={
-                <ProtectedRoute>
-                  <MetricsPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/resources" element={
-                <ProtectedRoute>
-                  <ResourcesPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <SettingsPage />
-                </ProtectedRoute>
-              } />
+                {/* Protected routes */}
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
+                    <DashboardPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/traces" element={
+                  <ProtectedRoute>
+                    <TracesPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/spans" element={
+                  <ProtectedRoute>
+                    <SpansPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/metrics" element={
+                  <ProtectedRoute>
+                    <MetricsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/resources" element={
+                  <ProtectedRoute>
+                    <ResourcesPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/settings" element={
+                  <ProtectedRoute>
+                    <SettingsPage />
+                  </ProtectedRoute>
+                } />
 
-              {/* Default redirect */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-            <Toast />
-          </div>
-        </Router>
-      </AuthProvider>
-    </QueryClientProvider>
+                {/* Default redirect */}
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </div>
+          </Router>
+        </AuthProvider>
+      </QueryClientProvider>
+    </Theme>
   )
 }
 

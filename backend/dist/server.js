@@ -14,6 +14,7 @@ const auth_1 = require("./middleware/auth");
 const auth_2 = require("./handlers/auth");
 const telemetry_1 = require("./handlers/telemetry");
 const ingest_1 = require("./handlers/ingest");
+const ingestToken_1 = require("./handlers/ingestToken");
 // Create Fastify instance
 const app = (0, fastify_1.default)({
     logger: (0, logger_1.pinoConfig)('backend'),
@@ -109,6 +110,47 @@ app.get('/auth/fetch_user', async (request, reply) => {
         reply.status(500).send({ error: 'Internal server error' });
     }
 });
+// Ingest token management endpoints
+app.post('/auth/generate_ingest_token', async (request, reply) => {
+    const authenticated = await (0, auth_1.authenticateJWT)(request, reply);
+    if (!authenticated)
+        return;
+    try {
+        const result = await (0, ingestToken_1.handleGenerateIngestToken)(request.user.uuid);
+        reply.status(result.status || 200).send(result.response);
+    }
+    catch (error) {
+        logger_1.logger.error({ message: 'Generate ingest token error', error });
+        reply.status(500).send({ error: 'Internal server error' });
+    }
+});
+app.get('/auth/fetch_ingest_tokens', async (request, reply) => {
+    const authenticated = await (0, auth_1.authenticateJWT)(request, reply);
+    if (!authenticated)
+        return;
+    try {
+        const result = await (0, ingestToken_1.handleFetchIngestTokens)(request.user.uuid);
+        reply.status(result.status || 200).send(result.response);
+    }
+    catch (error) {
+        logger_1.logger.error({ message: 'Fetch ingest tokens error', error });
+        reply.status(500).send({ error: 'Internal server error' });
+    }
+});
+app.post('/auth/revoke_ingest_token/:tokenUuid', async (request, reply) => {
+    const authenticated = await (0, auth_1.authenticateJWT)(request, reply);
+    if (!authenticated)
+        return;
+    try {
+        const { tokenUuid } = request.params;
+        const result = await (0, ingestToken_1.handleRevokeIngestToken)(request.user.uuid, tokenUuid);
+        reply.status(result.status || 200).send(result.response);
+    }
+    catch (error) {
+        logger_1.logger.error({ message: 'Revoke ingest token error', error });
+        reply.status(500).send({ error: 'Internal server error' });
+    }
+});
 // Telemetry data retrieval endpoints
 app.get('/telemetry/fetch_resources', async (request, reply) => {
     const authenticated = await (0, auth_1.authenticateJWT)(request, reply);
@@ -192,14 +234,14 @@ app.get('/telemetry/fetch_metrics', async (request, reply) => {
 // Telemetry ingestion endpoints
 app.post('/telemetry/ingest_http', async (request, reply) => {
     try {
-        const ingestTokenHeader = request.headers['ingest-token'];
+        const ingestTokenHeader = request.headers['Authorization'];
         if (!ingestTokenHeader) {
-            reply.status(401).send({ error: 'Missing ingest-token header' });
+            reply.status(401).send({ error: 'Missing Authorization header' });
             return;
         }
         const ingestToken = await (0, ingest_1.verifyIngestToken)(ingestTokenHeader);
         if (!ingestToken) {
-            reply.status(401).send({ error: 'Invalid or inactive ingest token' });
+            reply.status(401).send({ error: 'Invalid or inactive Authorization token' });
             return;
         }
         const result = await (0, ingest_1.handleIngestHTTP)(ingestToken, request.body);
