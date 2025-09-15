@@ -1,119 +1,273 @@
 import fastify, { FastifyReply, FastifyRequest } from 'fastify'
 import fastifyCors from '@fastify/cors'
-import { PORT } from './config'
+import fastifyRateLimit from '@fastify/rate-limit'
+import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE } from './config'
 import { logger, pinoConfig } from './logger'
-import { sendReply } from './utils'
-import * as yup from 'yup'
-import { handleLogin, loginSchema } from './handlers/user'
-import { authenticateRequest } from './handlers/authentication'
-// import {
-//   createDashboard,
-//   createDashboardSchema,
-//   updateDashboard,
-//   updateDashboardSchema,
-//   deleteDashboard,
-//   deleteDashboardSchema,
-//   readDashboard,
-//   readDashboardSchema,
-//   toggleStar,
-//   toggleStarSchema,
-//   listDashboards,
-//   listDashboardsSchema
-// } from './handlers/dashboards'
-// import {
-//   callBlockchain,
-//   callBlockchainSchema,
-//   listBlockchains,
-//   listBlockchainsSchema
-// } from './handlers/blockchain'
-import { User } from './models'
+import { sequelize } from './dbClient'
+import { authenticateJWT, authenticateIngestToken, AuthenticatedRequest } from './middleware/auth'
 
-type Response<ResponseBody extends any> = {
-  response: ResponseBody | string
-  error?: boolean
-  status?: number
-}
+// Import handlers
+import {
+  handleCreateUser,
+  createUserSchema,
+  handleLogin,
+  loginSchema,
+  handleVerifyUser,
+  verifyUserSchema,
+  handleFetchUser
+} from './handlers/auth'
 
-type RequestHandler<RequestBodySchema extends yup.ISchema<any, any, any, any>, ResponseBody> = (
-  userUuid: User["uuid"],
-  request: yup.InferType<RequestBodySchema>
-) => Promise<Response<ResponseBody>>
+import {
+  handleFetchResources,
+  handleFetchTraces,
+  handleFetchSpans,
+  handleFetchMetrics,
+  fetchDataSchema
+} from './handlers/telemetry'
 
+import {
+  handleIngestHTTP,
+  verifyIngestToken
+} from './handlers/ingest'
+
+// Create Fastify instance
 const app = fastify({
   logger: pinoConfig('backend'),
-  bodyLimit: 1024 * 1024 * 16, // 16 MiB
+  bodyLimit: parseInt(MAX_PAYLOAD_SIZE.replace('mb', '')) * 1024 * 1024,
 })
 
-const requestMiddleware = <T extends yup.ISchema<any, any, any, any>>(
-  requestHandler: RequestHandler<T, any>,
-  requestBodySchema: T,
-  requireAuth: boolean = true
-) => async (request: FastifyRequest, reply: FastifyReply) => {
+// Register plugins
+app.register(fastifyCors, {
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE']
+})
+
+app.register(fastifyRateLimit, {
+  max: RATE_LIMIT_MAX,
+  timeWindow: RATE_LIMIT_WINDOW
+})
+
+// Health check endpoint
+app.get('/health', async (request, reply) => {
   try {
-    const { body } = request
-    logger.debug({ request: body })
-
-    let validatedBody;
-    try {
-      validatedBody = await requestBodySchema.validate(body, {
-        abortEarly: false,
-        stripUnknown: true,
-        strict: false
-      })
-    } catch (error: any) {
-      logger.warn({ validation_error: error.message })
-      return sendReply({
-        body: error.message,
-        reply,
-        status: 400,
-        error: true
-      })
-    }
-   
-    let userUuid = null
-    if (requireAuth) {
-      userUuid = await authenticateRequest(request, reply)
-      if (!userUuid) return
-    }
-
-    const { response, error, status } = await requestHandler(userUuid as string, validatedBody)
-    sendReply({ body: response, error, status, reply })
-  } catch (error: any) {
-    logger.error({ message: 'Request error', error })
-    sendReply({
-      body: 'Internal server error',
-      reply,
-      status: 500,
-      error: true
-    })
+    await sequelize.authenticate()
+    reply.send({ status: 'ok', timestamp: new Date().toISOString() })
+  } catch (error) {
+    reply.status(503).send({ status: 'error', message: 'Database connection failed' })
   }
-}
+})
 
-// Route definitions
-// app.post('/blockchain/call', requestMiddleware(callBlockchain, callBlockchainSchema))
-// app.post('/blockchain/list', requestMiddleware(listBlockchains, listBlockchainsSchema))
-// app.post('/dashboard/create', requestMiddleware(createDashboard, createDashboardSchema))
-// app.post('/dashboard/delete', requestMiddleware(deleteDashboard, deleteDashboardSchema))
-// app.post('/dashboard/list', requestMiddleware(listDashboards, listDashboardsSchema))
-// app.post('/dashboard/read', requestMiddleware(readDashboard, readDashboardSchema))
-// app.post('/dashboard/toggleStar', requestMiddleware(toggleStar, toggleStarSchema))
-// app.post('/dashboard/update', requestMiddleware(updateDashboard, updateDashboardSchema))
-// app.post('/user/login', requestMiddleware(handleLogin, loginSchema, false))
+// Authentication endpoints
+app.post('/auth/create_user', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const validatedBody = await createUserSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
 
+    const result = await handleCreateUser(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Create user error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.post('/auth/login', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const validatedBody = await loginSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleLogin(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Login error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.post('/auth/verify_user', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const validatedBody = await verifyUserSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleVerifyUser(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Verify user error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/auth/fetch_user', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleFetchUser(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch user error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// Telemetry data retrieval endpoints
+app.get('/telemetry/fetch_resources', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleFetchResources(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch resources error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.get('/telemetry/fetch_traces', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedQuery = await fetchDataSchema.validate(request.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleFetchTraces(request.user!.uuid, validatedQuery)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch traces error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/telemetry/fetch_spans', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedQuery = await fetchDataSchema.validate(request.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleFetchSpans(request.user!.uuid, validatedQuery)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch spans error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/telemetry/fetch_metrics', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedQuery = await fetchDataSchema.validate(request.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleFetchMetrics(request.user!.uuid, validatedQuery)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch metrics error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+// Telemetry ingestion endpoints
+app.post('/telemetry/ingest_http', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const ingestTokenHeader = request.headers['ingest-token'] as string
+
+    if (!ingestTokenHeader) {
+      reply.status(401).send({ error: 'Missing ingest-token header' })
+      return
+    }
+
+    const ingestToken = await verifyIngestToken(ingestTokenHeader)
+
+    if (!ingestToken) {
+      reply.status(401).send({ error: 'Invalid or inactive ingest token' })
+      return
+    }
+
+    const result = await handleIngestHTTP(ingestToken, request.body as any)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Ingest HTTP error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// Error handler
+app.setErrorHandler((error, request, reply) => {
+  logger.error({ message: 'Unhandled error', error, url: request.url })
+  reply.status(500).send({ error: 'Internal server error' })
+})
+
+// Start server
 const start = async () => {
   try {
-    // Register CORS plugin
-    await app.register(fastifyCors, {
-      origin: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE']
-    })
+    // Test database connection
+    await sequelize.authenticate()
+    logger.info('Database connection established successfully')
 
+    // Start server
     logger.info({ msg: `Starting service on port ${PORT}` })
     await app.listen({ port: parseInt(PORT), host: '0.0.0.0' })
   } catch (error) {
-    logger.error(error)
+    logger.error({ message: 'Failed to start server', error })
     process.exit(1)
   }
 }
+
+// Handle graceful shutdown
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully')
+  await app.close()
+  await sequelize.close()
+  process.exit(0)
+})
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down gracefully')
+  await app.close()
+  await sequelize.close()
+  process.exit(0)
+})
 
 start()
