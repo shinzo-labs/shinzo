@@ -1,0 +1,38 @@
+{
+    "name": "shinzo-backend",
+    "version": "1.0.0",
+    "main": "server.js",
+    "scripts": {
+        "test": "jest",
+        "build": "tsc -p tsconfig.json",
+        "start": "node -r ts-node/register --env-file=.env src/server.ts",
+        "start:prod": "NODE_PATH=./dist node dist/server.js"
+    },
+    "author": "Austin Born (austin@shinzolabs.com)",
+    "dependencies": {
+        "@babel/core": "^7.26.9",
+        "@fastify/cors": "^10.1.0",
+        "axios": "^1.8.1",
+        "dotenv": "^16.4.7",
+        "fastify": "^5.2.1",
+        "pg": "^8.13.3",
+        "pino": "^9.6.0",
+        "sequelize": "^6.37.5",
+        "uuid": "^11.1.0",
+        "yup": "^1.6.1"
+    },
+    "devDependencies": {
+        "@babel/preset-env": "^7.26.9",
+        "@babel/preset-typescript": "^7.26.0",
+        "@types/node": "^22.13.5",
+        "@types/sequelize": "^4.28.20",
+        "@types/uuid": "^10.0.0",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.7.3"
+    },
+    "jest": {
+        "testPathIgnorePatterns": [
+            "dist"
+        ]
+    }
+}
