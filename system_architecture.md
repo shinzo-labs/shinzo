@@ -105,7 +105,6 @@ The frontend must implement efficient data fetching patterns with caching and re
 | apiBaseUrl | string | Yes | - | Base URL for the ingestion service API |
 | refreshInterval | number | No | 30000 | Dashboard refresh interval (ms) |
 | maxCacheAge | number | No | 300000 | Maximum cache age (ms) |
-| enableRealtime | boolean | No | false | Enable WebSocket real-time updates |
 | defaultTimeRange | string | No | "1h" | Default time range for queries |
 
 ### P2: Dashboards
@@ -489,7 +488,6 @@ Ingests OpenTelemetry data via gRPC following OTLP specification.
 - **Recent Activity Feed**
   - Latest traces and errors
   - Service deployment notifications
-  - System alerts and warnings
 
 ### Traces Page (`/traces`)
 **Purpose:** Distributed tracing analysis and visualization
@@ -626,7 +624,6 @@ Ingests OpenTelemetry data via gRPC following OTLP specification.
 **State Management:**
 - React Context for user authentication state
 - Local storage for basic user preferences
-- Real-time updates via WebSocket connections (when enabled)
 
 **Data Fetching:**
 - React Query for efficient API calls and caching
