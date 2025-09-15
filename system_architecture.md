@@ -84,25 +84,15 @@ The service must provide RESTful APIs for querying telemetry data with support f
 
 #### UI Component Library
 
-**Primary Choice: Material-UI (MUI)**
-- `@mui/material`: Core Material-UI components
-- `@mui/icons-material`: Material Design icons
-- `@mui/mui-x`: Advanced data and chart components
+**Primary Choice: Radix-UI**
+- `@radix-ui`: Core Material-UI components
 
-**Rationale:** Material-UI provides comprehensive, accessible components with excellent TypeScript support. The data grid and chart components are particularly well-suited for observability dashboards.
+**Rationale:** Radix-UI provides comprehensive, accessible components with excellent TypeScript support. The data grid and chart components are particularly well-suited for observability dashboards.
 
 **Alternatives:**
 - Ant Design: Rich component set but heavier bundle size
 - Chakra UI: Simpler API but fewer specialized components for data visualization
-
-#### Styling/Theme
-
-**Primary Choice: Emotion**
-- `@emotion/react`: CSS-in-JS library
-- `@emotion/styled`: Styled components
-
-**Alternative:**
-- Tailwind CSS: Utility-first approach for custom designs
+- Pure Material UI: More basic, but reliable
 
 ### P2: Frontend Data Fetching
 
