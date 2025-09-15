@@ -417,3 +417,230 @@ Ingests OpenTelemetry data via gRPC following OTLP specification.
 - gRPC status codes following OTLP specification
 - Supports streaming and batch ingestion modes
 - Automatic compression and connection pooling
+
+# Frontend Layout
+
+## Authentication Flow
+
+### Login Page (`/login`)
+**Purpose:** User authentication and account access
+
+**Components:**
+- **Login Form**
+  - Email input field with validation
+  - Password input field with show/hide toggle
+  - "Remember me" checkbox for persistent sessions
+  - Login button with loading state
+  - Link to registration page
+- **Status Messages**
+  - Error display for invalid credentials
+  - Success confirmation for login
+  - Rate limiting notifications
+- **Footer**
+  - Links to privacy policy and terms
+
+### Registration Page (`/register`)
+**Purpose:** New user account creation
+
+**Components:**
+- **Registration Form**
+  - Email input with real-time validation
+  - Password input with strength indicator
+  - Confirm password field
+  - Terms of service checkbox
+  - Create account button
+- **Email Verification**
+  - Post-registration verification instructions
+  - Resend verification email option
+  - Verification status display
+
+### Email Verification Page (`/verify`)
+**Purpose:** Email verification completion
+
+**Components:**
+- **Verification Status**
+  - Success/failure message display
+  - Token validation feedback
+  - Redirect to login after success
+- **Troubleshooting**
+  - Resend verification email option
+  - Contact support link
+  - Return to registration option
+
+## Main Application
+
+### Dashboard/Home Page (`/dashboard`)
+**Purpose:** Overview of telemetry data and system health
+
+**Layout:**
+- **Header Navigation**
+  - Shinzo logo and branding
+  - User profile dropdown (logout, settings)
+  - Ingest token status indicator
+- **Quick Stats Cards**
+  - Total traces (last 24h)
+  - Active services count
+  - Error rate percentage
+  - Average response time
+- **Service Overview**
+  - Service list with health status indicators
+  - Recent activity timeline
+  - Resource utilization metrics
+- **Recent Activity Feed**
+  - Latest traces and errors
+  - Service deployment notifications
+  - System alerts and warnings
+
+### Traces Page (`/traces`)
+**Purpose:** Distributed tracing analysis and visualization
+
+**Components:**
+- **Trace Search & Filters**
+  - Time range selector (last 1h, 6h, 24h, custom)
+  - Service name filter dropdown
+  - Operation name filter
+  - Status filter (ok, error, timeout)
+  - Duration range slider (min/max milliseconds)
+- **Trace List Table**
+  - Columns: Start Time, Service, Operation, Duration, Status, Span Count
+  - Sortable by any column
+  - Pagination controls (limit: 100, offset navigation)
+  - Row click to view trace details
+- **Trace Detail Modal**
+  - Waterfall chart showing span timeline
+  - Span hierarchy tree view
+  - Individual span details panel
+  - Span attributes and metadata
+  - Error stack traces when available
+
+### Spans Page (`/spans`)
+**Purpose:** Individual span analysis and debugging
+
+**Components:**
+- **Span Search Interface**
+  - Time range controls
+  - Trace ID input for specific trace spans
+  - Service and operation filters
+  - Span kind filter (server, client, producer, etc.)
+  - Status code filter
+- **Span Data Table**
+  - Columns: Start Time, Trace ID, Operation, Duration, Status, Service
+  - Include attributes toggle
+  - Export functionality
+  - Bulk operations for analysis
+- **Span Details Panel**
+  - Complete span metadata
+  - Parent-child relationships
+  - Attribute key-value pairs
+  - Timing breakdown and performance metrics
+
+### Metrics Page (`/metrics`)
+**Purpose:** Metrics visualization and monitoring
+
+**Components:**
+- **Metrics Explorer**
+  - Metric name search and autocomplete
+  - Service filter
+  - Metric type filter (counter, gauge, histogram)
+  - Time range selection
+- **Visualization Panels**
+  - Time-series line charts
+  - Histogram distributions
+  - Basic gauge displays
+  - Simple comparison charts
+- **Metrics Data Display**
+  - Simple chart visualization
+  - Basic metric information display
+
+### Resources Page (`/resources`)
+**Purpose:** Service discovery and resource management
+
+**Components:**
+- **Resource Overview**
+  - Service topology map
+  - Resource health indicators
+  - First/last seen timestamps
+- **Resource Details**
+  - Service metadata display
+  - Version history and deployment tracking
+  - Resource attributes and configuration
+  - Associated traces and metrics links
+- **Service Map**
+  - Interactive visualization of service relationships
+  - Dependency mapping
+  - Performance overlay (latency, error rates)
+
+### Settings Page (`/settings`)
+**Purpose:** User account and telemetry configuration
+
+**Sections:**
+- **Account Settings**
+  - Profile information (email, verification status)
+- **Ingest Token Management**
+  - Current active tokens list
+  - Token status (live, deprecated)
+  - Generate new token button
+  - Revoke token functionality
+  - Token usage statistics
+- **Data Management**
+  - Basic data viewing options
+  - Privacy and data management information
+
+## Shared Components
+
+### Navigation Sidebar
+**Always Visible:**
+- Dashboard link with activity indicator
+- Traces navigation with error count badge
+- Spans analysis link
+- Metrics monitoring link
+- Resources overview link
+- Settings gear icon
+
+### Header Bar
+**Global Elements:**
+- Shinzo platform branding
+- Global search functionality
+- Time range selector (affects all pages)
+- User profile menu
+- Help and documentation links
+- System status indicator
+
+### Loading States
+**For Data-Heavy Operations:**
+- Skeleton screens for table loading
+- Progress indicators for large queries
+- Graceful error handling with retry options
+- Empty states with helpful guidance
+
+### Responsive Design
+**Mobile Considerations:**
+- Collapsible sidebar navigation
+- Touch-friendly controls
+- Simplified tables with expandable rows
+- Swipe gestures for navigation
+- Optimized charts for smaller screens
+
+## Technical Implementation Notes
+
+**State Management:**
+- React Context for user authentication state
+- Local storage for basic user preferences
+- Real-time updates via WebSocket connections (when enabled)
+
+**Data Fetching:**
+- React Query for efficient API calls and caching
+- Pagination controls integrated with backend limits
+- Optimistic updates for better user experience
+
+**Accessibility:**
+- ARIA labels for screen readers
+- Keyboard navigation support
+- High contrast mode compatibility
+- Focus management for modals and overlays
+
+**Performance:**
+- Virtualized tables for large datasets
+- Lazy loading for heavy components
+- Memoized components to prevent unnecessary re-renders
+- Progressive enhancement for chart visualizations
