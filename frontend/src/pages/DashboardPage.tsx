@@ -189,26 +189,6 @@ export const DashboardPage: React.FC = () => {
           </Card>
         </Grid>
 
-        {/* Quick actions */}
-        <Card>
-          <Flex direction="column" gap="4">
-            <Heading size="4">Quick Actions</Heading>
-            <Grid columns={{ initial: '1', sm: '3' }} gap="4">
-              <Button variant="outline" style={{ justifyContent: 'flex-start' }}>
-                <Icons.PlusIcon />
-                Generate Ingest Token
-              </Button>
-              <Button variant="outline" style={{ justifyContent: 'flex-start' }}>
-                <Icons.FileTextIcon />
-                View Documentation
-              </Button>
-              <Button variant="outline" style={{ justifyContent: 'flex-start' }}>
-                <Icons.DownloadIcon />
-                Export Data
-              </Button>
-            </Grid>
-          </Flex>
-        </Card>
       </Flex>
     </AppLayout>
   )
