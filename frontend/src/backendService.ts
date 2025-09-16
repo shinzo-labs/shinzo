@@ -1,178 +1,249 @@
-import { getAuthHeader } from './utils'
-import { BACKEND_URL } from './config'
-// import { BlockchainQuery, GridItem, Dashboard, NetworkList } from './types'
+import { API_BASE_URL } from './config'
 
-// const handleAuthError = () => {
-//   document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;'
-//   window.location.reload()
-// }
+interface User {
+  uuid: string
+  email: string
+  verified: boolean
+  created_at?: string
+  updated_at?: string
+}
 
-// const dashboardService = {
-//   async list(filters?: { owner_uuid?: string }): Promise<Dashboard[]> {
-//     try {
-//       const response = await fetch(`${BACKEND_URL}/dashboard/list`, {
-//         method: 'POST',
-//         headers: getAuthHeader(),
-//         body: JSON.stringify(filters || {})
-//       })
+interface AuthResponse {
+  token: string
+  user: User
+}
 
-//       if (response.status === 401) {
-//         handleAuthError()
-//         return []
-//       }
+interface CreateUserRequest {
+  email: string
+  password: string
+}
 
-//       const data = await response.json()
-//       return data.error ? [] : data.body.dashboards
-//     } catch (error) {
-//       console.error('Error in list:', error)
-//       return []
-//     }
-//   },
+interface CreateUserResponse {
+  message: string
+  uuid: string
+  email: string
+  verification_token: string
+}
 
-//   async read(uuid: string): Promise<{
-//     error?: boolean
-//     body?: Dashboard
-//   }> {
-//     try {
-//       const response = await fetch(`${BACKEND_URL}/dashboard/read`, {
-//         method: 'POST',
-//         headers: getAuthHeader(),
-//         body: JSON.stringify({ uuid })
-//       })
+interface LoginRequest {
+  email: string
+  password: string
+}
 
-//       if (response.status === 401) {
-//         handleAuthError()
-//         return { error: true }
-//       }
+interface VerifyUserRequest {
+  email: string
+  verification_token: string
+}
 
-//       const data = await response.json()
+interface VerifyUserResponse {
+  message: string
+  verified: boolean
+}
 
-//       if (data.body?.config?.gridItems) {
-//         const typedGridItems: Record<string, GridItem> = {}
-//         Object.entries(data.body.config.gridItems).forEach(([id, item]) => {
-//           const gridItem = item as GridItem
-//           typedGridItems[id] = gridItem
-//         })
-//         data.body.config.gridItems = typedGridItems
-//       }
+interface IngestToken {
+  uuid: string
+  ingest_token: string
+  status: 'live' | 'deprecated'
+  created_at: string
+  updated_at: string
+}
 
-//       if (data.body?.config?.blockchainQueries) {
-//         const typedBlockchainQueries: Record<string, BlockchainQuery> = {}
-//         Object.entries(data.body.config.blockchainQueries).forEach(([id, query]) => {
-//           const blockchainQuery = query as BlockchainQuery
-//           typedBlockchainQueries[id] = blockchainQuery
-//         })
-//         data.body.config.blockchainQueries = typedBlockchainQueries
-//       }
+interface Resource {
+  uuid: string
+  service_name: string
+  attributes: Record<string, any>
+  created_at: string
+}
 
-//       return data
-//     } catch (error) {
-//       console.error('Error in read:', error)
-//       return { error: true }
-//     }
-//   },
+interface Trace {
+  uuid: string
+  start_time: string
+  end_time: string | null
+  service_name: string
+  operation_name: string | null
+  status: string | null
+  span_count: number
+  duration_ms: number | null
+}
 
-//   async update(uuid: string, updates: Partial<Dashboard>): Promise<void> {
-//     await fetch(`${BACKEND_URL}/dashboard/update`, {
-//       method: 'POST',
-//       headers: getAuthHeader(),
-//       body: JSON.stringify({ uuid, ...updates })
-//     })
-//   },
+interface Span {
+  uuid: string
+  trace_uuid: string
+  parent_span_uuid: string | null
+  start_time: string
+  end_time: string | null
+  service_name: string
+  operation_name: string | null
+  status: string | null
+  duration_ms: number | null
+  attributes: Record<string, any>
+}
 
-//   async create(name: string): Promise<{
-//     error?: boolean
-//     body?: Dashboard
-//   }> {
-//     const response = await fetch(`${BACKEND_URL}/dashboard/create`, {
-//       method: 'POST',
-//       headers: getAuthHeader(),
-//       body: JSON.stringify({
-//         name,
-//         visibility: 'private',
-//         config: {
-//           gridItems: {},
-//           blockchainQueries: {}
-//         }
-//       })
-//     })
-//     return await response.json()
-//   },
+interface Metric {
+  uuid: string
+  name: string
+  description: string | null
+  unit: string | null
+  metric_type: string
+  timestamp: string
+  value: number
+  scope_name: string | null
+  scope_version: string | null
+  created_at: string
+  updated_at: string
+  attributes: Array<{
+    key: string
+    value: string
+  }>
+}
 
-//   async delete(uuid: string): Promise<void> {
-//     await fetch(`${BACKEND_URL}/dashboard/delete`, {
-//       method: 'POST',
-//       headers: getAuthHeader(),
-//       body: JSON.stringify({ uuid })
-//     })
-//   },
+interface TelemetryQueryParams {
+  start_time: string
+  end_time: string
+  limit?: number
+  offset?: number
+}
 
-//   async toggleStar(uuid: string): Promise<{
-//     error?: boolean
-//     body?: {
-//       uuid: string
-//       stars_count: number
-//       isStarred: boolean
-//     }
-//   }> {
-//     const response = await fetch(`${BACKEND_URL}/dashboard/toggleStar`, {
-//       method: 'POST',
-//       headers: getAuthHeader(),
-//       body: JSON.stringify({ uuid })
-//     })
-//     return await response.json()
-//   }
-// }
+const getAuthHeaders = (token: string) => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${token}`
+})
 
-// const userService = {
-//   async login(message: string, signature: string): Promise<{
-//     error?: boolean
-//     body?: {
-//       token: string
-//       uuid: string
-//     }
-//   }> {
-//     const response = await fetch(`${BACKEND_URL}/user/login`, {
-//       method: 'POST',
-//       headers: { 'Content-Type': 'application/json' },
-//       body: JSON.stringify({ message, signature })
-//     })
-//     return await response.json()
-//   }
-// }
+const handleResponse = async (response: Response) => {
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(errorText || `HTTP ${response.status}`)
+  }
+  return response.json()
+}
 
-// const blockchainService = {
-//   async getNetworks(): Promise<NetworkList> {
-//     const response = await fetch(`${BACKEND_URL}/blockchain/list`, {
-//       method: 'POST',
-//       headers: getAuthHeader(),
-//       body: JSON.stringify({})
-//     })
-//     const data = await response.json()
-//     return data.error ? {} : data.body
-//   },
+export const healthService = {
+  async check(): Promise<{ status: string; timestamp: string }> {
+    const response = await fetch(`${API_BASE_URL}/health`)
+    return handleResponse(response)
+  }
+}
 
-//   async callBlockchain(request: {
-//     address: string
-//     functionSignature: string
-//     network: string
-//     networkEnv: string
-//     params: any[]
-//   }): Promise<{
-//     error?: boolean
-//     body?: any
-//   }> {
-//     const response = await fetch(`${BACKEND_URL}/blockchain/call`, {
-//       method: 'POST',
-//       headers: getAuthHeader(),
-//       body: JSON.stringify(request)
-//     })
-//     return await response.json()
-//   }
-// }
+export const authService = {
+  async createUser(userData: CreateUserRequest): Promise<CreateUserResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/create_user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    })
+    return handleResponse(response)
+  },
 
-// export {
-//   blockchainService,
-//   dashboardService,
-//   userService
-// }
+  async login(credentials: LoginRequest): Promise<AuthResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    })
+    return handleResponse(response)
+  },
+
+  async verifyUser(verificationData: VerifyUserRequest): Promise<VerifyUserResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/verify_user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(verificationData)
+    })
+    return handleResponse(response)
+  },
+
+  async fetchUser(token: string): Promise<User> {
+    const response = await fetch(`${API_BASE_URL}/auth/fetch_user`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  }
+}
+
+export const ingestTokenService = {
+  async generate(token: string): Promise<{ token: string; uuid: string; status: string; created_at: string }> {
+    const response = await fetch(`${API_BASE_URL}/auth/generate_ingest_token`, {
+      method: 'POST',
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async fetchAll(token: string): Promise<IngestToken[]> {
+    const response = await fetch(`${API_BASE_URL}/auth/fetch_ingest_tokens`, {
+      headers: getAuthHeaders(token)
+    })
+    const result = await handleResponse(response)
+    return result.tokens || []
+  },
+
+  async revoke(token: string, tokenUuid: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/auth/revoke_ingest_token/${tokenUuid}`, {
+      method: 'POST',
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  }
+}
+
+export const telemetryService = {
+  async fetchResources(token: string): Promise<Resource[]> {
+    const response = await fetch(`${API_BASE_URL}/telemetry/fetch_resources`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async fetchTraces(token: string, params: TelemetryQueryParams): Promise<Trace[]> {
+    const queryParams = new URLSearchParams()
+    queryParams.append('start_time', params.start_time)
+    queryParams.append('end_time', params.end_time)
+    if (params.limit) queryParams.append('limit', params.limit.toString())
+    if (params.offset) queryParams.append('offset', params.offset.toString())
+
+    const response = await fetch(`${API_BASE_URL}/telemetry/fetch_traces?${queryParams}`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async fetchSpans(token: string, params: TelemetryQueryParams): Promise<Span[]> {
+    const queryParams = new URLSearchParams()
+    queryParams.append('start_time', params.start_time)
+    queryParams.append('end_time', params.end_time)
+    if (params.limit) queryParams.append('limit', params.limit.toString())
+    if (params.offset) queryParams.append('offset', params.offset.toString())
+
+    const response = await fetch(`${API_BASE_URL}/telemetry/fetch_spans?${queryParams}`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async fetchMetrics(token: string, params: TelemetryQueryParams): Promise<Metric[]> {
+    const queryParams = new URLSearchParams()
+    queryParams.append('start_time', params.start_time)
+    queryParams.append('end_time', params.end_time)
+    if (params.limit) queryParams.append('limit', params.limit.toString())
+    if (params.offset) queryParams.append('offset', params.offset.toString())
+
+    const response = await fetch(`${API_BASE_URL}/telemetry/fetch_metrics?${queryParams}`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  }
+}
+
+export const ingestService = {
+  async ingestHTTP(ingestToken: string, data: any): Promise<{ status: string }> {
+    const response = await fetch(`${API_BASE_URL}/telemetry/ingest_http`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': ingestToken
+      },
+      body: JSON.stringify(data)
+    })
+    return handleResponse(response)
+  }
+}

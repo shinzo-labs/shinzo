@@ -5,6 +5,7 @@ import { Button, TextField, Card, Flex, Text, Heading, Select, Box, Tabs, Switch
 import * as Icons from '@radix-ui/react-icons'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
+import { ingestTokenService } from '../backendService'
 
 interface UserProfile {
   id: string
@@ -55,7 +56,7 @@ export const SettingsPage: React.FC = () => {
   const { data: profile, isLoading: profileLoading } = useQuery(
     ['profile'],
     async () => {
-      const response = await fetch(`${API_BASE_URL}/api/profile`, {
+      const response = await fetch(`${API_BASE_URL}/auth/fetch_user`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -67,89 +68,68 @@ export const SettingsPage: React.FC = () => {
     { enabled: !!token }
   )
 
-  const { data: settings, isLoading: settingsLoading } = useQuery(
-    ['settings'],
-    async () => {
-      const response = await fetch(`${API_BASE_URL}/api/settings`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-      if (!response.ok) throw new Error('Failed to fetch settings')
-      return response.json()
+  // Stub out settings until backend implements these endpoints
+  const settings: Settings = {
+    notifications: {
+      email_alerts: false,
+      trace_errors: true,
+      performance_alerts: true,
+      weekly_reports: false
     },
-    { enabled: !!token }
-  )
+    data_retention: {
+      traces_days: 30,
+      metrics_days: 90,
+      logs_days: 7
+    },
+    sampling: {
+      enabled: false,
+      rate: 10
+    }
+  }
+  const settingsLoading = false
 
   const { data: ingestTokens, isLoading: tokensLoading } = useQuery(
     ['ingestTokens'],
     async () => {
-      const response = await fetch(`${API_BASE_URL}/auth/fetch_ingest_tokens`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-      if (!response.ok) throw new Error('Failed to fetch ingest tokens')
-      const result = await response.json()
-      return result.tokens || []
+      return ingestTokenService.fetchAll(token!)
     },
     { enabled: !!token }
   )
 
+  // Stub out settings update until backend implements these endpoints
   const updateSettingsMutation = useMutation(
     async (newSettings: Partial<Settings>) => {
-      const response = await fetch(`${API_BASE_URL}/api/settings`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newSettings),
-      })
-      if (!response.ok) throw new Error('Failed to update settings')
-      return response.json()
+      // TODO: Implement settings update when backend adds these endpoints
+      console.log('Settings update requested (not yet implemented):', newSettings)
+      return { success: true }
     },
     {
       onSuccess: () => {
-        queryClient.invalidateQueries(['settings'])
+        // Settings are stubbed, so no need to invalidate queries
+        console.log('Settings would be updated in backend')
       },
     }
   )
 
+  // Stub out password change until backend implements this endpoint
   const changePasswordMutation = useMutation(
     async (passwordData: typeof passwordForm) => {
-      const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(passwordData),
-      })
-      if (!response.ok) throw new Error('Failed to change password')
-      return response.json()
+      // TODO: Implement password change when backend adds this endpoint
+      console.log('Password change requested (not yet implemented):', { email: passwordData.current_password ? '[REDACTED]' : '' })
+      return { success: true }
     },
     {
       onSuccess: () => {
         setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
         setIsChangingPassword(false)
+        console.log('Password would be changed in backend')
       },
     }
   )
 
   const generateTokenMutation = useMutation(
     async () => {
-      const response = await fetch(`${API_BASE_URL}/auth/generate_ingest_token`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-      if (!response.ok) throw new Error('Failed to generate ingest token')
-      return response.json()
+      return ingestTokenService.generate(token!)
     },
     {
       onSuccess: () => {
@@ -160,15 +140,7 @@ export const SettingsPage: React.FC = () => {
 
   const revokeTokenMutation = useMutation(
     async (tokenUuid: string) => {
-      const response = await fetch(`${API_BASE_URL}/auth/revoke_ingest_token/${tokenUuid}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-      if (!response.ok) throw new Error('Failed to revoke ingest token')
-      return response.json()
+      return ingestTokenService.revoke(token!, tokenUuid)
     },
     {
       onSuccess: () => {
@@ -569,7 +541,7 @@ export const SettingsPage: React.FC = () => {
                           value={settings?.data_retention?.traces_days?.toString() || '30'}
                           onValueChange={(value) => handleRetentionChange('traces_days', parseInt(value))}
                         >
-                          <Select.Trigger style={{ minWidth: '100px' }} />
+                          <Select.Trigger placeholder="Select days" style={{ minWidth: '100px' }} />
                           <Select.Content>
                             {[7, 14, 30, 60, 90, 180].map((days) => (
                               <Select.Item key={days} value={days.toString()}>
@@ -589,7 +561,7 @@ export const SettingsPage: React.FC = () => {
                           value={settings?.data_retention?.metrics_days?.toString() || '90'}
                           onValueChange={(value) => handleRetentionChange('metrics_days', parseInt(value))}
                         >
-                          <Select.Trigger style={{ minWidth: '100px' }} />
+                          <Select.Trigger placeholder="Select days" style={{ minWidth: '100px' }} />
                           <Select.Content>
                             {[30, 60, 90, 180, 365].map((days) => (
                               <Select.Item key={days} value={days.toString()}>

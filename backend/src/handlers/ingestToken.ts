@@ -1,5 +1,6 @@
 import * as yup from 'yup'
 import { IngestToken } from '../models/open_telemetry/IngestToken'
+import { User } from '../models/main/User'
 import { logger } from '../logger'
 import * as crypto from 'crypto'
 
@@ -10,14 +11,30 @@ function generateIngestToken(): string {
 
 export const handleGenerateIngestToken = async (userUuid: string) => {
   try {
+    logger.info({ message: 'Starting ingest token generation', userUuid })
+
+    // Verify user exists
+    const user = await User.findByPk(userUuid)
+    if (!user) {
+      logger.error({ message: 'User not found for ingest token generation', userUuid })
+      return {
+        response: 'User not found',
+        error: true,
+        status: 404
+      }
+    }
+    logger.info({ message: 'User found', userUuid, userEmail: user.email })
+
     // Deprecate existing live tokens for this user
-    await IngestToken.update(
+    const updateResult = await IngestToken.update(
       { status: 'deprecated' },
       { where: { user_uuid: userUuid, status: 'live' } }
     )
+    logger.info({ message: 'Deprecated existing tokens', userUuid, updatedCount: updateResult[0] })
 
     // Generate new token
     const newTokenValue = generateIngestToken()
+    logger.info({ message: 'Generated new token value', userUuid, tokenLength: newTokenValue.length })
 
     const newToken = await IngestToken.create({
       user_uuid: userUuid,
@@ -38,8 +55,8 @@ export const handleGenerateIngestToken = async (userUuid: string) => {
       status: 201
     }
 
-  } catch (error) {
-    logger.error({ message: 'Error generating ingest token', error, userUuid })
+  } catch (error: any) {
+    logger.error({ message: 'Error generating ingest token', error: error.message, stack: error.stack, userUuid })
     return {
       response: 'Error generating ingest token',
       error: true,

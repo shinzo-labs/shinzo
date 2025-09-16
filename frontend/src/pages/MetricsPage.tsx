@@ -3,19 +3,23 @@ import { useQuery } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
-import { API_BASE_URL, DEFAULT_TIME_RANGE } from '../config'
+import { DEFAULT_TIME_RANGE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
+import { telemetryService } from '../backendService'
 import { format, subHours, subDays } from 'date-fns'
 
 interface Metric {
   uuid: string
-  metric_name: string
+  name: string
   description: string | null
   unit: string | null
-  type: string
-  start_time_unix: string
+  metric_type: string
+  timestamp: string
   value: number
-  resource_uuid: string
+  scope_name: string | null
+  scope_version: string | null
+  created_at: string
+  updated_at: string
   attributes: Array<{
     key: string
     value: string
@@ -26,7 +30,7 @@ export const MetricsPage: React.FC = () => {
   const { token } = useAuth()
   const [timeRange, setTimeRange] = useState(DEFAULT_TIME_RANGE)
   const [metricNameFilter, setMetricNameFilter] = useState('')
-  const [typeFilter, setTypeFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
 
   // Calculate time range
   const getTimeRange = () => {
@@ -64,25 +68,17 @@ export const MetricsPage: React.FC = () => {
     ['metrics', timeRange],
     async () => {
       const timeParams = getTimeRange()
-      const params = new URLSearchParams(timeParams)
-
-      const response = await fetch(`${API_BASE_URL}/telemetry/fetch_metrics?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      if (!response.ok) throw new Error('Failed to fetch metrics')
-      return response.json()
+      return telemetryService.fetchMetrics(token!, timeParams)
     },
     { enabled: !!token }
   )
 
   // Filter metrics
   const filteredMetrics = metrics.filter((metric: Metric) => {
-    if (metricNameFilter && !metric.metric_name.toLowerCase().includes(metricNameFilter.toLowerCase())) {
+    if (metricNameFilter && !metric.name.toLowerCase().includes(metricNameFilter.toLowerCase())) {
       return false
     }
-    if (typeFilter && metric.type !== typeFilter) {
+    if (typeFilter && typeFilter !== 'all' && metric.metric_type !== typeFilter) {
       return false
     }
     return true
@@ -97,7 +93,7 @@ export const MetricsPage: React.FC = () => {
   ]
 
   const typeOptions = [
-    { value: '', label: 'All types' },
+    { value: 'all', label: 'All types' },
     { value: 'counter', label: 'Counter' },
     { value: 'gauge', label: 'Gauge' },
     { value: 'histogram', label: 'Histogram' },
@@ -130,7 +126,7 @@ export const MetricsPage: React.FC = () => {
               <Flex direction="column" gap="2" style={{ minWidth: '180px' }}>
                 <Text size="2" weight="medium">Time Range</Text>
                 <Select.Root value={timeRange} onValueChange={setTimeRange}>
-                  <Select.Trigger style={{ width: '100%' }} />
+                  <Select.Trigger placeholder="Select time range" style={{ width: '100%' }} />
                   <Select.Content>
                     {timeRangeOptions.map((option) => (
                       <Select.Item key={option.value} value={option.value}>
@@ -172,7 +168,7 @@ export const MetricsPage: React.FC = () => {
                   variant="outline"
                   onClick={() => {
                     setMetricNameFilter('')
-                    setTypeFilter('')
+                    setTypeFilter('all')
                   }}
                 >
                   Clear Filters
@@ -226,21 +222,21 @@ export const MetricsPage: React.FC = () => {
                   {filteredMetrics.map((metric: Metric) => (
                     <Table.Row key={metric.uuid}>
                       <Table.RowHeaderCell>
-                        <Text size="2">{format(new Date(parseInt(metric.start_time_unix) * 1000), 'HH:mm:ss.SSS')}</Text>
+                        <Text size="2">{format(new Date(metric.timestamp), 'HH:mm:ss.SSS')}</Text>
                       </Table.RowHeaderCell>
                       <Table.Cell>
-                        <Text size="2" weight="medium">{metric.metric_name}</Text>
+                        <Text size="2" weight="medium">{metric.name}</Text>
                       </Table.Cell>
                       <Table.Cell>
                         <Badge
                           color={
-                            metric.type === 'counter' ? 'blue' :
-                            metric.type === 'gauge' ? 'green' :
-                            metric.type === 'histogram' ? 'purple' : 'gray'
+                            metric.metric_type === 'counter' ? 'blue' :
+                            metric.metric_type === 'gauge' ? 'green' :
+                            metric.metric_type === 'histogram' ? 'purple' : 'gray'
                           }
                           variant="soft"
                         >
-                          {metric.type}
+                          {metric.metric_type}
                         </Badge>
                       </Table.Cell>
                       <Table.Cell>

@@ -3,8 +3,8 @@ import { useQuery } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
-import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
+import { telemetryService } from '../backendService'
 
 interface Resource {
   id: string
@@ -22,37 +22,10 @@ export const ResourcesPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 20
 
-  const { data: resourcesData, isLoading, error } = useQuery(
+  const { data: resources = [], isLoading, error } = useQuery(
     ['resources', searchTerm, selectedType, currentPage],
     async () => {
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: itemsPerPage.toString(),
-      })
-
-      if (searchTerm) {
-        params.append('search', searchTerm)
-      }
-
-      if (selectedType !== 'all') {
-        params.append('type', selectedType)
-      }
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/resources?${params}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      )
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch resources')
-      }
-
-      return response.json()
+      return telemetryService.fetchResources(token!)
     },
     {
       enabled: !!token,
@@ -60,8 +33,13 @@ export const ResourcesPage: React.FC = () => {
     }
   )
 
-  const resources = resourcesData?.data || []
-  const totalCount = resourcesData?.total || 0
+  const filteredResources = resources.filter((resource: any) => {
+    if (searchTerm && !resource.service_name?.toLowerCase().includes(searchTerm.toLowerCase())) {
+      return false
+    }
+    return true
+  })
+  const totalCount = filteredResources.length
   const totalPages = Math.ceil(totalCount / itemsPerPage)
 
   const resourceTypes = ['all', 'service', 'host', 'container', 'database', 'queue', 'other']
@@ -114,7 +92,7 @@ export const ResourcesPage: React.FC = () => {
               <Flex direction="column" gap="2" style={{ minWidth: '140px' }}>
                 <Text size="2" weight="medium">Type</Text>
                 <Select.Root value={selectedType} onValueChange={setSelectedType}>
-                  <Select.Trigger style={{ width: '100%' }} />
+                  <Select.Trigger placeholder="Select type" style={{ width: '100%' }} />
                   <Select.Content>
                     {resourceTypes.map((type) => (
                       <Select.Item key={type} value={type}>
@@ -137,7 +115,7 @@ export const ResourcesPage: React.FC = () => {
           <Flex direction="column" gap="4">
             <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
               <Heading size="4">
-                Resources ({resources.length})
+                Resources ({filteredResources.length})
               </Heading>
             </Box>
 
@@ -151,7 +129,7 @@ export const ResourcesPage: React.FC = () => {
                 <Heading size="4" style={{ marginTop: '16px', marginBottom: '8px' }}>Error loading resources</Heading>
                 <Text color="gray">Please try again later</Text>
               </Flex>
-            ) : resources.length === 0 ? (
+            ) : filteredResources.length === 0 ? (
               <Flex direction="column" align="center" justify="center" style={{ padding: '48px 0', textAlign: 'center' }}>
                 <Icons.CubeIcon width="48" height="48" color="var(--gray-8)" />
                 <Heading size="4" style={{ marginTop: '16px', marginBottom: '8px' }}>No resources found</Heading>
@@ -173,17 +151,17 @@ export const ResourcesPage: React.FC = () => {
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {resources.map((resource: Resource) => (
-                    <Table.Row key={resource.id}>
+                  {filteredResources.map((resource: any) => (
+                    <Table.Row key={resource.uuid}>
                       <Table.RowHeaderCell>
                         <Flex direction="column" gap="1">
-                          <Text size="2" weight="medium">{resource.name}</Text>
-                          <Text size="1" color="gray">ID: {resource.id}</Text>
+                          <Text size="2" weight="medium">{resource.service_name}</Text>
+                          <Text size="1" color="gray">ID: {resource.uuid}</Text>
                         </Flex>
                       </Table.RowHeaderCell>
                       <Table.Cell>
                         <Badge color="blue" variant="soft">
-                          {resource.type}
+                          Service
                         </Badge>
                       </Table.Cell>
                       <Table.Cell>
@@ -191,9 +169,9 @@ export const ResourcesPage: React.FC = () => {
                           <Text size="2" style={{ maxWidth: '300px' }} truncate>
                             {formatAttributes(resource.attributes)}
                           </Text>
-                          {Object.keys(resource.attributes).length > 3 && (
+                          {Object.keys(resource.attributes || {}).length > 3 && (
                             <Text size="1" color="gray">
-                              +{Object.keys(resource.attributes).length - 3} more
+                              +{Object.keys(resource.attributes || {}).length - 3} more
                             </Text>
                           )}
                         </Flex>

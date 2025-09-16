@@ -3,8 +3,9 @@ import { useQuery } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
-import { API_BASE_URL, DEFAULT_TIME_RANGE } from '../config'
+import { DEFAULT_TIME_RANGE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
+import { telemetryService } from '../backendService'
 import { format, subHours, subDays } from 'date-fns'
 
 export const SpansPage: React.FC = () => {
@@ -49,15 +50,7 @@ export const SpansPage: React.FC = () => {
     ['spans', timeRange],
     async () => {
       const timeParams = getTimeRange()
-      const params = new URLSearchParams(timeParams)
-
-      const response = await fetch(`${API_BASE_URL}/telemetry/fetch_spans?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      if (!response.ok) throw new Error('Failed to fetch spans')
-      return response.json()
+      return telemetryService.fetchSpans(token!, timeParams)
     },
     { enabled: !!token }
   )
@@ -107,7 +100,7 @@ export const SpansPage: React.FC = () => {
               <Flex direction="column" gap="2" style={{ minWidth: '180px' }}>
                 <Text size="2" weight="medium">Time Range</Text>
                 <Select.Root value={timeRange} onValueChange={setTimeRange}>
-                  <Select.Trigger style={{ width: '100%' }} />
+                  <Select.Trigger placeholder="Select time range" style={{ width: '100%' }} />
                   <Select.Content>
                     {timeRangeOptions.map((option) => (
                       <Select.Item key={option.value} value={option.value}>
