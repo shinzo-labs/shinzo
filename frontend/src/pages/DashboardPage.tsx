@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, Card, Flex, Text, Heading, Badge, Grid, Box } from '@radix-ui/themes'
@@ -7,6 +7,16 @@ import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
 import { telemetryService } from '../backendService'
 import { subHours } from 'date-fns'
+import { TimeRangePicker, TimeRange } from '../components/charts/TimeRangePicker'
+import { TraceTimeSeriesChart } from '../components/charts/TraceTimeSeriesChart'
+import { TracePieChart } from '../components/charts/TracePieChart'
+import {
+  processTracesForTimeSeriesByOperation,
+  processTracesForTimeSeriesBySession,
+  processTracesForPieByOperation,
+  processTracesForPieBySession,
+  addColorsToData
+} from '../utils/chartDataProcessing'
 
 interface DashboardStats {
   totalTraces: number
@@ -18,6 +28,13 @@ interface DashboardStats {
 export const DashboardPage: React.FC = () => {
   const { token } = useAuth()
   const queryClient = useQueryClient()
+
+  // State for time range
+  const [timeRange, setTimeRange] = useState<TimeRange>({
+    start: subHours(new Date(), 1),
+    end: new Date(),
+    label: 'Last 1 hour'
+  })
 
   // Fetch resources
   const { data: resources = [], isLoading: resourcesLoading } = useQuery(
@@ -34,9 +51,21 @@ export const DashboardPage: React.FC = () => {
     { enabled: !!token }
   )
 
-  // Fetch traces for last 24 hours to calculate stats
+  // Fetch traces for the selected time range for charts
   const { data: traces = [] } = useQuery(
-    'dashboard-traces',
+    ['dashboard-traces', timeRange.start.toISOString(), timeRange.end.toISOString()],
+    async () => {
+      return telemetryService.fetchTraces(token!, {
+        start_time: timeRange.start.toISOString(),
+        end_time: timeRange.end.toISOString(),
+      })
+    },
+    { enabled: !!token }
+  )
+
+  // Fetch traces for last 24 hours to calculate stats
+  const { data: statsTraces = [] } = useQuery(
+    'dashboard-stats-traces',
     async () => {
       const end = new Date()
       const start = subHours(end, 24)
@@ -48,17 +77,23 @@ export const DashboardPage: React.FC = () => {
     { enabled: !!token }
   )
 
-  // Calculate real stats from actual data
+  // Calculate real stats from last 24 hours data
   const stats: DashboardStats = {
-    totalTraces: traces.length,
+    totalTraces: statsTraces.length,
     activeServices: resources.length,
-    errorRate: traces.length > 0
-      ? (traces.filter((trace: any) => trace.status === 'error').length / traces.length) * 100
+    errorRate: statsTraces.length > 0
+      ? (statsTraces.filter((trace: any) => trace.status === 'error').length / statsTraces.length) * 100
       : 0,
-    avgResponseTime: traces.length > 0
-      ? traces.reduce((sum: number, trace: any) => sum + (trace.duration_ms || 0), 0) / traces.length
+    avgResponseTime: statsTraces.length > 0
+      ? statsTraces.reduce((sum: number, trace: any) => sum + (trace.duration_ms || 0), 0) / statsTraces.length
       : 0,
   }
+
+  // Process chart data
+  const operationTimeSeriesData = processTracesForTimeSeriesByOperation(traces, timeRange)
+  const sessionTimeSeriesData = processTracesForTimeSeriesBySession(traces, timeRange)
+  const operationPieData = addColorsToData(processTracesForPieByOperation(traces))
+  const sessionPieData = addColorsToData(processTracesForPieBySession(traces))
 
   const statCards = [
     {
@@ -98,16 +133,23 @@ export const DashboardPage: React.FC = () => {
               Overview of your telemetry data and system health
             </Text>
           </Box>
-          <Button
-            variant="outline"
-            onClick={() => {
-              queryClient.invalidateQueries('resources')
-              queryClient.invalidateQueries('dashboard-traces')
-            }}
-          >
-            <Icons.ReloadIcon />
-            Refresh
-          </Button>
+          <Flex gap="3" align="center">
+            <TimeRangePicker
+              currentRange={timeRange}
+              onTimeRangeChange={setTimeRange}
+            />
+            <Button
+              variant="outline"
+              onClick={() => {
+                queryClient.invalidateQueries('resources')
+                queryClient.invalidateQueries(['dashboard-traces'])
+                queryClient.invalidateQueries('dashboard-stats-traces')
+              }}
+            >
+              <Icons.ReloadIcon />
+              Refresh
+            </Button>
+          </Flex>
         </Flex>
 
         {/* Quick stats cards */}
@@ -176,7 +218,7 @@ export const DashboardPage: React.FC = () => {
                         Last seen: {new Date(resource.last_seen).toLocaleTimeString()}
                       </Text>
                     </Flex>
-                  )}
+                  ))}
                 </Flex>
               ) : (
                 <Flex direction="column" align="center" justify="center" style={{ padding: '32px 0', textAlign: 'center' }}>
@@ -190,6 +232,42 @@ export const DashboardPage: React.FC = () => {
             </Box>
           </Flex>
         </Card>
+
+        {/* Charts Section */}
+        <Flex direction="column" gap="4">
+          <Box>
+            <Heading size="4">Analytics</Heading>
+            <Text size="2" color="gray">Telemetry data visualization for {timeRange.label.toLowerCase()}</Text>
+          </Box>
+
+          {/* Top row - Line charts */}
+          <Grid columns={{ initial: '1', lg: '2' }} gap="4">
+            <TraceTimeSeriesChart
+              title="Trace Count by Operation"
+              data={operationTimeSeriesData}
+              height={300}
+            />
+            <TraceTimeSeriesChart
+              title="Trace Count by Session ID"
+              data={sessionTimeSeriesData}
+              height={300}
+            />
+          </Grid>
+
+          {/* Bottom row - Pie charts */}
+          <Grid columns={{ initial: '1', lg: '2' }} gap="4">
+            <TracePieChart
+              title="Traces by Operation"
+              data={operationPieData}
+              height={300}
+            />
+            <TracePieChart
+              title="Traces by Session ID"
+              data={sessionPieData}
+              height={300}
+            />
+          </Grid>
+        </Flex>
 
       </Flex>
     </AppLayout>
