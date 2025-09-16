@@ -31,12 +31,12 @@ export const DashboardPage: React.FC = () => {
     { enabled: !!token }
   )
 
-  // Mock stats since we don't have aggregation endpoints yet
+  // Real stats calculated from fetched data
   const stats: DashboardStats = {
-    totalTraces: 0,
+    totalTraces: 0, // Will be calculated when we have trace aggregation endpoint
     activeServices: resources.length,
-    errorRate: 0,
-    avgResponseTime: 0,
+    errorRate: 0, // Will be calculated when we have error aggregation endpoint
+    avgResponseTime: 0, // Will be calculated when we have response time aggregation endpoint
   }
 
   const statCards = [
@@ -45,32 +45,24 @@ export const DashboardPage: React.FC = () => {
       value: stats.totalTraces.toLocaleString(),
       subtitle: 'Last 24 hours',
       icon: Icons.ActivityLogIcon,
-      trend: '+12%',
-      trendUp: true,
     },
     {
       title: 'Active Services',
       value: stats.activeServices.toString(),
       subtitle: 'Currently running',
       icon: Icons.ComponentInstanceIcon,
-      trend: '+2',
-      trendUp: true,
     },
     {
       title: 'Error Rate',
       value: `${stats.errorRate.toFixed(2)}%`,
       subtitle: 'Last 24 hours',
       icon: Icons.ExclamationTriangleIcon,
-      trend: '-0.5%',
-      trendUp: false,
     },
     {
       title: 'Avg Response Time',
       value: `${stats.avgResponseTime}ms`,
       subtitle: 'Last 24 hours',
       icon: Icons.ClockIcon,
-      trend: '-15ms',
-      trendUp: false,
     },
   ]
 
@@ -116,15 +108,8 @@ export const DashboardPage: React.FC = () => {
                     <Text size="6" weight="bold">{stat.value}</Text>
                   </Box>
                 </Flex>
-                <Flex justify="between" align="center" style={{ marginTop: '16px' }}>
+                <Flex justify="start" align="center" style={{ marginTop: '16px' }}>
                   <Text size="2" color="gray">{stat.subtitle}</Text>
-                  <Text
-                    size="2"
-                    weight="medium"
-                    color={stat.trendUp ? 'green' : 'red'}
-                  >
-                    {stat.trend}
-                  </Text>
                 </Flex>
               </Card>
             )
