@@ -1,10 +1,12 @@
 import React from 'react'
-import { useQuery } from 'react-query'
+import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, Card, Flex, Text, Heading, Badge, Grid, Box } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
+import { telemetryService } from '../backendService'
+import { subHours } from 'date-fns'
 
 interface DashboardStats {
   totalTraces: number
@@ -15,8 +17,9 @@ interface DashboardStats {
 
 export const DashboardPage: React.FC = () => {
   const { token } = useAuth()
+  const queryClient = useQueryClient()
 
-  // Fetch dashboard stats (simulated since we don't have aggregation endpoints)
+  // Fetch resources
   const { data: resources = [], isLoading: resourcesLoading } = useQuery(
     'resources',
     async () => {
@@ -31,12 +34,30 @@ export const DashboardPage: React.FC = () => {
     { enabled: !!token }
   )
 
-  // Real stats calculated from fetched data
+  // Fetch traces for last 24 hours to calculate stats
+  const { data: traces = [] } = useQuery(
+    'dashboard-traces',
+    async () => {
+      const end = new Date()
+      const start = subHours(end, 24)
+      return telemetryService.fetchTraces(token!, {
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+      })
+    },
+    { enabled: !!token }
+  )
+
+  // Calculate real stats from actual data
   const stats: DashboardStats = {
-    totalTraces: 0, // Will be calculated when we have trace aggregation endpoint
+    totalTraces: traces.length,
     activeServices: resources.length,
-    errorRate: 0, // Will be calculated when we have error aggregation endpoint
-    avgResponseTime: 0, // Will be calculated when we have response time aggregation endpoint
+    errorRate: traces.length > 0
+      ? (traces.filter((trace: any) => trace.status === 'error').length / traces.length) * 100
+      : 0,
+    avgResponseTime: traces.length > 0
+      ? traces.reduce((sum: number, trace: any) => sum + (trace.duration_ms || 0), 0) / traces.length
+      : 0,
   }
 
   const statCards = [
@@ -77,7 +98,13 @@ export const DashboardPage: React.FC = () => {
               Overview of your telemetry data and system health
             </Text>
           </Box>
-          <Button variant="outline">
+          <Button
+            variant="outline"
+            onClick={() => {
+              queryClient.invalidateQueries('resources')
+              queryClient.invalidateQueries('dashboard-traces')
+            }}
+          >
             <Icons.ReloadIcon />
             Refresh
           </Button>
@@ -117,77 +144,52 @@ export const DashboardPage: React.FC = () => {
         </Grid>
 
         {/* Service overview */}
-        <Grid columns={{ initial: '1', lg: '2' }} gap="6">
-          {/* Services list */}
-          <Card>
-            <Flex direction="column" gap="4">
-              <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
-                <Heading size="4">Services</Heading>
-                <Text size="2" color="gray">Active services and their status</Text>
-              </Box>
-              <Box>
-                {resourcesLoading ? (
-                  <Flex direction="column" gap="3">
-                    {[...Array(3)].map((_, i) => (
-                      <Box key={i} className="loading-skeleton" style={{ height: '64px', borderRadius: 'var(--radius-2)' }} />
-                    ))}
-                  </Flex>
-                ) : resources.length > 0 ? (
-                  <Flex direction="column" gap="4">
-                    {resources.slice(0, 5).map((resource: any) => (
-                      <Flex key={resource.uuid} justify="between" align="center">
-                        <Flex align="center" gap="3">
-                          <Badge color="green" variant="soft" style={{ width: '8px', height: '8px', padding: 0 }} />
-                          <Box>
-                            <Text size="2" weight="medium">
-                              {resource.service_name}
-                            </Text>
-                            <Text size="1" color="gray">
-                              {resource.service_version || 'No version'}
-                            </Text>
-                          </Box>
-                        </Flex>
-                        <Text size="1" color="gray">
-                          Last seen: {new Date(resource.last_seen).toLocaleTimeString()}
-                        </Text>
+        <Card>
+          <Flex direction="column" gap="4">
+            <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
+              <Heading size="4">Services</Heading>
+              <Text size="2" color="gray">Active services and their status</Text>
+            </Box>
+            <Box>
+              {resourcesLoading ? (
+                <Flex direction="column" gap="3">
+                  {[...Array(3)].map((_, i) => (
+                    <Box key={i} className="loading-skeleton" style={{ height: '64px', borderRadius: 'var(--radius-2)' }} />
+                  ))}
+                </Flex>
+              ) : resources.length > 0 ? (
+                <Flex direction="column" gap="4">
+                  {resources.slice(0, 5).map((resource: any) => (
+                    <Flex key={resource.uuid} justify="between" align="center">
+                      <Flex align="center" gap="3">
+                        <Badge color="green" variant="soft" style={{ width: '8px', height: '8px', padding: 0 }} />
+                        <Box>
+                          <Text size="2" weight="medium">
+                            {resource.service_name}
+                          </Text>
+                          <Text size="1" color="gray">
+                            {resource.service_version || 'No version'}
+                          </Text>
+                        </Box>
                       </Flex>
-                    ))}
-                    {resources.length > 5 && (
-                      <Button variant="ghost" style={{ width: '100%', marginTop: '16px' }}>
-                        View all {resources.length} services
-                      </Button>
-                    )}
-                  </Flex>
-                ) : (
-                  <Flex direction="column" align="center" justify="center" style={{ padding: '32px 0', textAlign: 'center' }}>
-                    <Icons.ComponentInstanceIcon width="48" height="48" color="var(--gray-8)" />
-                    <Text size="2" color="gray" style={{ marginTop: '8px' }}>No services found</Text>
-                    <Text size="1" color="gray">
-                      Services will appear here once telemetry data is ingested
-                    </Text>
-                  </Flex>
-                )}
-              </Box>
-            </Flex>
-          </Card>
-
-          {/* Recent activity */}
-          <Card>
-            <Flex direction="column" gap="4">
-              <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
-                <Heading size="4">Recent Activity</Heading>
-                <Text size="2" color="gray">Latest traces and system events</Text>
-              </Box>
-              <Flex direction="column" align="center" justify="center" style={{ padding: '32px 0', textAlign: 'center' }}>
-                <Icons.ActivityLogIcon width="48" height="48" color="var(--gray-8)" />
-                <Text size="2" color="gray" style={{ marginTop: '8px' }}>No recent activity</Text>
-                <Text size="1" color="gray">
-                  Activity will appear here once traces are received
-                </Text>
-              </Flex>
-            </Flex>
-          </Card>
-        </Grid>
+                      <Text size="1" color="gray">
+                        Last seen: {new Date(resource.last_seen).toLocaleTimeString()}
+                      </Text>
+                    </Flex>
+                  )}
+                </Flex>
+              ) : (
+                <Flex direction="column" align="center" justify="center" style={{ padding: '32px 0', textAlign: 'center' }}>
+                  <Icons.ComponentInstanceIcon width="48" height="48" color="var(--gray-8)" />
+                  <Text size="2" color="gray" style={{ marginTop: '8px' }}>No services found</Text>
+                  <Text size="1" color="gray">
+                    Services will appear here once telemetry data is ingested
+                  </Text>
+                </Flex>
+              )}
+            </Box>
+          </Flex>
+        </Card>
 
       </Flex>
     </AppLayout>

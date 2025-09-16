@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useQuery } from 'react-query'
+import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
@@ -28,6 +28,7 @@ interface Metric {
 
 export const MetricsPage: React.FC = () => {
   const { token } = useAuth()
+  const queryClient = useQueryClient()
   const [timeRange, setTimeRange] = useState(DEFAULT_TIME_RANGE)
   const [metricNameFilter, setMetricNameFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -111,7 +112,10 @@ export const MetricsPage: React.FC = () => {
               Application metrics and performance indicators
             </Text>
           </Box>
-          <Button variant="outline">
+          <Button
+            variant="outline"
+            onClick={() => queryClient.invalidateQueries(['metrics', timeRange])}
+          >
             <Icons.ReloadIcon />
             Refresh
           </Button>

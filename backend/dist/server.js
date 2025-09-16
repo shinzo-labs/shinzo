@@ -116,11 +116,13 @@ app.post('/auth/generate_ingest_token', async (request, reply) => {
     if (!authenticated)
         return;
     try {
+        logger_1.logger.info({ message: 'Generate ingest token request', user: request.user });
         const result = await (0, ingestToken_1.handleGenerateIngestToken)(request.user.uuid);
+        logger_1.logger.info({ message: 'Generate ingest token result', status: result.status, hasError: !!result.error });
         reply.status(result.status || 200).send(result.response);
     }
     catch (error) {
-        logger_1.logger.error({ message: 'Generate ingest token error', error });
+        logger_1.logger.error({ message: 'Generate ingest token error', error: error.message, stack: error.stack });
         reply.status(500).send({ error: 'Internal server error' });
     }
 });
@@ -234,7 +236,7 @@ app.get('/telemetry/fetch_metrics', async (request, reply) => {
 // Telemetry ingestion endpoints
 app.post('/telemetry/ingest_http', async (request, reply) => {
     try {
-        const ingestTokenHeader = request.headers['Authorization'];
+        const ingestTokenHeader = request.headers['authorization'];
         if (!ingestTokenHeader) {
             reply.status(401).send({ error: 'Missing Authorization header' });
             return;
@@ -249,6 +251,47 @@ app.post('/telemetry/ingest_http', async (request, reply) => {
     }
     catch (error) {
         logger_1.logger.error({ message: 'Ingest HTTP error', error });
+        reply.status(500).send({ error: 'Internal server error' });
+    }
+});
+// OpenTelemetry specification compliant endpoints
+app.post('/telemetry/ingest_http/metrics', async (request, reply) => {
+    try {
+        const ingestTokenHeader = request.headers['authorization'];
+        if (!ingestTokenHeader) {
+            reply.status(401).send({ error: 'Missing Authorization header' });
+            return;
+        }
+        const ingestToken = await (0, ingest_1.verifyIngestToken)(ingestTokenHeader);
+        if (!ingestToken) {
+            reply.status(401).send({ error: 'Invalid or inactive Authorization token' });
+            return;
+        }
+        const result = await (0, ingest_1.handleIngestHTTP)(ingestToken, request.body);
+        reply.status(result.status || 200).send(result.response);
+    }
+    catch (error) {
+        logger_1.logger.error({ message: 'Ingest HTTP metrics error', error });
+        reply.status(500).send({ error: 'Internal server error' });
+    }
+});
+app.post('/telemetry/ingest_http/traces', async (request, reply) => {
+    try {
+        const ingestTokenHeader = request.headers['authorization'];
+        if (!ingestTokenHeader) {
+            reply.status(401).send({ error: 'Missing Authorization header' });
+            return;
+        }
+        const ingestToken = await (0, ingest_1.verifyIngestToken)(ingestTokenHeader);
+        if (!ingestToken) {
+            reply.status(401).send({ error: 'Invalid or inactive Authorization token' });
+            return;
+        }
+        const result = await (0, ingest_1.handleIngestHTTP)(ingestToken, request.body);
+        reply.status(result.status || 200).send(result.response);
+    }
+    catch (error) {
+        logger_1.logger.error({ message: 'Ingest HTTP traces error', error });
         reply.status(500).send({ error: 'Internal server error' });
     }
 });

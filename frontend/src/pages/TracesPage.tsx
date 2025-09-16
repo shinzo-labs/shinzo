@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useQuery } from 'react-query'
+import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
@@ -21,6 +21,7 @@ interface Trace {
 
 export const TracesPage: React.FC = () => {
   const { token } = useAuth()
+  const queryClient = useQueryClient()
   const [timeRange, setTimeRange] = useState(DEFAULT_TIME_RANGE)
   const [serviceFilter, setServiceFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -103,7 +104,10 @@ export const TracesPage: React.FC = () => {
               Distributed tracing analysis and visualization
             </Text>
           </Box>
-          <Button variant="outline">
+          <Button
+            variant="outline"
+            onClick={() => queryClient.invalidateQueries(['traces', timeRange, serviceFilter, statusFilter])}
+          >
             <Icons.ReloadIcon />
             Refresh
           </Button>

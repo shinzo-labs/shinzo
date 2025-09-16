@@ -147,7 +147,6 @@ export const ResourcesPage: React.FC = () => {
                     <Table.ColumnHeaderCell>Type</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Attributes</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Created</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Actions</Table.ColumnHeaderCell>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -180,11 +179,6 @@ export const ResourcesPage: React.FC = () => {
                         <Text size="2" color="gray">
                           {new Date(resource.created_at).toLocaleDateString()}
                         </Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Button variant="ghost" size="1">
-                          View Details
-                        </Button>
                       </Table.Cell>
                     </Table.Row>
                   ))}

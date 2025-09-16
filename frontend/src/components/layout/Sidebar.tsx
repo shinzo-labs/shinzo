@@ -92,9 +92,6 @@ export const Sidebar: React.FC = () => {
               <Text size="2" weight="medium" style={{ flex: 1 }}>
                 {item.name}
               </Text>
-              {item.name === 'Traces' && (
-                <Badge color="red" size="1">2</Badge>
-              )}
             </Link>
           )
         })}

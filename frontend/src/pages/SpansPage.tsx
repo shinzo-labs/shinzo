@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useQuery } from 'react-query'
+import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
@@ -10,6 +10,7 @@ import { format, subHours, subDays } from 'date-fns'
 
 export const SpansPage: React.FC = () => {
   const { token } = useAuth()
+  const queryClient = useQueryClient()
   const [timeRange, setTimeRange] = useState(DEFAULT_TIME_RANGE)
   const [traceIdFilter, setTraceIdFilter] = useState('')
   const [serviceFilter, setServiceFilter] = useState('')
@@ -85,7 +86,10 @@ export const SpansPage: React.FC = () => {
               Individual span analysis and debugging
             </Text>
           </Box>
-          <Button variant="outline">
+          <Button
+            variant="outline"
+            onClick={() => queryClient.invalidateQueries(['spans', timeRange])}
+          >
             <Icons.ReloadIcon />
             Refresh
           </Button>
@@ -206,10 +210,10 @@ export const SpansPage: React.FC = () => {
                       </Table.Cell>
                       <Table.Cell>
                         <Badge
-                          color={span.status_code === 0 ? 'green' : span.status_code > 0 ? 'red' : 'gray'}
+                          color={span.status_code === 1 ? 'green' : span.status_code === 2 ? 'red' : 'gray'}
                           variant="soft"
                         >
-                          {span.status_code === 0 ? 'OK' : span.status_code > 0 ? 'Error' : 'Unknown'}
+                          {span.status_code === 1 ? 'OK' : span.status_code === 2 ? 'Error' : span.status_code === 0 ? 'Unset' : 'Unknown'}
                         </Badge>
                       </Table.Cell>
                       <Table.Cell>
