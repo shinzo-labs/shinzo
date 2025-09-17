@@ -12,9 +12,9 @@ export const RegisterPage: React.FC = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [verificationToken, setVerificationToken] = useState('')
+  const [resendLoading, setResendLoading] = useState(false)
 
-  const { register } = useAuth()
+  const { register, resendVerification } = useAuth()
   const navigate = useNavigate()
 
   const getPasswordStrength = (password: string) => {
@@ -53,13 +53,25 @@ export const RegisterPage: React.FC = () => {
     setLoading(true)
 
     try {
-      const result = await register(email, password)
-      setVerificationToken(result.verification_token)
+      await register(email, password)
       setSuccess(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResendVerification = async () => {
+    setError('')
+    setResendLoading(true)
+
+    try {
+      await resendVerification(email)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to resend verification email')
+    } finally {
+      setResendLoading(false)
     }
   }
 
@@ -90,15 +102,6 @@ export const RegisterPage: React.FC = () => {
               </Text>
             </Flex>
 
-            <Callout.Root color="gray" style={{ width: '100%' }}>
-              <Callout.Text>
-                <Text size="2" weight="bold">For development purposes, your verification token is:</Text>
-                <br />
-                <Text size="1" style={{ fontFamily: 'monospace', backgroundColor: 'var(--gray-2)', padding: '4px 8px', borderRadius: '4px' }}>
-                  {verificationToken}
-                </Text>
-              </Callout.Text>
-            </Callout.Root>
 
             <Flex direction="column" gap="4" style={{ width: '100%' }}>
               <Button
@@ -111,10 +114,22 @@ export const RegisterPage: React.FC = () => {
 
               <Text size="2" color="gray" align="center">
                 Didn't receive the email?{' '}
-                <Text style={{ color: 'var(--accent-9)', cursor: 'pointer' }}>
-                  Resend verification email
+                <Text
+                  style={{ color: 'var(--accent-9)', cursor: 'pointer' }}
+                  onClick={handleResendVerification}
+                >
+                  {resendLoading ? 'Sending...' : 'Resend verification email'}
                 </Text>
               </Text>
+
+              {error && (
+                <Callout.Root color="red">
+                  <Callout.Icon>
+                    <ExclamationTriangleIcon />
+                  </Callout.Icon>
+                  <Callout.Text>{error}</Callout.Text>
+                </Callout.Root>
+              )}
             </Flex>
           </Flex>
         </Card>

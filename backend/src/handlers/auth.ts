@@ -93,8 +93,7 @@ export const handleCreateUser = async (request: yup.InferType<typeof createUserS
       response: {
         message: 'User account created successfully, verification email sent',
         uuid: user.uuid,
-        email: user.email,
-        verification_token: emailToken // In production, this would only be sent via email
+        email: user.email
       },
       status: 201
     }
@@ -297,8 +296,7 @@ export const handleResendVerification = async (request: yup.InferType<typeof res
 
     return {
       response: {
-        message: 'Verification email sent successfully',
-        verification_token: emailToken // In development only
+        message: 'Verification email sent successfully'
       },
       status: 200
     }

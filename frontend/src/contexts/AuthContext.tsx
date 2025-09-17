@@ -13,8 +13,9 @@ interface AuthContextType {
   user: User | null
   token: string | null
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string) => Promise<{ verification_token: string }>
+  register: (email: string, password: string) => Promise<void>
   verify: (email: string, verification_token: string) => Promise<void>
+  resendVerification: (email: string) => Promise<void>
   logout: () => void
   loading: boolean
   isAuthenticated: boolean
@@ -111,8 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       throw new Error(error || 'Registration failed')
     }
 
-    const data = await response.json()
-    return { verification_token: data.verification_token }
+    await response.json()
   }
 
   const verify = async (email: string, verification_token: string) => {
@@ -130,6 +130,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
+  const resendVerification = async (email: string) => {
+    const response = await fetch(`${API_BASE_URL}/auth/resend_verification`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(error || 'Failed to resend verification email')
+    }
+
+    await response.json()
+  }
+
   const logout = () => {
     localStorage.removeItem('auth_token')
     setToken(null)
@@ -142,6 +159,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     register,
     verify,
+    resendVerification,
     logout,
     loading,
     isAuthenticated: !!token && !!user,
