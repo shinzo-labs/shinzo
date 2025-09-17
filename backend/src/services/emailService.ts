@@ -1,5 +1,16 @@
+import * as nodemailer from 'nodemailer'
 import { logger } from '../logger'
 import { User } from '../models'
+import {
+  SMTP_HOST,
+  SMTP_PORT,
+  SMTP_SECURE,
+  SMTP_USER,
+  SMTP_PASS,
+  FROM_EMAIL,
+  FROM_NAME,
+  FRONTEND_URL
+} from '../config'
 
 export interface EmailVerificationData {
   email: string
@@ -9,7 +20,11 @@ export interface EmailVerificationData {
 
 export class EmailService {
   private static instance: EmailService
-  private readonly fromEmail = 'austin@shinzolabs.com'
+  private transporter: nodemailer.Transporter
+
+  private constructor() {
+    this.transporter = this.createTransporter()
+  }
 
   public static getInstance(): EmailService {
     if (!EmailService.instance) {
@@ -18,19 +33,42 @@ export class EmailService {
     return EmailService.instance
   }
 
+  private createTransporter(): nodemailer.Transporter {
+    // For development, use either real SMTP or Ethereal test accounts
+    if (!SMTP_USER || !SMTP_PASS) {
+      logger.warn('SMTP credentials not configured - emails will be logged only')
+      // Return a test transporter that doesn't actually send
+      return nodemailer.createTransport({
+        streamTransport: true,
+        newline: 'unix',
+        buffer: true
+      })
+    }
+
+    return nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_SECURE,
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS
+      }
+    })
+  }
+
   async sendVerificationEmail(data: EmailVerificationData): Promise<void> {
     try {
       const { email, verification_token, user_uuid } = data
 
       const subject = 'Verify Your Shinzo Platform Account'
-      const verificationLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify?email=${encodeURIComponent(email)}&token=${verification_token}`
+      const verificationLink = `${FRONTEND_URL}/verify?email=${encodeURIComponent(email)}&token=${verification_token}`
 
       const body = this.createVerificationEmailBody(email, verification_token, verificationLink)
 
       await this.sendEmail({
-        to: [email],
+        to: email,
         subject,
-        body
+        html: body
       })
 
       logger.info({
@@ -177,37 +215,40 @@ export class EmailService {
   }
 
   private async sendEmail(options: {
-    to: string[]
+    to: string
     subject: string
-    body: string
-    cc?: string[]
-    bcc?: string[]
+    html: string
+    cc?: string
+    bcc?: string
   }): Promise<void> {
     try {
-      // Note: In a real production environment, this would use a proper email service like SendGrid, SES, etc.
-      // For this implementation, we'll simulate email sending with detailed logging
-
-      logger.info({
-        message: 'Email verification pipeline triggered',
+      const mailOptions = {
+        from: `${FROM_NAME} <${FROM_EMAIL}>`,
         to: options.to,
         subject: options.subject,
-        from: this.fromEmail,
-        bodyLength: options.body.length
-      })
-
-      // In production, this would be:
-      // await sendGridClient.send({ to: options.to[0], from: this.fromEmail, subject: options.subject, html: options.body })
-      // For now, we simulate successful email sending
+        html: options.html,
+        ...(options.cc && { cc: options.cc }),
+        ...(options.bcc && { bcc: options.bcc })
+      }
 
       logger.info({
-        message: 'Verification email sent successfully',
-        recipient: options.to[0],
-        deliveryMethod: 'simulated'
+        message: 'Sending email',
+        to: options.to,
+        subject: options.subject,
+        from: FROM_EMAIL
+      })
+
+      const result = await this.transporter.sendMail(mailOptions)
+
+      logger.info({
+        message: 'Email sent successfully',
+        recipient: options.to,
+        messageId: result.messageId
       })
 
     } catch (error) {
       logger.error({
-        message: 'Failed to send verification email',
+        message: 'Failed to send email',
         error,
         to: options.to,
         subject: options.subject

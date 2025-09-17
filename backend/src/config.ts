@@ -29,6 +29,16 @@ export const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX ?? '1000')
 export const RATE_LIMIT_BY_KEY = process.env.RATE_LIMIT_BY_KEY === 'true'
 export const ENABLE_IP_RATE_LIMIT = process.env.ENABLE_IP_RATE_LIMIT === 'true'
 
+// Email Configuration
+export const SMTP_HOST = process.env.SMTP_HOST ?? 'smtp.gmail.com'
+export const SMTP_PORT = parseInt(process.env.SMTP_PORT ?? '587')
+export const SMTP_SECURE = process.env.SMTP_SECURE === 'true'
+export const SMTP_USER = process.env.SMTP_USER ?? ''
+export const SMTP_PASS = process.env.SMTP_PASS ?? ''
+export const FROM_EMAIL = process.env.FROM_EMAIL ?? 'noreply@shinzolabs.com'
+export const FROM_NAME = process.env.FROM_NAME ?? 'Shinzo Platform'
+export const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:3000'
+
 // Frontend Configuration
 export const API_BASE_URL = process.env.API_BASE_URL ?? `http://localhost:${PORT}`
 export const REFRESH_INTERVAL = parseInt(process.env.REFRESH_INTERVAL ?? '30000')
