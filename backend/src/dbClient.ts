@@ -1,0 +1,77 @@
+import { Sequelize } from "sequelize"
+import { DATABASE_URL, TZ } from "./config"
+import { logger } from "./logger"
+import {
+  User,
+  Resource,
+  ResourceAttribute,
+  IngestToken,
+  Trace,
+  Span,
+  SpanAttribute,
+  Metric,
+  MetricAttribute
+} from './models'
+
+export const sequelize = new Sequelize(DATABASE_URL, {
+  dialect: 'postgres',
+  dialectOptions: {
+    supportBigNumbers: true,
+    bigNumberStrings: true
+  },
+  timezone: TZ || 'UTC',
+  logging: logger.debug.bind(logger),
+  benchmark: true,
+  logQueryParameters: true,
+  pool: {
+    max: 150, // max number of connections
+    idle: 5_000,// max time (ms) that a connection can be idle before being released
+    acquire: 30_000,// max time (ms) that pool will try to get connection before throwing error
+    evict: 1_000// time interval (ms) after which sequelize-pool will remove idle connections
+  }
+})
+
+// Initialize models
+User.initialize(sequelize)
+Resource.initialize(sequelize)
+ResourceAttribute.initialize(sequelize)
+IngestToken.initialize(sequelize)
+Trace.initialize(sequelize)
+Span.initialize(sequelize)
+SpanAttribute.initialize(sequelize)
+Metric.initialize(sequelize)
+MetricAttribute.initialize(sequelize)
+
+// Set up associations
+User.hasMany(Resource, { foreignKey: 'user_uuid', as: 'resources' })
+User.hasMany(IngestToken, { foreignKey: 'user_uuid', as: 'ingestTokens' })
+
+Resource.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
+Resource.hasMany(ResourceAttribute, { foreignKey: 'resource_uuid', as: 'attributes' })
+Resource.hasMany(Trace, { foreignKey: 'resource_uuid', as: 'traces' })
+Resource.hasMany(Metric, { foreignKey: 'resource_uuid', as: 'metrics' })
+
+ResourceAttribute.belongsTo(Resource, { foreignKey: 'resource_uuid', as: 'resource' })
+
+IngestToken.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
+IngestToken.hasMany(Trace, { foreignKey: 'ingest_token_uuid', as: 'traces' })
+IngestToken.hasMany(Metric, { foreignKey: 'ingest_token_uuid', as: 'metrics' })
+
+Trace.belongsTo(Resource, { foreignKey: 'resource_uuid', as: 'resource' })
+Trace.belongsTo(IngestToken, { foreignKey: 'ingest_token_uuid', as: 'ingestToken' })
+Trace.hasMany(Span, { foreignKey: 'trace_uuid', as: 'spans' })
+
+Span.belongsTo(Trace, { foreignKey: 'trace_uuid', as: 'trace' })
+Span.belongsTo(Span, { foreignKey: 'parent_span_uuid', as: 'parentSpan' })
+Span.hasMany(Span, { foreignKey: 'parent_span_uuid', as: 'childSpans' })
+Span.hasMany(SpanAttribute, { foreignKey: 'span_uuid', as: 'attributes' })
+
+SpanAttribute.belongsTo(Span, { foreignKey: 'span_uuid', as: 'span' })
+
+Metric.belongsTo(Resource, { foreignKey: 'resource_uuid', as: 'resource' })
+Metric.belongsTo(IngestToken, { foreignKey: 'ingest_token_uuid', as: 'ingestToken' })
+Metric.hasMany(MetricAttribute, { foreignKey: 'metric_uuid', as: 'attributes' })
+
+MetricAttribute.belongsTo(Metric, { foreignKey: 'metric_uuid', as: 'metric' })
+
+export const dbClient = sequelize
