@@ -4,6 +4,7 @@ import { logger } from '../logger'
 import * as crypto from 'crypto'
 import * as jwt from 'jsonwebtoken'
 import { JWT_SECRET } from '../config'
+import { emailService } from '../services/emailService'
 
 export const createUserSchema = yup.object({
   email: yup.string().email('Invalid email format').required('Email is required'),
@@ -18,6 +19,10 @@ export const loginSchema = yup.object({
 export const verifyUserSchema = yup.object({
   email: yup.string().email('Invalid email format').required('Email is required'),
   verification_token: yup.string().required('Verification token is required'),
+}).required()
+
+export const resendVerificationSchema = yup.object({
+  email: yup.string().email('Invalid email format').required('Email is required'),
 }).required()
 
 function hashPassword(password: string, salt: string): string {
@@ -59,7 +64,7 @@ export const handleCreateUser = async (request: yup.InferType<typeof createUserS
     const salt = generateSalt()
     const passwordHash = hashPassword(request.password, salt)
     const emailToken = generateEmailToken()
-    const emailTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    const emailTokenExpiry = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
     const user = await User.create({
       email: request.email,
@@ -72,12 +77,24 @@ export const handleCreateUser = async (request: yup.InferType<typeof createUserS
 
     logger.info({ message: 'User created successfully', email: request.email, uuid: user.uuid })
 
+    // Send verification email
+    try {
+      await emailService.sendVerificationEmail({
+        email: user.email,
+        verification_token: emailToken,
+        user_uuid: user.uuid
+      })
+    } catch (emailError) {
+      logger.error({ message: 'Failed to send verification email', error: emailError, user_uuid: user.uuid })
+      // Continue with user creation even if email fails
+    }
+
     return {
       response: {
         message: 'User account created successfully, verification email sent',
         uuid: user.uuid,
         email: user.email,
-        verification_token: emailToken // In production, this would be sent via email
+        verification_token: emailToken // In production, this would only be sent via email
       },
       status: 201
     }
@@ -177,7 +194,7 @@ export const handleVerifyUser = async (request: yup.InferType<typeof verifyUserS
     await user.update({
       verified: true,
       email_token: generateEmailToken(), // Generate new token for security
-      email_token_expiry: new Date(Date.now() + 24 * 60 * 60 * 1000)
+      email_token_expiry: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
     })
 
     return {
@@ -225,6 +242,71 @@ export const handleFetchUser = async (userUuid: string) => {
     logger.error({ message: 'Error fetching user', error })
     return {
       response: 'Error fetching user profile',
+      error: true,
+      status: 500
+    }
+  }
+}
+
+export const handleResendVerification = async (request: yup.InferType<typeof resendVerificationSchema>) => {
+  try {
+    const user = await User.findOne({ where: { email: request.email } })
+
+    if (!user) {
+      return {
+        response: 'User not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    if (user.verified) {
+      return {
+        response: 'Email is already verified',
+        error: true,
+        status: 400
+      }
+    }
+
+    // Generate new verification token
+    const emailToken = generateEmailToken()
+    const emailTokenExpiry = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+
+    await user.update({
+      email_token: emailToken,
+      email_token_expiry: emailTokenExpiry
+    })
+
+    // Send verification email
+    try {
+      await emailService.sendVerificationEmail({
+        email: user.email,
+        verification_token: emailToken,
+        user_uuid: user.uuid
+      })
+    } catch (emailError) {
+      logger.error({ message: 'Failed to resend verification email', error: emailError, user_uuid: user.uuid })
+      return {
+        response: 'Failed to send verification email',
+        error: true,
+        status: 500
+      }
+    }
+
+    logger.info({ message: 'Verification email resent successfully', email: request.email, uuid: user.uuid })
+
+    return {
+      response: {
+        message: 'Verification email sent successfully',
+        verification_token: emailToken // In development only
+      },
+      status: 200
+    }
+
+  } catch (error) {
+    logger.error({ message: 'Error resending verification email', error })
+    return {
+      response: 'Error resending verification email',
       error: true,
       status: 500
     }

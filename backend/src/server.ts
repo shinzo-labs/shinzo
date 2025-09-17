@@ -14,6 +14,8 @@ import {
   loginSchema,
   handleVerifyUser,
   verifyUserSchema,
+  handleResendVerification,
+  resendVerificationSchema,
   handleFetchUser
 } from './handlers/auth'
 
@@ -113,6 +115,25 @@ app.post('/auth/verify_user', async (request: FastifyRequest, reply: FastifyRepl
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Verify user error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.post('/auth/resend_verification', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const validatedBody = await resendVerificationSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleResendVerification(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Resend verification error', error })
     if (error.name === 'ValidationError') {
       reply.status(400).send({ error: error.message })
     } else {
