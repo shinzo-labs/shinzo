@@ -233,17 +233,3 @@ export const telemetryService = {
     return handleResponse(response)
   }
 }
-
-export const ingestService = {
-  async ingestHTTP(ingestToken: string, data: any): Promise<{ status: string }> {
-    const response = await fetch(`${API_BASE_URL}/telemetry/ingest_http`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': ingestToken
-      },
-      body: JSON.stringify(data)
-    })
-    return handleResponse(response)
-  }
-}
