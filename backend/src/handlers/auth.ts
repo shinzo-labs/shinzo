@@ -5,6 +5,7 @@ import * as crypto from 'crypto'
 import * as jwt from 'jsonwebtoken'
 import { JWT_SECRET } from '../config'
 import { emailService } from '../services/emailService'
+import { handleGenerateIngestToken } from './ingestToken'
 
 export const createUserSchema = yup.object({
   email: yup.string().email('Invalid email format').required('Email is required'),
@@ -195,6 +196,15 @@ export const handleVerifyUser = async (request: yup.InferType<typeof verifyUserS
       email_token: generateEmailToken(), // Generate new token for security
       email_token_expiry: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
     })
+
+    // Auto-generate ingest token for newly verified users
+    try {
+      await handleGenerateIngestToken(user.uuid)
+      logger.info({ message: 'Auto-generated ingest token for verified user', userUuid: user.uuid })
+    } catch (tokenError) {
+      logger.error({ message: 'Failed to auto-generate ingest token', error: tokenError, userUuid: user.uuid })
+      // Continue with verification even if token generation fails
+    }
 
     return {
       response: {

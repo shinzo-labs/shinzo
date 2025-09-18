@@ -25,12 +25,8 @@ export const handleGenerateIngestToken = async (userUuid: string) => {
     }
     logger.info({ message: 'User found', userUuid, userEmail: user.email })
 
-    // Deprecate existing live tokens for this user
-    const updateResult = await IngestToken.update(
-      { status: 'deprecated' },
-      { where: { user_uuid: userUuid, status: 'live' } }
-    )
-    logger.info({ message: 'Deprecated existing tokens', userUuid, updatedCount: updateResult[0] })
+    // Note: We no longer automatically deprecate existing tokens when creating new ones
+    // Users can manually revoke tokens if they want to
 
     // Generate new token
     const newTokenValue = generateIngestToken()
