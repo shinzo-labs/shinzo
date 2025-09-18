@@ -116,7 +116,7 @@ export const DashboardPage: React.FC = () => {
     },
     {
       title: 'Avg Response Time',
-      value: `${stats.avgResponseTime}ms`,
+      value: `${stats.avgResponseTime.toFixed(2)}ms`,
       subtitle: 'Last 24 hours',
       icon: Icons.ClockIcon,
     },
@@ -157,27 +157,27 @@ export const DashboardPage: React.FC = () => {
           {statCards.map((stat) => {
             const Icon = stat.icon
             return (
-              <Card key={stat.title}>
-                <Flex align="center" gap="3">
+              <Card key={stat.title} style={{ padding: '20px' }}>
+                <Flex align="center" gap="4">
                   <Flex
                     align="center"
                     justify="center"
                     style={{
-                      width: '32px',
-                      height: '32px',
+                      width: '40px',
+                      height: '40px',
                       backgroundColor: 'var(--blue-3)',
                       borderRadius: 'var(--radius-2)',
                       color: 'var(--blue-9)'
                     }}
                   >
-                    <Icon width="20" height="20" />
+                    <Icon width="24" height="24" />
                   </Flex>
                   <Box style={{ flex: 1 }}>
-                    <Text size="2" color="gray" weight="medium">{stat.title}</Text>
-                    <Text size="6" weight="bold">{stat.value}</Text>
+                    <Text size="2" color="gray" weight="medium" style={{ marginBottom: '4px', display: 'block' }}>{stat.title}</Text>
+                    <Text size="6" weight="bold" style={{ marginBottom: '8px', display: 'block' }}>{stat.value}</Text>
                   </Box>
                 </Flex>
-                <Flex justify="start" align="center" style={{ marginTop: '16px' }}>
+                <Flex justify="start" align="center" style={{ marginTop: '20px' }}>
                   <Text size="2" color="gray">{stat.subtitle}</Text>
                 </Flex>
               </Card>
@@ -186,10 +186,10 @@ export const DashboardPage: React.FC = () => {
         </Grid>
 
         {/* Service overview */}
-        <Card>
-          <Flex direction="column" gap="4">
-            <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
-              <Heading size="4">Services</Heading>
+        <Card style={{ padding: '24px' }}>
+          <Flex direction="column" gap="6">
+            <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '20px' }}>
+              <Heading size="4" style={{ marginBottom: '8px' }}>Services</Heading>
               <Text size="2" color="gray">Active services and their status</Text>
             </Box>
             <Box>
@@ -200,13 +200,13 @@ export const DashboardPage: React.FC = () => {
                   ))}
                 </Flex>
               ) : resources.length > 0 ? (
-                <Flex direction="column" gap="4">
+                <Flex direction="column" gap="5">
                   {resources.slice(0, 5).map((resource: any) => (
-                    <Flex key={resource.uuid} justify="between" align="center">
-                      <Flex align="center" gap="3">
+                    <Flex key={resource.uuid} justify="between" align="center" style={{ padding: '8px 0' }}>
+                      <Flex align="center" gap="4">
                         <Badge color="green" variant="soft" style={{ width: '8px', height: '8px', padding: 0 }} />
                         <Box>
-                          <Text size="2" weight="medium">
+                          <Text size="2" weight="medium" style={{ marginBottom: '2px', display: 'block' }}>
                             {resource.service_name}
                           </Text>
                           <Text size="1" color="gray">

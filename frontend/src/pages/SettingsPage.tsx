@@ -208,17 +208,9 @@ export const SettingsPage: React.FC = () => {
               <Icons.PersonIcon />
               Profile
             </Tabs.Trigger>
-            <Tabs.Trigger value="notifications">
-              <Icons.BellIcon />
-              Notifications
-            </Tabs.Trigger>
             <Tabs.Trigger value="tokens">
               <Icons.TokensIcon />
               Ingest Tokens
-            </Tabs.Trigger>
-            <Tabs.Trigger value="data">
-              <Icons.ArchiveIcon />
-              Data & Retention
             </Tabs.Trigger>
           </Tabs.List>
 
@@ -251,99 +243,11 @@ export const SettingsPage: React.FC = () => {
                         />
                       </Flex>
 
-                      <Flex direction="column" gap="2">
-                        <Text size="2" weight="medium">Name</Text>
-                        <TextField.Root
-                          type="text"
-                          value={profile?.name || ''}
-                          placeholder="Your name"
-                        />
-                      </Flex>
-
-                      <Flex direction="column" gap="2">
-                        <Text size="2" weight="medium">Organization</Text>
-                        <TextField.Root
-                          type="text"
-                          value={profile?.organization || ''}
-                          placeholder="Your organization"
-                        />
-                      </Flex>
-
-                      <Box style={{ paddingTop: '16px' }}>
-                        <Button>Save Changes</Button>
-                      </Box>
                     </Flex>
                   )}
                 </Flex>
               </Card>
 
-              <Card>
-                <Flex direction="column" gap="4">
-                  <Heading size="4">Change Password</Heading>
-
-                  {!isChangingPassword ? (
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsChangingPassword(true)}
-                    >
-                      Change Password
-                    </Button>
-                  ) : (
-                    <form onSubmit={handlePasswordChange}>
-                      <Flex direction="column" gap="4">
-                        <Flex direction="column" gap="2">
-                          <Text size="2" weight="medium">Current Password</Text>
-                          <TextField.Root
-                            type="password"
-                            value={passwordForm.current_password}
-                            onChange={(e) => setPasswordForm(prev => ({ ...prev, current_password: e.target.value }))}
-                            required
-                          />
-                        </Flex>
-
-                        <Flex direction="column" gap="2">
-                          <Text size="2" weight="medium">New Password</Text>
-                          <TextField.Root
-                            type="password"
-                            value={passwordForm.new_password}
-                            onChange={(e) => setPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
-                            required
-                          />
-                        </Flex>
-
-                        <Flex direction="column" gap="2">
-                          <Text size="2" weight="medium">Confirm New Password</Text>
-                          <TextField.Root
-                            type="password"
-                            value={passwordForm.confirm_password}
-                            onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
-                            required
-                          />
-                        </Flex>
-
-                        <Flex gap="2">
-                          <Button
-                            type="submit"
-                            disabled={changePasswordMutation.isLoading}
-                          >
-                            {changePasswordMutation.isLoading ? 'Changing...' : 'Change Password'}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => {
-                              setIsChangingPassword(false)
-                              setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </Flex>
-                      </Flex>
-                    </form>
-                  )}
-                </Flex>
-              </Card>
 
               <Card>
                 <Flex direction="column" gap="4">
@@ -360,70 +264,6 @@ export const SettingsPage: React.FC = () => {
             </Flex>
           </Tabs.Content>
 
-          <Tabs.Content value="notifications">
-            <Card>
-              <Flex direction="column" gap="4">
-                <Heading size="4">Notification Preferences</Heading>
-
-                {isLoading ? (
-                  <Flex direction="column" gap="4">
-                    {[1, 2, 3, 4].map(i => (
-                      <Flex key={i} justify="between" align="center">
-                        <Box style={{ height: '16px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '50%' }} />
-                        <Box style={{ height: '24px', backgroundColor: 'var(--gray-3)', borderRadius: '12px', width: '40px' }} />
-                      </Flex>
-                    ))}
-                  </Flex>
-                ) : (
-                  <Flex direction="column" gap="4">
-                    <Flex justify="between" align="center">
-                      <Box>
-                        <Text size="2" weight="medium">Email Alerts</Text>
-                        <Text size="2" color="gray">Receive important notifications via email</Text>
-                      </Box>
-                      <Switch
-                        checked={settings?.notifications?.email_alerts || false}
-                        onCheckedChange={(checked) => handleNotificationChange('email_alerts', checked)}
-                      />
-                    </Flex>
-
-                    <Flex justify="between" align="center">
-                      <Box>
-                        <Text size="2" weight="medium">Trace Errors</Text>
-                        <Text size="2" color="gray">Get notified when traces have errors</Text>
-                      </Box>
-                      <Switch
-                        checked={settings?.notifications?.trace_errors || false}
-                        onCheckedChange={(checked) => handleNotificationChange('trace_errors', checked)}
-                      />
-                    </Flex>
-
-                    <Flex justify="between" align="center">
-                      <Box>
-                        <Text size="2" weight="medium">Performance Alerts</Text>
-                        <Text size="2" color="gray">Receive alerts for performance issues</Text>
-                      </Box>
-                      <Switch
-                        checked={settings?.notifications?.performance_alerts || false}
-                        onCheckedChange={(checked) => handleNotificationChange('performance_alerts', checked)}
-                      />
-                    </Flex>
-
-                    <Flex justify="between" align="center">
-                      <Box>
-                        <Text size="2" weight="medium">Weekly Reports</Text>
-                        <Text size="2" color="gray">Get weekly summary reports</Text>
-                      </Box>
-                      <Switch
-                        checked={settings?.notifications?.weekly_reports || false}
-                        onCheckedChange={(checked) => handleNotificationChange('weekly_reports', checked)}
-                      />
-                    </Flex>
-                  </Flex>
-                )}
-              </Flex>
-            </Card>
-          </Tabs.Content>
 
           <Tabs.Content value="tokens">
             <Card>
@@ -515,114 +355,6 @@ export const SettingsPage: React.FC = () => {
             </Card>
           </Tabs.Content>
 
-          <Tabs.Content value="data">
-            <Flex direction="column" gap="6">
-              <Card>
-                <Flex direction="column" gap="4">
-                  <Heading size="4">Data Retention</Heading>
-
-                  {isLoading ? (
-                    <Flex direction="column" gap="4">
-                      {[1, 2, 3].map(i => (
-                        <Flex key={i} justify="between" align="center">
-                          <Box style={{ height: '16px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '50%' }} />
-                          <Box style={{ height: '40px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '80px' }} />
-                        </Flex>
-                      ))}
-                    </Flex>
-                  ) : (
-                    <Flex direction="column" gap="4">
-                      <Flex justify="between" align="center">
-                        <Box>
-                          <Text size="2" weight="medium">Traces Retention (days)</Text>
-                          <Text size="2" color="gray">How long to keep trace data</Text>
-                        </Box>
-                        <Select.Root
-                          value={settings?.data_retention?.traces_days?.toString() || '30'}
-                          onValueChange={(value) => handleRetentionChange('traces_days', parseInt(value))}
-                        >
-                          <Select.Trigger placeholder="Select days" style={{ minWidth: '100px' }} />
-                          <Select.Content>
-                            {[7, 14, 30, 60, 90, 180].map((days) => (
-                              <Select.Item key={days} value={days.toString()}>
-                                {days} days
-                              </Select.Item>
-                            ))}
-                          </Select.Content>
-                        </Select.Root>
-                      </Flex>
-
-                      <Flex justify="between" align="center">
-                        <Box>
-                          <Text size="2" weight="medium">Metrics Retention (days)</Text>
-                          <Text size="2" color="gray">How long to keep metrics data</Text>
-                        </Box>
-                        <Select.Root
-                          value={settings?.data_retention?.metrics_days?.toString() || '90'}
-                          onValueChange={(value) => handleRetentionChange('metrics_days', parseInt(value))}
-                        >
-                          <Select.Trigger placeholder="Select days" style={{ minWidth: '100px' }} />
-                          <Select.Content>
-                            {[30, 60, 90, 180, 365].map((days) => (
-                              <Select.Item key={days} value={days.toString()}>
-                                {days} days
-                              </Select.Item>
-                            ))}
-                          </Select.Content>
-                        </Select.Root>
-                      </Flex>
-                    </Flex>
-                  )}
-                </Flex>
-              </Card>
-
-              <Card>
-                <Flex direction="column" gap="4">
-                  <Heading size="4">Sampling Configuration</Heading>
-
-                  {isLoading ? (
-                    <Flex direction="column" gap="4">
-                      <Flex justify="between" align="center">
-                        <Box style={{ height: '16px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '50%' }} />
-                        <Box style={{ height: '24px', backgroundColor: 'var(--gray-3)', borderRadius: '12px', width: '40px' }} />
-                      </Flex>
-                      <Box style={{ height: '40px', backgroundColor: 'var(--gray-3)', borderRadius: '4px' }} />
-                    </Flex>
-                  ) : (
-                    <Flex direction="column" gap="4">
-                      <Flex justify="between" align="center">
-                        <Box>
-                          <Text size="2" weight="medium">Enable Sampling</Text>
-                          <Text size="2" color="gray">Reduce data volume by sampling traces</Text>
-                        </Box>
-                        <Switch
-                          checked={settings?.sampling?.enabled || false}
-                          onCheckedChange={(checked) => handleSamplingChange('enabled', checked)}
-                        />
-                      </Flex>
-
-                      {settings?.sampling?.enabled && (
-                        <Flex direction="column" gap="2">
-                          <Text size="2" weight="medium">Sampling Rate (%)</Text>
-                          <TextField.Root
-                            type="number"
-                            min="1"
-                            max="100"
-                            value={settings?.sampling?.rate || 10}
-                            onChange={(e) => handleSamplingChange('rate', parseInt(e.target.value))}
-                            style={{ width: '128px' }}
-                          />
-                          <Text size="1" color="gray">
-                            Percentage of traces to keep
-                          </Text>
-                        </Flex>
-                      )}
-                    </Flex>
-                  )}
-                </Flex>
-              </Card>
-            </Flex>
-          </Tabs.Content>
         </Tabs.Root>
       </Flex>
     </AppLayout>

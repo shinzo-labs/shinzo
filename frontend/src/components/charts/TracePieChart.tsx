@@ -23,13 +23,13 @@ export const TracePieChart: React.FC<TracePieChartProps> = ({
   const totalValue = data.reduce((sum, item) => sum + item.value, 0)
 
   const formatTooltip = (value: number, name: string) => {
-    const percentage = ((value / totalValue) * 100).toFixed(1)
+    const percentage = ((value / totalValue) * 100).toFixed(2)
     return [`${value} (${percentage}%)`, name]
   }
 
   const renderCustomLabel = (entry: any) => {
     const percentage = ((entry.value / totalValue) * 100)
-    return percentage > 5 ? `${percentage.toFixed(1)}%` : ''
+    return percentage > 5 ? `${percentage.toFixed(2)}%` : ''
   }
 
   return (

@@ -93,8 +93,6 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ onTimeRangeCha
           }}
         >
           <Flex direction="column" gap="4">
-            <Text size="3" weight="medium">Time Format (1m or 2h or 3d)</Text>
-
             <Grid columns="2" gap="4">
               {/* Left column - Preset ranges */}
               <Flex direction="column" gap="2">
@@ -111,14 +109,6 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ onTimeRangeCha
                     {preset.label}
                   </Button>
                 ))}
-
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowPicker(false)}
-                  style={{ justifyContent: 'flex-start', marginTop: '16px' }}
-                >
-                  Custom
-                </Button>
               </Flex>
 
               {/* Right column - Relative times */}
@@ -142,26 +132,6 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ onTimeRangeCha
                     </Button>
                   ))}
                 </Grid>
-
-                {/* Custom date range inputs */}
-                <Flex direction="column" gap="2" style={{ marginTop: '16px' }}>
-                  <Text size="2" color="gray">Current timezone — UTC - 7:00</Text>
-                  <TextField.Root
-                    placeholder="Start time"
-                    type="datetime-local"
-                    value={customStart}
-                    onChange={(e) => setCustomStart(e.target.value)}
-                  />
-                  <TextField.Root
-                    placeholder="End time"
-                    type="datetime-local"
-                    value={customEnd}
-                    onChange={(e) => setCustomEnd(e.target.value)}
-                  />
-                  <Button onClick={handleCustomRange} disabled={!customStart || !customEnd}>
-                    Apply Custom Range
-                  </Button>
-                </Flex>
               </Flex>
             </Grid>
           </Flex>

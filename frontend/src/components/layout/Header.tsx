@@ -37,12 +37,6 @@ export const Header: React.FC = () => {
         </TextField.Root>
       </Flex>
 
-      {/* System status indicator */}
-      <Flex align="center" gap="4">
-        <Badge color="green" variant="soft">
-          All systems operational
-        </Badge>
-      </Flex>
 
       {/* User menu */}
       <DropdownMenu.Root>
@@ -61,19 +55,6 @@ export const Header: React.FC = () => {
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end">
           <DropdownMenu.Label>{user?.email}</DropdownMenu.Label>
-          <DropdownMenu.Separator />
-          <DropdownMenu.Item>
-            <Icons.PersonIcon />
-            Profile
-          </DropdownMenu.Item>
-          <DropdownMenu.Item>
-            <Icons.GearIcon />
-            Settings
-          </DropdownMenu.Item>
-          <DropdownMenu.Item>
-            <Icons.QuestionMarkCircledIcon />
-            Help & Documentation
-          </DropdownMenu.Item>
           <DropdownMenu.Separator />
           <DropdownMenu.Item color="red" onSelect={handleLogout}>
             <Icons.ExitIcon />

@@ -44,10 +44,25 @@ export const ResourcesPage: React.FC = () => {
 
   const resourceTypes = ['all', 'service', 'host', 'container', 'database', 'queue', 'other']
 
-  const formatAttributes = (attributes: Record<string, any>) => {
-    return Object.entries(attributes)
+  const formatAttributes = (attributes: Record<string, any> | null | undefined) => {
+    if (!attributes || typeof attributes !== 'object') {
+      return 'No attributes'
+    }
+
+    const entries = Object.entries(attributes)
+    if (entries.length === 0) {
+      return 'No attributes'
+    }
+
+    return entries
       .slice(0, 3)
-      .map(([key, value]) => `${key}: ${value}`)
+      .map(([key, value]) => {
+        // Handle cases where value might be an object, array, or other complex type
+        const displayValue = typeof value === 'object' && value !== null
+          ? JSON.stringify(value)
+          : String(value)
+        return `${key}: ${displayValue}`
+      })
       .join(', ')
   }
 

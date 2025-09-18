@@ -164,7 +164,8 @@ export const ingestTokenService = {
   async generate(token: string): Promise<{ token: string; uuid: string; status: string; created_at: string }> {
     const response = await fetch(`${API_BASE_URL}/auth/generate_ingest_token`, {
       method: 'POST',
-      headers: getAuthHeaders(token)
+      headers: getAuthHeaders(token),
+      body: JSON.stringify({})
     })
     return handleResponse(response)
   },
