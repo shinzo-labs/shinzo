@@ -10,8 +10,9 @@ export const VerifyPage: React.FC = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
 
-  const { verify } = useAuth()
+  const { verify, resendVerification } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -67,6 +68,24 @@ export const VerifyPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     handleVerification()
+  }
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      setError('Please enter your email address first')
+      return
+    }
+
+    setError('')
+    setResendLoading(true)
+
+    try {
+      await resendVerification(email)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to resend verification email')
+    } finally {
+      setResendLoading(false)
+    }
   }
 
   if (success) {
@@ -161,8 +180,11 @@ export const VerifyPage: React.FC = () => {
           <Flex direction="column" gap="4" align="center">
             <Text size="2" color="gray" align="center">
               Didn't receive the verification email?{' '}
-              <Text style={{ color: 'var(--accent-9)', cursor: 'pointer' }}>
-                Resend verification email
+              <Text
+                style={{ color: 'var(--accent-9)', cursor: 'pointer' }}
+                onClick={handleResendVerification}
+              >
+                {resendLoading ? 'Sending...' : 'Resend verification email'}
               </Text>
             </Text>
 

@@ -52,7 +52,15 @@ export const Sidebar: React.FC = () => {
     >
       {/* Logo */}
       <Flex align="center" gap="3" style={{ padding: '16px', height: '64px', borderBottom: '1px solid var(--gray-6)' }}>
-        <Avatar fallback="S" color="blue" size="2" />
+        <img
+          src="/ShinzoIcon512.png"
+          alt="Shinzo Logo"
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '6px'
+          }}
+        />
         <Text size="4" weight="bold">Shinzo</Text>
       </Flex>
 
