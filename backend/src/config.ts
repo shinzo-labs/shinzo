@@ -5,7 +5,7 @@ dotenv.config()
 export const DATABASE_URL = process.env.DATABASE_URL ?? ''
 
 // Server Configuration
-export const PORT = process.env.PORT ?? '8000'
+export const PORT = process.env.BACKEND_PORT ?? process.env.PORT ?? '8004'
 export const GRPC_PORT = process.env.GRPC_PORT ?? '4317'
 export const HTTP_PORT = process.env.HTTP_PORT ?? '4318'
 export const LOG_LEVEL = process.env.LOG_LEVEL ?? 'info'

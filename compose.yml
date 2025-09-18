@@ -65,7 +65,7 @@ services:
       - backend
     env_file: ./frontend/.env
     ports:
-      - "${FRONTEND_PORT:-3004}:${FRONTEND_PORT:-3004}"
+      - "3004:3004"
     volumes:
       - ./frontend/src:/app/src
     restart: always

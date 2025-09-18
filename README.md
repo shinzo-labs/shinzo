@@ -45,7 +45,7 @@ cp frontend/.env.example frontend/.env
 
 **Important Port Configuration:**
 - Backend runs on port **8004** (configurable via `BACKEND_PORT`)
-- Frontend runs on port **3004** (configurable via `FRONTEND_PORT`)
+- Frontend runs on port **3004** (configurable via `PORT` in frontend/.env)
 - OpenTelemetry GRPC on port **4317** (configurable via `OTEL_GRPC_PORT`)
 - OpenTelemetry HTTP on port **4318** (configurable via `OTEL_HTTP_PORT`)
 
