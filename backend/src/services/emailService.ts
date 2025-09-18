@@ -123,6 +123,21 @@ export class EmailService {
             background: linear-gradient(90deg, rgb(194, 229, 255) 0%, rgb(153, 255, 248) 50%, rgb(92, 122, 255) 100%);
             color: rgb(20, 20, 20);
         }
+        .logo-container {
+            display: inline-block;
+            width: 80px;
+            height: 80px;
+            background: white;
+            border-radius: 50%;
+            padding: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .logo-icon {
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+        }
         .logo-text {
             font-size: 28px;
             font-weight: 700;
@@ -263,6 +278,9 @@ export class EmailService {
 <body>
     <div class="email-container">
         <div class="header">
+            <div class="logo-container">
+                <img src="${FRONTEND_URL}/ShinzoIcon512.png" alt="Shinzo Logo" class="logo-icon">
+            </div>
             <h1 class="logo-text">Shinzo Platform</h1>
             <p class="header-title">Verify Your Email Address</p>
         </div>
