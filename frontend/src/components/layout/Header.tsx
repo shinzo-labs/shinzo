@@ -18,7 +18,7 @@ export const Header: React.FC = () => {
         padding: '16px 24px',
         minHeight: '64px'
       }}
-      justify="between"
+      justify="end"
       align="center"
       gap="4"
     >
