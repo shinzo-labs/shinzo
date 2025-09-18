@@ -38,9 +38,16 @@ Copy the example environment files and update them:
 cp backend/.env.example backend/.env
 # Edit backend/.env with your database URL and other settings
 
-# Frontend configuration (if exists)
+# Frontend configuration
 cp frontend/.env.example frontend/.env
+# Edit frontend/.env with your API URL and other frontend settings
 ```
+
+**Important Port Configuration:**
+- Backend runs on port **8004** (configurable via `BACKEND_PORT`)
+- Frontend runs on port **3004** (configurable via `PORT` in frontend/.env)
+- OpenTelemetry GRPC on port **4317** (configurable via `OTEL_GRPC_PORT`)
+- OpenTelemetry HTTP on port **4318** (configurable via `OTEL_HTTP_PORT`)
 
 ### 3. Local Development
 
@@ -66,7 +73,7 @@ docker-compose up --build -d
 
 Check that the backend is running:
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8004/health
 ```
 
 ## Managing Services
