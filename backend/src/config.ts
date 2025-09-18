@@ -30,11 +30,6 @@ export const RATE_LIMIT_BY_KEY = process.env.RATE_LIMIT_BY_KEY === 'true'
 export const ENABLE_IP_RATE_LIMIT = process.env.ENABLE_IP_RATE_LIMIT === 'true'
 
 // Email Configuration
-export const SMTP_HOST = process.env.SMTP_HOST ?? 'smtp.gmail.com'
-export const SMTP_PORT = parseInt(process.env.SMTP_PORT ?? '587')
-export const SMTP_SECURE = process.env.SMTP_SECURE === 'true'
-export const SMTP_USER = process.env.SMTP_USER ?? ''
-export const SMTP_PASS = process.env.SMTP_PASS ?? ''
 export const MAILGUN_API_KEY = process.env.MAILGUN_API_KEY ?? ''
 export const MAILGUN_DOMAIN = process.env.MAILGUN_DOMAIN ?? 'transactional.shinzo.ai'
 export const FROM_EMAIL = process.env.FROM_EMAIL ?? 'noreply@transactional.shinzo.ai'
