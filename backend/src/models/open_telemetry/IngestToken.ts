@@ -13,10 +13,6 @@ export class IngestToken extends CommonModel {
         user_uuid: {
           type: DataTypes.UUID,
           allowNull: false,
-          references: {
-            model: 'user',
-            key: 'uuid',
-          },
         },
         ingest_token: {
           type: DataTypes.TEXT,

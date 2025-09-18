@@ -1,12 +1,10 @@
-import * as nodemailer from 'nodemailer'
+import FormData from 'form-data'
+import Mailgun from 'mailgun.js'
 import { logger } from '../logger'
 import { User } from '../models'
 import {
-  SMTP_HOST,
-  SMTP_PORT,
-  SMTP_SECURE,
-  SMTP_USER,
-  SMTP_PASS,
+  MAILGUN_API_KEY,
+  MAILGUN_DOMAIN,
   FROM_EMAIL,
   FROM_NAME,
   FRONTEND_URL
@@ -20,10 +18,10 @@ export interface EmailVerificationData {
 
 export class EmailService {
   private static instance: EmailService
-  private transporter: nodemailer.Transporter
+  private mailgun: any
 
   private constructor() {
-    this.transporter = this.createTransporter()
+    this.mailgun = this.createMailgunClient()
   }
 
   public static getInstance(): EmailService {
@@ -33,26 +31,16 @@ export class EmailService {
     return EmailService.instance
   }
 
-  private createTransporter(): nodemailer.Transporter {
-    // For development, use either real SMTP or Ethereal test accounts
-    if (!SMTP_USER || !SMTP_PASS) {
-      logger.warn('SMTP credentials not configured - emails will be logged only')
-      // Return a test transporter that doesn't actually send
-      return nodemailer.createTransport({
-        streamTransport: true,
-        newline: 'unix',
-        buffer: true
-      })
+  private createMailgunClient() {
+    if (!MAILGUN_API_KEY || !MAILGUN_DOMAIN) {
+      logger.warn('Mailgun credentials not configured - emails will be logged only')
+      return null
     }
 
-    return nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_SECURE,
-      auth: {
-        user: SMTP_USER,
-        pass: SMTP_PASS
-      }
+    const mailgun = new Mailgun(FormData)
+    return mailgun.client({
+      username: 'api',
+      key: MAILGUN_API_KEY
     })
   }
 
@@ -222,7 +210,23 @@ export class EmailService {
     bcc?: string
   }): Promise<void> {
     try {
-      const mailOptions = {
+      if (!this.mailgun) {
+        logger.warn({
+          message: 'Mailgun not configured - email not sent',
+          to: options.to,
+          subject: options.subject
+        })
+        return
+      }
+
+      logger.info({
+        message: 'Sending email via Mailgun',
+        to: options.to,
+        subject: options.subject,
+        from: FROM_EMAIL
+      })
+
+      const mailData = {
         from: `${FROM_NAME} <${FROM_EMAIL}>`,
         to: options.to,
         subject: options.subject,
@@ -231,24 +235,17 @@ export class EmailService {
         ...(options.bcc && { bcc: options.bcc })
       }
 
-      logger.info({
-        message: 'Sending email',
-        to: options.to,
-        subject: options.subject,
-        from: FROM_EMAIL
-      })
-
-      const result = await this.transporter.sendMail(mailOptions)
+      const result = await this.mailgun.messages.create(MAILGUN_DOMAIN, mailData)
 
       logger.info({
-        message: 'Email sent successfully',
+        message: 'Email sent successfully via Mailgun',
         recipient: options.to,
-        messageId: result.messageId
+        messageId: result.id
       })
 
     } catch (error) {
       logger.error({
-        message: 'Failed to send email',
+        message: 'Failed to send email via Mailgun',
         error,
         to: options.to,
         subject: options.subject

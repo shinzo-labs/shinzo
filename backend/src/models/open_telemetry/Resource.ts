@@ -16,10 +16,6 @@ export class Resource extends CommonModel {
         user_uuid: {
           type: DataTypes.UUID,
           allowNull: false,
-          references: {
-            model: 'user',
-            key: 'uuid',
-          },
         },
         service_name: {
           type: DataTypes.TEXT,

@@ -365,6 +365,10 @@ const start = async () => {
     await sequelize.authenticate()
     logger.info('Database connection established successfully')
 
+    // Sync database (create tables if they don't exist)
+    await sequelize.sync({ force: false })
+    logger.info('Database tables synchronized successfully')
+
     // Start server
     logger.info({ msg: `Starting service on port ${PORT}` })
     await app.listen({ port: parseInt(PORT), host: '0.0.0.0' })

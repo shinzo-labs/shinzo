@@ -35,7 +35,9 @@ export const SMTP_PORT = parseInt(process.env.SMTP_PORT ?? '587')
 export const SMTP_SECURE = process.env.SMTP_SECURE === 'true'
 export const SMTP_USER = process.env.SMTP_USER ?? ''
 export const SMTP_PASS = process.env.SMTP_PASS ?? ''
-export const FROM_EMAIL = process.env.FROM_EMAIL ?? 'noreply@shinzolabs.com'
+export const MAILGUN_API_KEY = process.env.MAILGUN_API_KEY ?? ''
+export const MAILGUN_DOMAIN = process.env.MAILGUN_DOMAIN ?? 'transactional.shinzo.ai'
+export const FROM_EMAIL = process.env.FROM_EMAIL ?? 'noreply@transactional.shinzo.ai'
 export const FROM_NAME = process.env.FROM_NAME ?? 'Shinzo Platform'
 export const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:3000'
 
