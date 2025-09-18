@@ -2,8 +2,13 @@ import React from 'react'
 import { DropdownMenu, Avatar, Flex, Text, Button } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { useAuth } from '../../contexts/AuthContext'
+import { RefreshSettings } from '../ui/RefreshSettings'
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onRefresh?: () => void
+}
+
+export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
   const { user, logout } = useAuth()
 
   const handleLogout = () => {
@@ -18,12 +23,20 @@ export const Header: React.FC = () => {
         padding: '16px 24px',
         minHeight: '64px'
       }}
-      justify="end"
+      justify="between"
       align="center"
       gap="4"
     >
-      {/* User menu */}
-      <DropdownMenu.Root>
+      {/* Left side - could be used for page title or breadcrumbs later */}
+      <Flex />
+
+      {/* Right side */}
+      <Flex align="center" gap="4">
+        {/* Refresh settings */}
+        <RefreshSettings onRefresh={onRefresh} />
+
+        {/* User menu */}
+        <DropdownMenu.Root>
         <DropdownMenu.Trigger>
           <Button variant="ghost" size="2">
             <Avatar
@@ -46,6 +59,7 @@ export const Header: React.FC = () => {
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Root>
+      </Flex>
     </Flex>
   )
 }

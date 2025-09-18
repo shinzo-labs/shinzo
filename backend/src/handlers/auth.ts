@@ -26,6 +26,15 @@ export const resendVerificationSchema = yup.object({
   email: yup.string().email('Invalid email format').required('Email is required'),
 }).required()
 
+export const updateRefreshSettingsSchema = yup.object({
+  auto_refresh_enabled: yup.boolean().required('Auto refresh enabled flag is required'),
+  auto_refresh_interval_seconds: yup.number().nullable().when('auto_refresh_enabled', {
+    is: true,
+    then: (schema) => schema.positive('Interval must be positive').required('Interval is required when auto refresh is enabled'),
+    otherwise: (schema) => schema.nullable()
+  }),
+}).required()
+
 function hashPassword(password: string, salt: string): string {
   return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex')
 }
@@ -241,6 +250,8 @@ export const handleFetchUser = async (userUuid: string) => {
         uuid: user.uuid,
         email: user.email,
         verified: user.verified,
+        auto_refresh_enabled: user.auto_refresh_enabled,
+        auto_refresh_interval_seconds: user.auto_refresh_interval_seconds,
         created_at: user.created_at,
         updated_at: user.updated_at
       },
@@ -315,6 +326,49 @@ export const handleResendVerification = async (request: yup.InferType<typeof res
     logger.error({ message: 'Error resending verification email', error })
     return {
       response: 'Error resending verification email',
+      error: true,
+      status: 500
+    }
+  }
+}
+
+export const handleUpdateRefreshSettings = async (userUuid: string, request: yup.InferType<typeof updateRefreshSettingsSchema>) => {
+  try {
+    const user = await User.findByPk(userUuid)
+
+    if (!user) {
+      return {
+        response: 'User not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    await user.update({
+      auto_refresh_enabled: request.auto_refresh_enabled,
+      auto_refresh_interval_seconds: request.auto_refresh_enabled ? request.auto_refresh_interval_seconds : null
+    })
+
+    logger.info({
+      message: 'User refresh settings updated successfully',
+      userUuid: user.uuid,
+      auto_refresh_enabled: request.auto_refresh_enabled,
+      auto_refresh_interval_seconds: request.auto_refresh_interval_seconds
+    })
+
+    return {
+      response: {
+        message: 'Refresh settings updated successfully',
+        auto_refresh_enabled: user.auto_refresh_enabled,
+        auto_refresh_interval_seconds: user.auto_refresh_interval_seconds
+      },
+      status: 200
+    }
+
+  } catch (error) {
+    logger.error({ message: 'Error updating refresh settings', error })
+    return {
+      response: 'Error updating refresh settings',
       error: true,
       status: 500
     }

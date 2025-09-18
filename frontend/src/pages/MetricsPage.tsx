@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
@@ -7,6 +7,7 @@ import { DEFAULT_TIME_RANGE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
 import { telemetryService } from '../backendService'
 import { format, subHours, subDays } from 'date-fns'
+import { useAutoRefresh } from '../hooks/useAutoRefresh'
 
 interface Metric {
   uuid: string
@@ -74,6 +75,14 @@ export const MetricsPage: React.FC = () => {
     { enabled: !!token }
   )
 
+  // Refresh function for manual and auto-refresh
+  const handleRefresh = useCallback(() => {
+    queryClient.invalidateQueries(['metrics', timeRange])
+  }, [queryClient, timeRange])
+
+  // Set up auto-refresh
+  useAutoRefresh({ onRefresh: handleRefresh })
+
   // Filter metrics
   const filteredMetrics = metrics.filter((metric: Metric) => {
     if (metricNameFilter && !metric.name.toLowerCase().includes(metricNameFilter.toLowerCase())) {
@@ -102,24 +111,15 @@ export const MetricsPage: React.FC = () => {
   ]
 
   return (
-    <AppLayout>
+    <AppLayout onRefresh={handleRefresh}>
       <Flex direction="column" gap="6">
         {/* Page header */}
-        <Flex justify="between" align="center">
-          <Box>
-            <Heading size="6">Metrics</Heading>
-            <Text color="gray">
-              Application metrics and performance indicators
-            </Text>
-          </Box>
-          <Button
-            variant="outline"
-            onClick={() => queryClient.invalidateQueries(['metrics', timeRange])}
-          >
-            <Icons.ReloadIcon />
-            Refresh
-          </Button>
-        </Flex>
+        <Box>
+          <Heading size="6">Metrics</Heading>
+          <Text color="gray">
+            Application metrics and performance indicators
+          </Text>
+        </Box>
 
         {/* Filters */}
         <Card>

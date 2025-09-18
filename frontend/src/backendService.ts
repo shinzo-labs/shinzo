@@ -4,6 +4,8 @@ interface User {
   uuid: string
   email: string
   verified: boolean
+  auto_refresh_enabled: boolean
+  auto_refresh_interval_seconds: number | null
   created_at?: string
   updated_at?: string
 }
@@ -38,6 +40,17 @@ interface VerifyUserRequest {
 interface VerifyUserResponse {
   message: string
   verified: boolean
+}
+
+interface UpdateRefreshSettingsRequest {
+  auto_refresh_enabled: boolean
+  auto_refresh_interval_seconds: number | null
+}
+
+interface UpdateRefreshSettingsResponse {
+  message: string
+  auto_refresh_enabled: boolean
+  auto_refresh_interval_seconds: number | null
 }
 
 interface IngestToken {
@@ -155,6 +168,15 @@ export const authService = {
   async fetchUser(token: string): Promise<User> {
     const response = await fetch(`${API_BASE_URL}/auth/fetch_user`, {
       headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async updateRefreshSettings(token: string, settings: UpdateRefreshSettingsRequest): Promise<UpdateRefreshSettingsResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh_settings`, {
+      method: 'PUT',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(settings)
     })
     return handleResponse(response)
   }
