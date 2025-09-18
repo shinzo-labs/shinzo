@@ -204,13 +204,13 @@ export const RegisterPage: React.FC = () => {
                 />
                 <Text size="2" color="gray">
                   I agree to the{' '}
-                  <Link to="/terms" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
+                  <a href="https://www.shinzo.ai/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
                     Terms of Service
-                  </Link>{' '}
+                  </a>{' '}
                   and{' '}
-                  <Link to="/privacy" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
+                  <a href="https://www.shinzo.ai/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
                     Privacy Policy
-                  </Link>
+                  </a>
                 </Text>
               </Flex>
 

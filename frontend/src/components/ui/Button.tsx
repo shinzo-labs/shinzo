@@ -9,13 +9,13 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 export const Button = React.forwardRef<
   HTMLButtonElement,
   ButtonProps
->(({ className, variant = 'primary', size = 'md', ...props }, ref) => {
+>(({ className, variant = 'primary', size = 'md', style, ...props }, ref) => {
   return (
     <button
       className={clsx(
-        'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(92,122,255)] disabled:pointer-events-none disabled:opacity-50',
         {
-          'bg-blue-600 text-white hover:bg-blue-700': variant === 'primary',
+          'text-white hover:opacity-90': variant === 'primary',
           'bg-gray-200 text-gray-900 hover:bg-gray-300': variant === 'secondary',
           'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50': variant === 'outline',
           'text-gray-700 hover:bg-gray-100': variant === 'ghost',
@@ -26,6 +26,12 @@ export const Button = React.forwardRef<
         },
         className
       )}
+      style={{
+        ...(variant === 'primary' && {
+          background: 'linear-gradient(90deg, rgb(194, 229, 255) 0%, rgb(153, 255, 248) 50%, rgb(92, 122, 255) 100%)',
+        }),
+        ...style,
+      }}
       ref={ref}
       {...props}
     />

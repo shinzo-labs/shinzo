@@ -21,7 +21,7 @@ export const LoginPage: React.FC = () => {
     setLoading(true)
 
     try {
-      await login(email, password)
+      await login(email, password, rememberMe)
       navigate('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
@@ -116,13 +116,13 @@ export const LoginPage: React.FC = () => {
             </Text>
 
             <Flex gap="2" align="center">
-              <Link to="/privacy" style={{ color: 'var(--gray-9)', textDecoration: 'none', fontSize: '12px' }}>
+              <a href="https://www.shinzo.ai/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gray-9)', textDecoration: 'none', fontSize: '12px' }}>
                 Privacy Policy
-              </Link>
+              </a>
               <Text size="1" color="gray">•</Text>
-              <Link to="/terms" style={{ color: 'var(--gray-9)', textDecoration: 'none', fontSize: '12px' }}>
+              <a href="https://www.shinzo.ai/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gray-9)', textDecoration: 'none', fontSize: '12px' }}>
                 Terms of Service
-              </Link>
+              </a>
             </Flex>
           </Flex>
         </Flex>

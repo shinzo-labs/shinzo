@@ -121,7 +121,7 @@ export const ResourcesPage: React.FC = () => {
 
             {isLoading ? (
               <Flex justify="center" align="center" style={{ padding: '48px 0' }}>
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{borderBottomColor: 'rgb(92, 122, 255)'}}></div>
               </Flex>
             ) : error ? (
               <Flex direction="column" align="center" justify="center" style={{ padding: '48px 0', textAlign: 'center' }}>
