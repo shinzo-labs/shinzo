@@ -25,16 +25,6 @@ const presetRanges = [
   { label: 'Last 1 month', getValue: () => ({ start: subMonths(new Date(), 1), end: new Date() }) },
 ]
 
-const relativeRanges = [
-  { label: 'Last 3 hours', getValue: () => ({ start: subHours(new Date(), 3), end: new Date() }) },
-  { label: 'Last 4 days', getValue: () => ({ start: subDays(new Date(), 4), end: new Date() }) },
-  { label: 'Last 6 weeks', getValue: () => ({ start: subWeeks(new Date(), 6), end: new Date() }) },
-  { label: 'Last 12 hours', getValue: () => ({ start: subHours(new Date(), 12), end: new Date() }) },
-  { label: 'Last 10 days', getValue: () => ({ start: subDays(new Date(), 10), end: new Date() }) },
-  { label: 'Last 2 weeks', getValue: () => ({ start: subWeeks(new Date(), 2), end: new Date() }) },
-  { label: 'Last 2 months', getValue: () => ({ start: subMonths(new Date(), 2), end: new Date() }) },
-  { label: 'today', getValue: () => ({ start: new Date(new Date().setHours(0, 0, 0, 0)), end: new Date() }) },
-]
 
 export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ onTimeRangeChange, currentRange }) => {
   const [showPicker, setShowPicker] = useState(false)
@@ -85,7 +75,7 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ onTimeRangeCha
             top: '100%',
             left: 0,
             zIndex: 1000,
-            width: '800px',
+            width: '400px',
             padding: '16px',
             backgroundColor: 'var(--color-panel-solid)',
             border: '1px solid var(--gray-6)',
@@ -93,47 +83,22 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ onTimeRangeCha
           }}
         >
           <Flex direction="column" gap="4">
-            <Grid columns="2" gap="4">
-              {/* Left column - Preset ranges */}
-              <Flex direction="column" gap="2">
-                {presetRanges.map((preset) => (
-                  <Button
-                    key={preset.label}
-                    variant="ghost"
-                    onClick={() => handlePresetClick(preset)}
-                    style={{
-                      justifyContent: 'flex-start',
-                      backgroundColor: currentRange.label === preset.label ? 'var(--gray-3)' : 'transparent'
-                    }}
-                  >
-                    {preset.label}
-                  </Button>
-                ))}
-              </Flex>
-
-              {/* Right column - Relative times */}
-              <Flex direction="column" gap="2">
-                <Text size="2" weight="medium" color="gray" style={{ marginBottom: '8px' }}>
-                  RELATIVE TIMES
-                </Text>
-                <Grid columns="2" gap="2">
-                  {relativeRanges.map((preset) => (
-                    <Button
-                      key={preset.label}
-                      variant="ghost"
-                      size="1"
-                      onClick={() => handlePresetClick(preset)}
-                      style={{
-                        justifyContent: 'flex-start',
-                        backgroundColor: currentRange.label === preset.label ? 'var(--gray-3)' : 'transparent'
-                      }}
-                    >
-                      {preset.label}
-                    </Button>
-                  ))}
-                </Grid>
-              </Flex>
-            </Grid>
+            {/* Single column - Preset ranges only */}
+            <Flex direction="column" gap="2">
+              {presetRanges.map((preset) => (
+                <Button
+                  key={preset.label}
+                  variant="ghost"
+                  onClick={() => handlePresetClick(preset)}
+                  style={{
+                    justifyContent: 'flex-start',
+                    backgroundColor: currentRange.label === preset.label ? 'var(--gray-3)' : 'transparent'
+                  }}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </Flex>
           </Flex>
         </Card>
       )}

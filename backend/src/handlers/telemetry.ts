@@ -32,17 +32,47 @@ export const handleFetchResources = async (userUuid: string) => {
     })
 
     return {
-      response: resources.map(resource => ({
-        uuid: resource.uuid,
-        service_name: resource.service_name,
-        service_version: resource.service_version,
-        service_namespace: resource.service_namespace,
-        first_seen: resource.first_seen,
-        last_seen: resource.last_seen,
-        created_at: resource.created_at,
-        updated_at: resource.updated_at,
-        attributes: (resource as any).attributes || []
-      })),
+      response: resources.map(resource => {
+        // Transform attributes array to key-value object
+        const attributes: Record<string, any> = {}
+        if ((resource as any).attributes && Array.isArray((resource as any).attributes)) {
+          (resource as any).attributes.forEach((attr: any) => {
+            let value: any
+            switch (attr.value_type) {
+              case 'string':
+                value = attr.string_value
+                break
+              case 'int':
+                value = attr.int_value
+                break
+              case 'double':
+                value = attr.double_value
+                break
+              case 'bool':
+                value = attr.bool_value
+                break
+              case 'array':
+                value = attr.array_value
+                break
+              default:
+                value = attr.string_value
+            }
+            attributes[attr.key] = value
+          })
+        }
+
+        return {
+          uuid: resource.uuid,
+          service_name: resource.service_name,
+          service_version: resource.service_version,
+          service_namespace: resource.service_namespace,
+          first_seen: resource.first_seen,
+          last_seen: resource.last_seen,
+          created_at: resource.created_at,
+          updated_at: resource.updated_at,
+          attributes
+        }
+      }),
       status: 200
     }
 
@@ -182,22 +212,52 @@ export const handleFetchSpans = async (userUuid: string, query: yup.InferType<ty
     })
 
     return {
-      response: spans.map(span => ({
-        uuid: span.uuid,
-        trace_uuid: span.trace_uuid,
-        parent_span_uuid: span.parent_span_uuid,
-        operation_name: span.operation_name,
-        start_time: span.start_time,
-        end_time: span.end_time,
-        duration_ms: span.duration_ms,
-        status_code: span.status_code,
-        status_message: span.status_message,
-        span_kind: span.span_kind,
-        service_name: span.service_name,
-        created_at: span.created_at,
-        updated_at: span.updated_at,
-        attributes: (span as any).attributes || []
-      })),
+      response: spans.map(span => {
+        // Transform attributes array to key-value object
+        const attributes: Record<string, any> = {}
+        if ((span as any).attributes && Array.isArray((span as any).attributes)) {
+          (span as any).attributes.forEach((attr: any) => {
+            let value: any
+            switch (attr.value_type) {
+              case 'string':
+                value = attr.string_value
+                break
+              case 'int':
+                value = attr.int_value
+                break
+              case 'double':
+                value = attr.double_value
+                break
+              case 'bool':
+                value = attr.bool_value
+                break
+              case 'array':
+                value = attr.array_value
+                break
+              default:
+                value = attr.string_value
+            }
+            attributes[attr.key] = value
+          })
+        }
+
+        return {
+          uuid: span.uuid,
+          trace_uuid: span.trace_uuid,
+          parent_span_uuid: span.parent_span_uuid,
+          operation_name: span.operation_name,
+          start_time: span.start_time,
+          end_time: span.end_time,
+          duration_ms: span.duration_ms,
+          status_code: span.status_code,
+          status_message: span.status_message,
+          span_kind: span.span_kind,
+          service_name: span.service_name,
+          created_at: span.created_at,
+          updated_at: span.updated_at,
+          attributes
+        }
+      }),
       status: 200
     }
 
@@ -262,20 +322,50 @@ export const handleFetchMetrics = async (userUuid: string, query: yup.InferType<
     })
 
     return {
-      response: metrics.map(metric => ({
-        uuid: metric.uuid,
-        name: metric.name,
-        description: metric.description,
-        unit: metric.unit,
-        metric_type: metric.metric_type,
-        timestamp: metric.timestamp,
-        value: metric.value,
-        scope_name: metric.scope_name,
-        scope_version: metric.scope_version,
-        created_at: metric.created_at,
-        updated_at: metric.updated_at,
-        attributes: (metric as any).attributes || []
-      })),
+      response: metrics.map(metric => {
+        // Transform attributes array to key-value object
+        const attributes: Record<string, any> = {}
+        if ((metric as any).attributes && Array.isArray((metric as any).attributes)) {
+          (metric as any).attributes.forEach((attr: any) => {
+            let value: any
+            switch (attr.value_type) {
+              case 'string':
+                value = attr.string_value
+                break
+              case 'int':
+                value = attr.int_value
+                break
+              case 'double':
+                value = attr.double_value
+                break
+              case 'bool':
+                value = attr.bool_value
+                break
+              case 'array':
+                value = attr.array_value
+                break
+              default:
+                value = attr.string_value
+            }
+            attributes[attr.key] = value
+          })
+        }
+
+        return {
+          uuid: metric.uuid,
+          name: metric.name,
+          description: metric.description,
+          unit: metric.unit,
+          metric_type: metric.metric_type,
+          timestamp: metric.timestamp,
+          value: metric.value,
+          scope_name: metric.scope_name,
+          scope_version: metric.scope_version,
+          created_at: metric.created_at,
+          updated_at: metric.updated_at,
+          attributes
+        }
+      }),
       status: 200
     }
 

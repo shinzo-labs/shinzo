@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useQuery } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
-import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
+import { Button, Card, Flex, Text, Heading, Badge, Box, Table, Dialog } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { useAuth } from '../contexts/AuthContext'
 import { telemetryService } from '../backendService'
@@ -17,32 +17,19 @@ interface Resource {
 
 export const ResourcesPage: React.FC = () => {
   const { token } = useAuth()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedType, setSelectedType] = useState('all')
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 20
+  const [selectedResource, setSelectedResource] = useState<any>(null)
 
   const { data: resources = [], isLoading, error } = useQuery(
-    ['resources', searchTerm, selectedType, currentPage],
+    'resources',
     async () => {
       return telemetryService.fetchResources(token!)
     },
     {
       enabled: !!token,
-      keepPreviousData: true,
     }
   )
 
-  const filteredResources = resources.filter((resource: any) => {
-    if (searchTerm && !resource.service_name?.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false
-    }
-    return true
-  })
-  const totalCount = filteredResources.length
-  const totalPages = Math.ceil(totalCount / itemsPerPage)
-
-  const resourceTypes = ['all', 'service', 'host', 'container', 'database', 'queue', 'other']
+  const totalCount = resources.length
 
   const formatAttributes = (attributes: Record<string, any> | null | undefined) => {
     if (!attributes || typeof attributes !== 'object') {
@@ -66,15 +53,6 @@ export const ResourcesPage: React.FC = () => {
       .join(', ')
   }
 
-  const handleSearch = () => {
-    setCurrentPage(1)
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch()
-    }
-  }
 
   return (
     <AppLayout>
@@ -86,51 +64,12 @@ export const ResourcesPage: React.FC = () => {
           </Text>
         </Flex>
 
-        <Card>
-          <Flex direction="column" gap="4">
-            <Text size="3" weight="medium">Search Resources</Text>
-            <Flex gap="4" align="end" wrap="wrap">
-              <Flex direction="column" gap="2" style={{ flex: 1, minWidth: '300px' }}>
-                <Text size="2" weight="medium">Search</Text>
-                <TextField.Root
-                  placeholder="Search resources by name or attributes..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                >
-                  <TextField.Slot>
-                    <Icons.MagnifyingGlassIcon height="16" width="16" />
-                  </TextField.Slot>
-                </TextField.Root>
-              </Flex>
-
-              <Flex direction="column" gap="2" style={{ minWidth: '140px' }}>
-                <Text size="2" weight="medium">Type</Text>
-                <Select.Root value={selectedType} onValueChange={setSelectedType}>
-                  <Select.Trigger placeholder="Select type" style={{ width: '100%' }} />
-                  <Select.Content>
-                    {resourceTypes.map((type) => (
-                      <Select.Item key={type} value={type}>
-                        {type === 'all' ? 'All Types' : type.charAt(0).toUpperCase() + type.slice(1)}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-              </Flex>
-
-              <Button onClick={handleSearch}>
-                <Icons.MagnifyingGlassIcon />
-                Search
-              </Button>
-            </Flex>
-          </Flex>
-        </Card>
 
         <Card>
           <Flex direction="column" gap="4">
             <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
               <Heading size="4">
-                Resources ({filteredResources.length})
+                Resources ({resources.length})
               </Heading>
             </Box>
 
@@ -144,14 +83,12 @@ export const ResourcesPage: React.FC = () => {
                 <Heading size="4" style={{ marginTop: '16px', marginBottom: '8px' }}>Error loading resources</Heading>
                 <Text color="gray">Please try again later</Text>
               </Flex>
-            ) : filteredResources.length === 0 ? (
+            ) : resources.length === 0 ? (
               <Flex direction="column" align="center" justify="center" style={{ padding: '48px 0', textAlign: 'center' }}>
                 <Icons.CubeIcon width="48" height="48" color="var(--gray-8)" />
                 <Heading size="4" style={{ marginTop: '16px', marginBottom: '8px' }}>No resources found</Heading>
                 <Text color="gray">
-                  {searchTerm || selectedType !== 'all'
-                    ? 'Try adjusting your search criteria'
-                    : 'No resources have been detected yet'}
+                  No resources have been detected yet
                 </Text>
               </Flex>
             ) : (
@@ -165,8 +102,12 @@ export const ResourcesPage: React.FC = () => {
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {filteredResources.map((resource: any) => (
-                    <Table.Row key={resource.uuid}>
+                  {resources.map((resource: any) => (
+                    <Table.Row
+                      key={resource.uuid}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setSelectedResource(resource)}
+                    >
                       <Table.RowHeaderCell>
                         <Flex direction="column" gap="1">
                           <Text size="2" weight="medium">{resource.service_name}</Text>
@@ -203,38 +144,68 @@ export const ResourcesPage: React.FC = () => {
           </Flex>
         </Card>
 
-        {totalPages > 1 && (
-          <Card>
-            <Flex justify="between" align="center">
-              <Text size="2" color="gray">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} results
-              </Text>
-              <Flex align="center" gap="2">
-                <Button
-                  variant="ghost"
-                  size="1"
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <Icons.ChevronLeftIcon />
-                  Previous
-                </Button>
-                <Text size="2" color="gray">
-                  Page {currentPage} of {totalPages}
-                </Text>
-                <Button
-                  variant="ghost"
-                  size="1"
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  Next
-                  <Icons.ChevronRightIcon />
-                </Button>
+
+        {/* Resource Details Modal */}
+        <Dialog.Root open={!!selectedResource} onOpenChange={(open) => !open && setSelectedResource(null)}>
+          <Dialog.Content style={{ maxWidth: '600px' }}>
+            <Dialog.Title>Resource Details</Dialog.Title>
+            {selectedResource && (
+              <Flex direction="column" gap="4">
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Service Name</Text>
+                  <Text size="3">{selectedResource.service_name}</Text>
+                </Flex>
+
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Resource ID</Text>
+                  <Text size="2" style={{ fontFamily: 'monospace', backgroundColor: 'var(--gray-2)', padding: '8px', borderRadius: '4px', wordBreak: 'break-all' }}>
+                    {selectedResource.uuid}
+                  </Text>
+                </Flex>
+
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Type</Text>
+                  <Badge color="blue" variant="soft" style={{ width: 'fit-content' }}>
+                    Service
+                  </Badge>
+                </Flex>
+
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Attributes</Text>
+                  {selectedResource.attributes && Object.keys(selectedResource.attributes).length > 0 ? (
+                    <Card style={{ backgroundColor: 'var(--gray-1)' }}>
+                      <Flex direction="column" gap="2">
+                        {Object.entries(selectedResource.attributes).map(([key, value]) => (
+                          <Flex key={key} direction="column" gap="1">
+                            <Text size="1" weight="medium" color="gray" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              {key}
+                            </Text>
+                            <Text size="2" style={{ fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                              {typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value)}
+                            </Text>
+                          </Flex>
+                        ))}
+                      </Flex>
+                    </Card>
+                  ) : (
+                    <Text size="2" color="gray">No attributes available</Text>
+                  )}
+                </Flex>
+
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Created</Text>
+                  <Text size="2">{new Date(selectedResource.created_at).toLocaleString()}</Text>
+                </Flex>
+
+                <Flex justify="end" gap="2" style={{ marginTop: '16px' }}>
+                  <Dialog.Close>
+                    <Button variant="outline">Close</Button>
+                  </Dialog.Close>
+                </Flex>
               </Flex>
-            </Flex>
-          </Card>
-        )}
+            )}
+          </Dialog.Content>
+        </Dialog.Root>
       </Flex>
     </AppLayout>
   )

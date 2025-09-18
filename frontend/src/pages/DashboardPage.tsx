@@ -1,15 +1,16 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, Card, Flex, Text, Heading, Badge, Grid, Box } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
-import { telemetryService } from '../backendService'
+import { telemetryService, ingestTokenService } from '../backendService'
 import { subHours } from 'date-fns'
 import { TimeRangePicker, TimeRange } from '../components/charts/TimeRangePicker'
 import { TraceTimeSeriesChart } from '../components/charts/TraceTimeSeriesChart'
 import { TracePieChart } from '../components/charts/TracePieChart'
+import { WelcomeBanner } from '../components/WelcomeBanner'
 import {
   processTracesForTimeSeriesByOperation,
   processTracesForTimeSeriesBySession,
@@ -28,6 +29,7 @@ interface DashboardStats {
 export const DashboardPage: React.FC = () => {
   const { token } = useAuth()
   const queryClient = useQueryClient()
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState(false)
 
   // State for time range
   const [timeRange, setTimeRange] = useState<TimeRange>({
@@ -35,6 +37,35 @@ export const DashboardPage: React.FC = () => {
     end: new Date(),
     label: 'Last 1 hour'
   })
+
+  // Check if user should see welcome banner (new user with fresh token)
+  useEffect(() => {
+    const checkForWelcomeBanner = async () => {
+      if (token) {
+        try {
+          const tokens = await ingestTokenService.fetchAll(token)
+          if (tokens.length === 1) {
+            // If user has exactly one token, they might be new
+            const tokenAge = new Date().getTime() - new Date(tokens[0].created_at).getTime()
+            const oneHourInMs = 60 * 60 * 1000
+
+            // Show banner if token was created within the last hour and banner hasn't been dismissed
+            if (tokenAge < oneHourInMs && !localStorage.getItem('welcomeBannerDismissed')) {
+              setShowWelcomeBanner(true)
+            }
+          }
+        } catch (error) {
+          console.error('Failed to check for welcome banner:', error)
+        }
+      }
+    }
+    checkForWelcomeBanner()
+  }, [token])
+
+  const handleDismissWelcomeBanner = () => {
+    setShowWelcomeBanner(false)
+    localStorage.setItem('welcomeBannerDismissed', 'true')
+  }
 
   // Fetch resources
   const { data: resources = [], isLoading: resourcesLoading } = useQuery(
@@ -125,6 +156,11 @@ export const DashboardPage: React.FC = () => {
   return (
     <AppLayout>
       <Flex direction="column" gap="6">
+        {/* Welcome Banner for new users */}
+        {showWelcomeBanner && (
+          <WelcomeBanner onDismiss={handleDismissWelcomeBanner} />
+        )}
+
         {/* Page header */}
         <Flex justify="between" align="center">
           <Box>

@@ -1,11 +1,10 @@
-import React, { useState } from 'react'
-import { DropdownMenu, TextField, Avatar, Flex, Text, Button, Badge } from '@radix-ui/themes'
+import React from 'react'
+import { DropdownMenu, Avatar, Flex, Text, Button } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { useAuth } from '../../contexts/AuthContext'
 
 export const Header: React.FC = () => {
   const { user, logout } = useAuth()
-  const [searchQuery, setSearchQuery] = useState('')
 
   const handleLogout = () => {
     logout()
@@ -23,21 +22,6 @@ export const Header: React.FC = () => {
       align="center"
       gap="4"
     >
-      {/* Global search */}
-      <Flex style={{ flex: 1, maxWidth: '400px' }}>
-        <TextField.Root
-          placeholder="Search traces, spans, services..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ width: '100%' }}
-        >
-          <TextField.Slot>
-            <Icons.MagnifyingGlassIcon height="16" width="16" />
-          </TextField.Slot>
-        </TextField.Root>
-      </Flex>
-
-
       {/* User menu */}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger>
