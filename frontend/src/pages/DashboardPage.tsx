@@ -173,6 +173,7 @@ export const DashboardPage: React.FC = () => {
             <TimeRangePicker
               currentRange={timeRange}
               onTimeRangeChange={setTimeRange}
+              preferenceKey="dashboard_time_range"
             />
             <Button
               variant="outline"
