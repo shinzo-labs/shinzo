@@ -104,6 +104,14 @@ interface TelemetryQueryParams {
   offset?: number
 }
 
+interface UserQuota {
+  currentUsage: number
+  monthlyQuota: number | null
+  tier: 'free' | 'growth' | 'scale'
+  lastCounterReset: string
+  subscribedOn: string | null
+}
+
 const getAuthHeaders = (token: string) => ({
   'Content-Type': 'application/json',
   'Authorization': `Bearer ${token}`
@@ -157,6 +165,13 @@ export const authService = {
       headers: getAuthHeaders(token)
     })
     return handleResponse(response)
+  },
+
+  async fetchUserQuota(token: string): Promise<UserQuota> {
+    const response = await fetch(`${API_BASE_URL}/auth/fetch_user_quota`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
   }
 }
 
@@ -186,6 +201,8 @@ export const ingestTokenService = {
     return handleResponse(response)
   }
 }
+
+export type { UserQuota }
 
 export const telemetryService = {
   async fetchResources(token: string): Promise<Resource[]> {

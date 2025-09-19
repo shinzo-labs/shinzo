@@ -3,6 +3,7 @@ import { DATABASE_URL, TZ } from "./config"
 import { logger } from "./logger"
 import {
   User,
+  SubscriptionTier,
   Resource,
   ResourceAttribute,
   IngestToken,
@@ -33,6 +34,7 @@ export const sequelize = new Sequelize(DATABASE_URL, {
 
 // Initialize models
 User.initialize(sequelize)
+SubscriptionTier.initialize(sequelize)
 Resource.initialize(sequelize)
 ResourceAttribute.initialize(sequelize)
 IngestToken.initialize(sequelize)
@@ -45,6 +47,9 @@ MetricAttribute.initialize(sequelize)
 // Set up associations
 User.hasMany(Resource, { foreignKey: 'user_uuid', as: 'resources' })
 User.hasMany(IngestToken, { foreignKey: 'user_uuid', as: 'ingestTokens' })
+User.belongsTo(SubscriptionTier, { foreignKey: 'subscription_tier_uuid', as: 'subscriptionTier' })
+
+SubscriptionTier.hasMany(User, { foreignKey: 'subscription_tier_uuid', as: 'users' })
 
 Resource.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
 Resource.hasMany(ResourceAttribute, { foreignKey: 'resource_uuid', as: 'attributes' })

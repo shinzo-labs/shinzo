@@ -1,5 +1,7 @@
 import * as yup from 'yup'
 import {
+  User,
+  SubscriptionTier,
   Resource,
   ResourceAttribute,
   IngestToken,
@@ -26,6 +28,82 @@ export const verifyIngestToken = async (token: string): Promise<IngestToken | nu
   } catch (error) {
     logger.error({ message: 'Error verifying ingest token', error })
     return null
+  }
+}
+
+export const checkAndUpdateQuota = async (
+  userUuid: string,
+  datapointCount: number,
+  transaction: Transaction
+): Promise<{ canIngest: boolean; quotaExceeded?: boolean; quotaInfo?: any }> => {
+  try {
+    const user = await User.findOne({
+      where: { uuid: userUuid },
+      include: [{
+        model: SubscriptionTier,
+        as: 'subscriptionTier'
+      }],
+      transaction
+    })
+
+    if (!user) {
+      return { canIngest: false }
+    }
+
+    const now = new Date()
+    const lastReset = new Date(user.last_counter_reset)
+    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+
+    // Check if we need to reset the counter (if more than 1 month has passed)
+    if (lastReset <= oneMonthAgo) {
+      await user.update({
+        monthly_counter: 0,
+        last_counter_reset: now
+      }, { transaction })
+      user.monthly_counter = 0
+    }
+
+    const subscriptionTier = (user as any).subscriptionTier
+    const monthlyQuota = subscriptionTier?.monthly_quota
+
+    // If quota is null (scale tier), allow unlimited ingestion
+    if (monthlyQuota === null) {
+      await user.update({
+        monthly_counter: user.monthly_counter + datapointCount
+      }, { transaction })
+      return { canIngest: true }
+    }
+
+    // Check if adding this data would exceed quota
+    if (user.monthly_counter + datapointCount > monthlyQuota) {
+      return {
+        canIngest: false,
+        quotaExceeded: true,
+        quotaInfo: {
+          currentUsage: user.monthly_counter,
+          monthlyQuota: monthlyQuota,
+          tier: subscriptionTier?.tier
+        }
+      }
+    }
+
+    // Update the counter
+    await user.update({
+      monthly_counter: user.monthly_counter + datapointCount
+    }, { transaction })
+
+    return {
+      canIngest: true,
+      quotaInfo: {
+        currentUsage: user.monthly_counter + datapointCount,
+        monthlyQuota: monthlyQuota,
+        tier: subscriptionTier?.tier
+      }
+    }
+
+  } catch (error) {
+    logger.error({ message: 'Error checking quota', error })
+    return { canIngest: false }
   }
 }
 
@@ -207,6 +285,57 @@ export const handleIngestHTTP = async (ingestToken: IngestToken, data: OTLPData)
   try {
     let totalSpans = 0
     let totalMetrics = 0
+
+    // Calculate total datapoints first (for quota checking)
+    let totalDatapoints = 0
+    if (data.resourceSpans) {
+      for (const resourceSpan of data.resourceSpans) {
+        for (const scopeSpan of resourceSpan.scopeSpans) {
+          totalDatapoints += scopeSpan.spans.length
+        }
+      }
+    }
+    if (data.resourceMetrics) {
+      for (const resourceMetric of data.resourceMetrics) {
+        for (const scopeMetric of resourceMetric.scopeMetrics) {
+          for (const otlpMetric of scopeMetric.metrics) {
+            if (otlpMetric.gauge) {
+              totalDatapoints += otlpMetric.gauge.dataPoints.length
+            } else if (otlpMetric.sum) {
+              totalDatapoints += otlpMetric.sum.dataPoints.length
+            } else if (otlpMetric.histogram) {
+              totalDatapoints += otlpMetric.histogram.dataPoints.length
+            }
+          }
+        }
+      }
+    }
+
+    // Check quota before processing
+    const quotaCheck = await checkAndUpdateQuota(ingestToken.user_uuid, totalDatapoints, transaction)
+    if (!quotaCheck.canIngest) {
+      await transaction.rollback()
+      if (quotaCheck.quotaExceeded) {
+        logger.warn({
+          message: 'Quota exceeded for user',
+          userUuid: ingestToken.user_uuid,
+          quotaInfo: quotaCheck.quotaInfo
+        })
+        return {
+          response: {
+            message: 'Monthly quota exceeded. Please upgrade your subscription to continue ingesting data.',
+            quotaInfo: quotaCheck.quotaInfo
+          },
+          status: 429
+        }
+      } else {
+        return {
+          response: 'Error checking user quota',
+          error: true,
+          status: 500
+        }
+      }
+    }
 
     // Process traces and spans
     if (data.resourceSpans) {

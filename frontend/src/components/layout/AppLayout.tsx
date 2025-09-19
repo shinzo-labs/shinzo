@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
+import { QuotaBar } from '../QuotaBar'
 import { Flex, Box } from '@radix-ui/themes'
 
 interface AppLayoutProps {
@@ -12,6 +13,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     <Flex style={{ minHeight: '100vh' }}>
       <Sidebar />
       <Flex direction="column" style={{ flex: 1 }}>
+        <QuotaBar />
         <Header />
         <Box style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
           {children}

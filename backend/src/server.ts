@@ -16,7 +16,8 @@ import {
   verifyUserSchema,
   handleResendVerification,
   resendVerificationSchema,
-  handleFetchUser
+  handleFetchUser,
+  handleFetchUserQuota
 } from './handlers/auth'
 
 import {
@@ -151,6 +152,19 @@ app.get('/auth/fetch_user', async (request: AuthenticatedRequest, reply: Fastify
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Fetch user error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.get('/auth/fetch_user_quota', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleFetchUserQuota(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch user quota error', error })
     reply.status(500).send({ error: 'Internal server error' })
   }
 })
