@@ -1,52 +1,11 @@
 version: '3.8'
 
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: shinzo-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    container_name: shinzo-zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
-
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    container_name: shinzo-kafka
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_LOG_RETENTION_HOURS: 168
-      KAFKA_LOG_SEGMENT_BYTES: 1073741824
-      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
-
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: shinzo-backend
-    depends_on:
-      redis:
-        condition: service_healthy
     env_file: ./backend/.env
     ports:
       - "${BACKEND_PORT:-8004}:${BACKEND_PORT:-8004}"
@@ -70,5 +29,3 @@ services:
       - ./frontend/src:/app/src
     restart: always
 
-volumes:
-  redis_data:
