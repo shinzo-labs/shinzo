@@ -1,4 +1,5 @@
-FROM node:lts
+# Build stage
+FROM node:lts AS build
 
 WORKDIR /app
 
@@ -13,4 +14,20 @@ COPY --chown=node:node ["./", "./"]
 
 RUN pnpm run build
 
-ENTRYPOINT ["pnpm", "run", "start"]
+# Production stage
+FROM nginx:alpine
+
+# Copy built assets from build stage
+COPY --from=build /app/build /usr/share/nginx/html
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001 && \
+    chown -R nextjs:nodejs /usr/share/nginx/html
+
+EXPOSE 3000
+
+CMD ["nginx", "-g", "daemon off;"]
