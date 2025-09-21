@@ -12,6 +12,14 @@ RUN pnpm install -r --offline
 
 COPY --chown=node:node ["./", "./"]
 
+# Set production environment variables for React build
+ENV REACT_APP_BACKEND_URL=https://api.app.shinzo.ai
+ENV REACT_APP_LOG_LEVEL=info
+ENV REACT_APP_REFRESH_INTERVAL=30000
+ENV REACT_APP_MAX_CACHE_AGE=300000
+ENV REACT_APP_ENABLE_REALTIME=true
+ENV REACT_APP_DEFAULT_TIME_RANGE=1h
+
 RUN pnpm run build
 
 # Production stage
