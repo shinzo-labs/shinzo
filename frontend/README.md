@@ -14,7 +14,7 @@ cp .env.example .env
 ```
 
 Key environment variables:
-- `PORT` - Frontend server port (default: 3004)
+- `PORT` - Frontend server port (default: 3000)
 - `REACT_APP_BACKEND_URL` - Backend API URL (default: http://localhost:8000)
 
 ### Run Locally
