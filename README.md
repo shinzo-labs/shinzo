@@ -44,8 +44,8 @@ cp frontend/.env.example frontend/.env
 ```
 
 **Important Port Configuration:**
-- Backend runs on port **8004** (configurable via `BACKEND_PORT`)
-- Frontend runs on port **3004** (configurable via `PORT` in frontend/.env)
+- Backend runs on port **8000** (configurable via `BACKEND_PORT`)
+- Frontend runs on port **3000** (configurable via `PORT` in frontend/.env)
 - OpenTelemetry GRPC on port **4317** (configurable via `OTEL_GRPC_PORT`)
 - OpenTelemetry HTTP on port **4318** (configurable via `OTEL_HTTP_PORT`)
 
@@ -73,7 +73,7 @@ docker-compose up --build -d
 
 Check that the backend is running:
 ```bash
-curl http://localhost:8004/health
+curl http://localhost:8000/health
 ```
 
 ## Managing Services
