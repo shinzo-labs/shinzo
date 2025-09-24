@@ -79,7 +79,27 @@ export const RegisterPage: React.FC = () => {
     return (
       <div className="auth-page">
         <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
-          <Flex direction="column" gap="6" align="center">
+          <Flex direction="column" gap="2" align="center">
+            <Flex justify="center" align="center" style={{ width: '100%' }}>
+              <a
+                href="https://www.shinzo.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: 'none' }}
+              >
+                <img
+                  src="/ShinzoIconV2-128x128.png"
+                  alt="Shinzo Labs"
+                  style={{
+                    width: '128px',
+                    height: '128px',
+                    cursor: 'pointer'
+                  }}
+                />
+              </a>
+              <div />
+            </Flex>
+
             <Flex
               justify="center"
               align="center"
@@ -140,11 +160,31 @@ export const RegisterPage: React.FC = () => {
   return (
     <div className="auth-page">
       <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
-        <Flex direction="column" gap="6">
+        <Flex direction="column" gap="2">
+          <Flex justify="center" align="center" style={{ width: '100%' }}>
+            <a
+              href="https://www.shinzo.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none' }}
+            >
+              <img
+                src="/ShinzoIconV2-128x128.png"
+                alt="Shinzo Labs"
+                style={{
+                  width: '128px',
+                  height: '128px',
+                  cursor: 'pointer'
+                }}
+              />
+            </a>
+            <div />
+          </Flex>
+
           <Flex direction="column" gap="2" align="center">
             <Heading size="6">Create Account</Heading>
             <Text size="2" color="gray">
-              Get started with Shinzo platform
+              Get started with Shinzo
             </Text>
           </Flex>
 
