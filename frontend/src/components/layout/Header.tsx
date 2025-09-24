@@ -22,6 +22,16 @@ export const Header: React.FC = () => {
       align="center"
       gap="4"
     >
+      {/* Documentation button */}
+      <Button
+        variant="outline"
+        size="2"
+        onClick={() => window.open('https://docs.shinzo.ai', '_blank')}
+      >
+        <Icons.QuestionMarkCircledIcon />
+        Docs
+      </Button>
+
       {/* User menu */}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger>
