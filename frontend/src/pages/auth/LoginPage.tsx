@@ -34,7 +34,7 @@ export const LoginPage: React.FC = () => {
     <div className="auth-page">
       <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
         <Flex direction="column" gap="6">
-          <Flex justify="space-between" align="center" style={{ width: '100%' }}>
+          <Flex justify="between" align="center" style={{ width: '100%' }}>
             <a
               href="https://www.shinzo.ai"
               target="_blank"
