@@ -80,6 +80,26 @@ export const RegisterPage: React.FC = () => {
       <div className="auth-page">
         <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
           <Flex direction="column" gap="6" align="center">
+            <Flex justify="space-between" align="center" style={{ width: '100%' }}>
+              <a
+                href="https://www.shinzo.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: 'none' }}
+              >
+                <img
+                  src="/ShinzoIconV2-128x128.png"
+                  alt="Shinzo Labs"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    cursor: 'pointer'
+                  }}
+                />
+              </a>
+              <div />
+            </Flex>
+
             <Flex
               justify="center"
               align="center"
@@ -141,6 +161,26 @@ export const RegisterPage: React.FC = () => {
     <div className="auth-page">
       <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
         <Flex direction="column" gap="6">
+          <Flex justify="space-between" align="center" style={{ width: '100%' }}>
+            <a
+              href="https://www.shinzo.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none' }}
+            >
+              <img
+                src="/ShinzoIconV2-128x128.png"
+                alt="Shinzo Labs"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  cursor: 'pointer'
+                }}
+              />
+            </a>
+            <div />
+          </Flex>
+
           <Flex direction="column" gap="2" align="center">
             <Heading size="6">Create Account</Heading>
             <Text size="2" color="gray">
