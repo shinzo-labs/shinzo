@@ -42,7 +42,7 @@ export const LoginPage: React.FC = () => {
               style={{ textDecoration: 'none' }}
             >
               <img
-                src="/ShinzoIconV2-128x128.png"
+                src="/ShinzoIcon512.png"
                 alt="Shinzo Labs"
                 style={{
                   width: '128px',
