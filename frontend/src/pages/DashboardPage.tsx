@@ -5,6 +5,7 @@ import { Button, Card, Flex, Text, Heading, Badge, Grid, Box } from '@radix-ui/t
 import * as Icons from '@radix-ui/react-icons'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
+import { useRefresh } from '../contexts/RefreshContext'
 import { telemetryService, ingestTokenService } from '../backendService'
 import { subHours } from 'date-fns'
 import { TimeRangePicker, TimeRange } from '../components/charts/TimeRangePicker'
@@ -28,6 +29,7 @@ interface DashboardStats {
 
 export const DashboardPage: React.FC = () => {
   const { token } = useAuth()
+  const { refreshTrigger } = useRefresh()
   const queryClient = useQueryClient()
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false)
 
@@ -69,7 +71,7 @@ export const DashboardPage: React.FC = () => {
 
   // Fetch resources
   const { data: resources = [], isLoading: resourcesLoading } = useQuery(
-    'resources',
+    ['resources', refreshTrigger],
     async () => {
       const response = await fetch(`${API_BASE_URL}/telemetry/fetch_resources`, {
         headers: {
@@ -84,7 +86,7 @@ export const DashboardPage: React.FC = () => {
 
   // Fetch traces for the selected time range for charts
   const { data: traces = [] } = useQuery(
-    ['dashboard-traces', timeRange.start.toISOString(), timeRange.end.toISOString()],
+    ['dashboard-traces', timeRange.start.toISOString(), timeRange.end.toISOString(), refreshTrigger],
     async () => {
       return telemetryService.fetchTraces(token!, {
         start_time: timeRange.start.toISOString(),
@@ -96,7 +98,7 @@ export const DashboardPage: React.FC = () => {
 
   // Fetch traces for last 24 hours to calculate stats
   const { data: statsTraces = [] } = useQuery(
-    'dashboard-stats-traces',
+    ['dashboard-stats-traces', refreshTrigger],
     async () => {
       const end = new Date()
       const start = subHours(end, 24)
@@ -169,23 +171,10 @@ export const DashboardPage: React.FC = () => {
               Overview of your telemetry data and system health
             </Text>
           </Box>
-          <Flex gap="3" align="center">
-            <TimeRangePicker
-              currentRange={timeRange}
-              onTimeRangeChange={setTimeRange}
-            />
-            <Button
-              variant="outline"
-              onClick={() => {
-                queryClient.invalidateQueries('resources')
-                queryClient.invalidateQueries(['dashboard-traces'])
-                queryClient.invalidateQueries('dashboard-stats-traces')
-              }}
-            >
-              <Icons.ReloadIcon />
-              Refresh
-            </Button>
-          </Flex>
+          <TimeRangePicker
+            currentRange={timeRange}
+            onTimeRangeChange={setTimeRange}
+          />
         </Flex>
 
         {/* Quick stats cards */}

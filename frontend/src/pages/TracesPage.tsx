@@ -103,7 +103,7 @@ export const TracesPage: React.FC = () => {
   ]
 
   return (
-    <AppLayout onRefresh={handleRefresh}>
+    <AppLayout>
       <Flex direction="column" gap="6">
         {/* Page header */}
         <Box>

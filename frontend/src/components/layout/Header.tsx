@@ -2,13 +2,8 @@ import React from 'react'
 import { DropdownMenu, Avatar, Flex, Text, Button } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { useAuth } from '../../contexts/AuthContext'
-import { RefreshSettings } from '../ui/RefreshSettings'
 
-interface HeaderProps {
-  onRefresh?: () => void
-}
-
-export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
+export const Header: React.FC = () => {
   const { user, logout } = useAuth()
 
   const handleLogout = () => {
@@ -42,9 +37,6 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
           <Icons.QuestionMarkCircledIcon />
           Docs
         </Button>
-        
-        {/* Refresh settings */}
-        <RefreshSettings onRefresh={onRefresh} />
 
         {/* User menu */}
         <DropdownMenu.Root>
