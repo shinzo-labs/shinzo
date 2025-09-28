@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Flex, Button, Text, Card, Grid, TextField } from '@radix-ui/themes'
 import { subMinutes, subHours, subDays, subWeeks, subMonths } from 'date-fns'
+import { useUserPreferences } from '../../contexts/UserPreferencesContext'
 
 export interface TimeRange {
   start: Date
@@ -11,6 +12,7 @@ export interface TimeRange {
 interface TimeRangePickerProps {
   onTimeRangeChange: (timeRange: TimeRange) => void
   currentRange: TimeRange
+  preferenceKey?: string // Optional preference key to save the selection
 }
 
 const presetRanges = [
@@ -21,18 +23,50 @@ const presetRanges = [
 ]
 
 
-export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ onTimeRangeChange, currentRange }) => {
+export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ onTimeRangeChange, currentRange, preferenceKey }) => {
   const [showPicker, setShowPicker] = useState(false)
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
+  const { savePreference, getPreference } = useUserPreferences()
 
-  const handlePresetClick = (preset: typeof presetRanges[0]) => {
+  // Load saved preference on mount
+  useEffect(() => {
+    if (preferenceKey) {
+      const savedRange = getPreference(preferenceKey)
+      if (savedRange && savedRange.label) {
+        // Find the matching preset
+        const matchingPreset = presetRanges.find(preset => preset.label === savedRange.label)
+        if (matchingPreset) {
+          const range = matchingPreset.getValue()
+          onTimeRangeChange({
+            start: range.start,
+            end: range.end,
+            label: matchingPreset.label
+          })
+        }
+      }
+    }
+  }, [preferenceKey, getPreference, onTimeRangeChange])
+
+  const handlePresetClick = async (preset: typeof presetRanges[0]) => {
     const range = preset.getValue()
-    onTimeRangeChange({
+    const timeRange = {
       start: range.start,
       end: range.end,
       label: preset.label
-    })
+    }
+
+    onTimeRangeChange(timeRange)
+
+    // Save preference if key is provided
+    if (preferenceKey) {
+      try {
+        await savePreference(preferenceKey, { label: preset.label })
+      } catch (error) {
+        console.error('Failed to save time range preference:', error)
+      }
+    }
+
     setShowPicker(false)
   }
 

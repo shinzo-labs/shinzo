@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from 'react-query'
 import { Theme } from '@radix-ui/themes'
 import { AuthProvider } from './contexts/AuthContext'
+import { UserPreferencesProvider } from './contexts/UserPreferencesContext'
 import { RefreshProvider } from './contexts/RefreshContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
@@ -36,10 +37,11 @@ function App() {
     <Theme>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <RefreshProvider>
-            <Router>
-              <div className="App">
-                <Routes>
+          <UserPreferencesProvider>
+            <RefreshProvider>
+              <Router>
+                <div className="App">
+                  <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
@@ -80,9 +82,10 @@ function App() {
                 {/* Default redirect */}
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Routes>
-            </div>
-          </Router>
-          </RefreshProvider>
+              </div>
+              </Router>
+            </RefreshProvider>
+          </UserPreferencesProvider>
         </AuthProvider>
       </QueryClientProvider>
     </Theme>

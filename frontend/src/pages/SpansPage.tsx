@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { DEFAULT_TIME_RANGE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
+import { useUserPreferences } from '../contexts/UserPreferencesContext'
 import { useRefresh } from '../contexts/RefreshContext'
 import { telemetryService } from '../backendService'
 import { format, subHours, subDays } from 'date-fns'
@@ -13,9 +14,26 @@ export const SpansPage: React.FC = () => {
   const { token } = useAuth()
   const { refreshTrigger } = useRefresh()
   const queryClient = useQueryClient()
+  const { savePreference, getPreference } = useUserPreferences()
   const [timeRange, setTimeRange] = useState(DEFAULT_TIME_RANGE)
   const [traceIdFilter, setTraceIdFilter] = useState('')
   const [serviceFilter, setServiceFilter] = useState('')
+
+  // Load saved time range preference on mount
+  useEffect(() => {
+    const savedTimeRange = getPreference('spans_time_range', DEFAULT_TIME_RANGE)
+    setTimeRange(savedTimeRange)
+  }, [getPreference])
+
+  // Save time range preference when it changes
+  const handleTimeRangeChange = async (newTimeRange: string) => {
+    setTimeRange(newTimeRange)
+    try {
+      await savePreference('spans_time_range', newTimeRange)
+    } catch (error) {
+      console.error('Failed to save time range preference:', error)
+    }
+  }
 
   // Calculate time range
   const getTimeRange = () => {
@@ -102,7 +120,7 @@ export const SpansPage: React.FC = () => {
               {/* Time range */}
               <Flex direction="column" gap="2" style={{ minWidth: '180px' }}>
                 <Text size="2" weight="medium">Time Range</Text>
-                <Select.Root value={timeRange} onValueChange={setTimeRange}>
+                <Select.Root value={timeRange} onValueChange={handleTimeRangeChange}>
                   <Select.Trigger placeholder="Select time range" style={{ width: '100%' }} />
                   <Select.Content>
                     {timeRangeOptions.map((option) => (
