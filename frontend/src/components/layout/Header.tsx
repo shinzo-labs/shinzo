@@ -32,6 +32,16 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
 
       {/* Right side */}
       <Flex align="center" gap="4">
+        {/* Documentation button */}
+        <Button
+          variant="outline"
+          size="2"
+          onClick={() => window.open('https://docs.shinzo.ai', '_blank')}
+        >
+          <Icons.QuestionMarkCircledIcon />
+          Docs
+        </Button>
+        
         {/* Refresh settings */}
         <RefreshSettings onRefresh={onRefresh} />
 

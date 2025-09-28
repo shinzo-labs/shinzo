@@ -140,6 +140,15 @@ export const handleLogin = async (request: yup.InferType<typeof loginSchema>) =>
       }
     }
 
+    // Check if user has verified their email
+    if (!user.verified) {
+      return {
+        response: 'Please verify your email address before logging in',
+        error: true,
+        status: 403
+      }
+    }
+
     const token = generateJWT(user)
 
     return {
