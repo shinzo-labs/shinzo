@@ -8,8 +8,6 @@ export class User extends CommonModel {
   public email_token!: string
   public email_token_expiry!: Date
   public verified!: boolean
-  public auto_refresh_enabled!: boolean
-  public auto_refresh_interval_seconds!: number | null
 
   static initialize(sequelize: Sequelize) {
     User.init(
@@ -43,7 +41,7 @@ export class User extends CommonModel {
           type: DataTypes.BOOLEAN,
           allowNull: false,
           defaultValue: false,
-        }
+        },
       },
       {
         sequelize,

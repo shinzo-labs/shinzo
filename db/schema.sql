@@ -1,4 +1,4 @@
-\restrict ZFH5gJ87fdeb4rrAgeAgr2uEdotIhYx4DcAsnCvGY0fwen5Q8I2xRWlrs1j0Hnc
+\restrict AxXeTeNVbYPHaUW72SSKUiGdxpKvQoLwEvQHNKRKw0QF9N4KfsUP588WWUsNoFW
 
 -- Dumped from database version 15.14 (Homebrew)
 -- Dumped by pg_dump version 15.14 (Homebrew)
@@ -681,7 +681,7 @@ ALTER TABLE ONLY open_telemetry.trace
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZFH5gJ87fdeb4rrAgeAgr2uEdotIhYx4DcAsnCvGY0fwen5Q8I2xRWlrs1j0Hnc
+\unrestrict AxXeTeNVbYPHaUW72SSKUiGdxpKvQoLwEvQHNKRKw0QF9N4KfsUP588WWUsNoFW
 
 
 --
