@@ -221,6 +221,42 @@ export const DashboardPage: React.FC = () => {
           })}
         </Grid>
 
+        {/* Charts Section */}
+        <Flex direction="column" gap="4">
+          <Box>
+            <Heading size="4">Analytics</Heading>
+            <Text size="2" color="gray">Telemetry data visualization for {timeRange.label.toLowerCase()}</Text>
+          </Box>
+
+          {/* Top row - Line charts */}
+          <Grid columns={{ initial: '1', lg: '2' }} gap="4">
+            <TraceTimeSeriesChart
+              title="Trace Count by Operation"
+              data={operationTimeSeriesData}
+              height={300}
+            />
+            <TraceTimeSeriesChart
+              title="Trace Count by Session ID"
+              data={sessionTimeSeriesData}
+              height={300}
+            />
+          </Grid>
+
+          {/* Bottom row - Pie charts */}
+          <Grid columns={{ initial: '1', lg: '2' }} gap="4">
+            <TracePieChart
+              title="Traces by Operation"
+              data={operationPieData}
+              height={300}
+            />
+            <TracePieChart
+              title="Traces by Session ID"
+              data={sessionPieData}
+              height={300}
+            />
+          </Grid>
+        </Flex>
+
         {/* Service overview */}
         <Card style={{ padding: '24px' }}>
           <Flex direction="column" gap="6">
@@ -268,42 +304,6 @@ export const DashboardPage: React.FC = () => {
             </Box>
           </Flex>
         </Card>
-
-        {/* Charts Section */}
-        <Flex direction="column" gap="4">
-          <Box>
-            <Heading size="4">Analytics</Heading>
-            <Text size="2" color="gray">Telemetry data visualization for {timeRange.label.toLowerCase()}</Text>
-          </Box>
-
-          {/* Top row - Line charts */}
-          <Grid columns={{ initial: '1', lg: '2' }} gap="4">
-            <TraceTimeSeriesChart
-              title="Trace Count by Operation"
-              data={operationTimeSeriesData}
-              height={300}
-            />
-            <TraceTimeSeriesChart
-              title="Trace Count by Session ID"
-              data={sessionTimeSeriesData}
-              height={300}
-            />
-          </Grid>
-
-          {/* Bottom row - Pie charts */}
-          <Grid columns={{ initial: '1', lg: '2' }} gap="4">
-            <TracePieChart
-              title="Traces by Operation"
-              data={operationPieData}
-              height={300}
-            />
-            <TracePieChart
-              title="Traces by Session ID"
-              data={sessionPieData}
-              height={300}
-            />
-          </Grid>
-        </Flex>
 
       </Flex>
     </AppLayout>

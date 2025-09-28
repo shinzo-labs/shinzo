@@ -21,7 +21,8 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
         backgroundColor: 'var(--color-background)',
         borderBottom: '1px solid var(--gray-6)',
         padding: '16px 24px',
-        minHeight: '64px'
+        minHeight: '64px',
+        flexShrink: 0
       }}
       justify="between"
       align="center"
