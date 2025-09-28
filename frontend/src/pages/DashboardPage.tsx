@@ -7,7 +7,7 @@ import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
 import { useRefresh } from '../contexts/RefreshContext'
 import { telemetryService, ingestTokenService } from '../backendService'
-import { subHours, subMinutes, subDays, subWeeks, subMonths } from 'date-fns'
+import { subHours, subDays } from 'date-fns'
 import { TimeRangePicker, TimeRange } from '../components/charts/TimeRangePicker'
 import { TraceTimeSeriesChart } from '../components/charts/TraceTimeSeriesChart'
 import { TracePieChart } from '../components/charts/TracePieChart'
@@ -224,17 +224,6 @@ export const DashboardPage: React.FC = () => {
               onTimeRangeChange={setTimeRange}
               preferenceKey="dashboard_time_range"
             />
-            <Button
-              variant="outline"
-              onClick={() => {
-                queryClient.invalidateQueries('resources')
-                queryClient.invalidateQueries(['dashboard-traces'])
-                queryClient.invalidateQueries('dashboard-stats-traces')
-              }}
-            >
-              <Icons.ReloadIcon />
-              Refresh
-            </Button>
           </Flex>
         </Flex>
 
