@@ -4,8 +4,6 @@ interface User {
   uuid: string
   email: string
   verified: boolean
-  auto_refresh_enabled: boolean
-  auto_refresh_interval_seconds: number | null
   created_at?: string
   updated_at?: string
 }
