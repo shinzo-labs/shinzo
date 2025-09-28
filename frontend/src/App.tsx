@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from 'react-query'
 import { Theme } from '@radix-ui/themes'
 import { AuthProvider } from './contexts/AuthContext'
 import { UserPreferencesProvider } from './contexts/UserPreferencesContext'
+import { RefreshProvider } from './contexts/RefreshContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
 // Auth pages
@@ -37,9 +38,10 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <UserPreferencesProvider>
-            <Router>
-            <div className="App">
-              <Routes>
+            <RefreshProvider>
+              <Router>
+                <div className="App">
+                  <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
@@ -80,8 +82,9 @@ function App() {
                 {/* Default redirect */}
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Routes>
-            </div>
-            </Router>
+              </div>
+              </Router>
+            </RefreshProvider>
           </UserPreferencesProvider>
         </AuthProvider>
       </QueryClientProvider>

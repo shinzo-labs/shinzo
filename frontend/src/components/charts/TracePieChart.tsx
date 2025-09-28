@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useRef, useEffect, useMemo } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 import { Card, Heading, Text, Box } from '@radix-ui/themes'
 import { TracePieData } from '../../utils/chartDataProcessing'
+import { chartPropsEqual } from '../../utils/chartUtils'
 
 interface TracePieChartProps {
   title: string
@@ -15,22 +16,30 @@ const chartColors = [
   '#f0e68c', '#ff6347', '#40e0d0', '#ee82ee', '#90ee90'
 ]
 
-export const TracePieChart: React.FC<TracePieChartProps> = ({
+const TracePieChartComponent: React.FC<TracePieChartProps> = ({
   title,
   data,
   height = 300
 }) => {
-  const totalValue = data.reduce((sum, item) => sum + item.value, 0)
+  const hasAnimatedRef = useRef(false)
+  const totalValue = useMemo(() => data.reduce((sum, item) => sum + item.value, 0), [data])
 
-  const formatTooltip = (value: number, name: string) => {
+  // Mark as animated after first render
+  useEffect(() => {
+    if (!hasAnimatedRef.current && data.length > 0) {
+      hasAnimatedRef.current = true
+    }
+  }, [data.length])
+
+  const formatTooltip = useMemo(() => (value: number, name: string) => {
     const percentage = ((value / totalValue) * 100).toFixed(2)
     return [`${value} (${percentage}%)`, name]
-  }
+  }, [totalValue])
 
-  const renderCustomLabel = (entry: any) => {
+  const renderCustomLabel = useMemo(() => (entry: any) => {
     const percentage = ((entry.value / totalValue) * 100)
     return percentage > 5 ? `${percentage.toFixed(2)}%` : ''
-  }
+  }, [totalValue])
 
   return (
     <Card>
@@ -41,7 +50,7 @@ export const TracePieChart: React.FC<TracePieChartProps> = ({
         </Text>
 
         <ResponsiveContainer width="100%" height={height}>
-          <PieChart>
+          <PieChart id={`pie-chart-${title.replace(/\s+/g, '-').toLowerCase()}`}>
             <Pie
               data={data}
               cx="50%"
@@ -53,6 +62,7 @@ export const TracePieChart: React.FC<TracePieChartProps> = ({
               dataKey="value"
               stroke="var(--color-panel-solid)"
               strokeWidth={2}
+              isAnimationActive={!hasAnimatedRef.current}
             >
               {data.map((entry, index) => (
                 <Cell
@@ -92,3 +102,5 @@ export const TracePieChart: React.FC<TracePieChartProps> = ({
     </Card>
   )
 }
+
+export const TracePieChart = React.memo(TracePieChartComponent, chartPropsEqual)

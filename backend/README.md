@@ -14,7 +14,7 @@ cp .env.example .env
 ```
 
 Key environment variables:
-- `BACKEND_PORT` - Server port (default: 8004)
+- `BACKEND_PORT` - Server port (default: 8000)
 - `DATABASE_URL` - PostgreSQL connection string
 - `JWT_SECRET` - Secret key for JWT tokens
 - `REDIS_URL` - Redis connection URL (for Docker: redis://redis:6379)

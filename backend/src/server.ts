@@ -4,7 +4,7 @@ import fastifyRateLimit from '@fastify/rate-limit'
 import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE } from './config'
 import { logger, pinoConfig } from './logger'
 import { sequelize } from './dbClient'
-import { authenticateJWT, authenticateIngestToken, AuthenticatedRequest } from './middleware/auth'
+import { authenticateJWT, AuthenticatedRequest } from './middleware/auth'
 
 // Import handlers
 import {
