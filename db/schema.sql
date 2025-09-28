@@ -1,4 +1,4 @@
-\restrict NbzZhxXx5eOtrplDWXwbumAdOeNcV4tDpXY40LNHkViia4bGHvJjFu1eB4jmgK3
+\restrict ZFH5gJ87fdeb4rrAgeAgr2uEdotIhYx4DcAsnCvGY0fwen5Q8I2xRWlrs1j0Hnc
 
 -- Dumped from database version 15.14 (Homebrew)
 -- Dumped by pg_dump version 15.14 (Homebrew)
@@ -57,11 +57,23 @@ CREATE TABLE main."user" (
     email text NOT NULL,
     password_hash text NOT NULL,
     password_salt text NOT NULL,
-    email_token text NOT NULL,
-    email_token_expiry timestamp with time zone NOT NULL,
-    verified boolean DEFAULT false NOT NULL,
-    auto_refresh_enabled boolean DEFAULT false,
-    auto_refresh_interval_seconds integer
+    email_token text,
+    email_token_expiry timestamp with time zone,
+    verified boolean DEFAULT false NOT NULL
+);
+
+
+--
+-- Name: user_preferences; Type: TABLE; Schema: main; Owner: -
+--
+
+CREATE TABLE main.user_preferences (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    user_uuid uuid NOT NULL,
+    preference_key text NOT NULL,
+    preference_value jsonb NOT NULL
 );
 
 
@@ -264,6 +276,22 @@ ALTER TABLE ONLY main."user"
 
 
 --
+-- Name: user_preferences user_preferences_pkey; Type: CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.user_preferences
+    ADD CONSTRAINT user_preferences_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: user_preferences user_preferences_user_uuid_preference_key_key; Type: CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.user_preferences
+    ADD CONSTRAINT user_preferences_user_uuid_preference_key_key UNIQUE (user_uuid, preference_key);
+
+
+--
 -- Name: ingest_token ingest_token_ingest_token_key; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
 --
 
@@ -341,6 +369,224 @@ ALTER TABLE ONLY open_telemetry.trace
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: idx_user_preferences_user_key; Type: INDEX; Schema: main; Owner: -
+--
+
+CREATE INDEX idx_user_preferences_user_key ON main.user_preferences USING btree (user_uuid, preference_key);
+
+
+--
+-- Name: idx_ingest_token_status; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_ingest_token_status ON open_telemetry.ingest_token USING btree (status);
+
+
+--
+-- Name: idx_ingest_token_user; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_ingest_token_user ON open_telemetry.ingest_token USING btree (user_uuid);
+
+
+--
+-- Name: idx_metric_attribute_metric; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_metric_attribute_metric ON open_telemetry.metric_attribute USING btree (metric_uuid);
+
+
+--
+-- Name: idx_metric_ingest_token; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_metric_ingest_token ON open_telemetry.metric USING btree (ingest_token_uuid);
+
+
+--
+-- Name: idx_metric_name; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_metric_name ON open_telemetry.metric USING btree (name);
+
+
+--
+-- Name: idx_metric_resource; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_metric_resource ON open_telemetry.metric USING btree (resource_uuid);
+
+
+--
+-- Name: idx_metric_timestamp; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_metric_timestamp ON open_telemetry.metric USING btree ("timestamp");
+
+
+--
+-- Name: idx_resource_attribute_resource; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_resource_attribute_resource ON open_telemetry.resource_attribute USING btree (resource_uuid);
+
+
+--
+-- Name: idx_resource_service; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_resource_service ON open_telemetry.resource USING btree (service_name);
+
+
+--
+-- Name: idx_resource_user; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_resource_user ON open_telemetry.resource USING btree (user_uuid);
+
+
+--
+-- Name: idx_span_attribute_span; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_attribute_span ON open_telemetry.span_attribute USING btree (span_uuid);
+
+
+--
+-- Name: idx_span_parent; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_parent ON open_telemetry.span USING btree (parent_span_uuid);
+
+
+--
+-- Name: idx_span_service; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_service ON open_telemetry.span USING btree (service_name);
+
+
+--
+-- Name: idx_span_start_time; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_start_time ON open_telemetry.span USING btree (start_time);
+
+
+--
+-- Name: idx_span_trace; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_trace ON open_telemetry.span USING btree (trace_uuid);
+
+
+--
+-- Name: idx_trace_ingest_token; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_trace_ingest_token ON open_telemetry.trace USING btree (ingest_token_uuid);
+
+
+--
+-- Name: idx_trace_resource; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_trace_resource ON open_telemetry.trace USING btree (resource_uuid);
+
+
+--
+-- Name: idx_trace_service; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_trace_service ON open_telemetry.trace USING btree (service_name);
+
+
+--
+-- Name: idx_trace_start_time; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_trace_start_time ON open_telemetry.trace USING btree (start_time);
+
+
+--
+-- Name: user updated_at_user; Type: TRIGGER; Schema: main; Owner: -
+--
+
+CREATE TRIGGER updated_at_user BEFORE UPDATE ON main."user" FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: user_preferences updated_at_user_preferences; Type: TRIGGER; Schema: main; Owner: -
+--
+
+CREATE TRIGGER updated_at_user_preferences BEFORE UPDATE ON main.user_preferences FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: ingest_token updated_at_ingest_token; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_ingest_token BEFORE UPDATE ON open_telemetry.ingest_token FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: metric updated_at_metric; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_metric BEFORE UPDATE ON open_telemetry.metric FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: metric_attribute updated_at_metric_attribute; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_metric_attribute BEFORE UPDATE ON open_telemetry.metric_attribute FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: resource updated_at_resource; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_resource BEFORE UPDATE ON open_telemetry.resource FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: resource_attribute updated_at_resource_attribute; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_resource_attribute BEFORE UPDATE ON open_telemetry.resource_attribute FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: span updated_at_span; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_span BEFORE UPDATE ON open_telemetry.span FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: span_attribute updated_at_span_attribute; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_span_attribute BEFORE UPDATE ON open_telemetry.span_attribute FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: trace updated_at_trace; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_trace BEFORE UPDATE ON open_telemetry.trace FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: user_preferences user_preferences_user_uuid_fkey; Type: FK CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.user_preferences
+    ADD CONSTRAINT user_preferences_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
 
 
 --
@@ -435,7 +681,7 @@ ALTER TABLE ONLY open_telemetry.trace
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NbzZhxXx5eOtrplDWXwbumAdOeNcV4tDpXY40LNHkViia4bGHvJjFu1eB4jmgK3
+\unrestrict ZFH5gJ87fdeb4rrAgeAgr2uEdotIhYx4DcAsnCvGY0fwen5Q8I2xRWlrs1j0Hnc
 
 
 --
@@ -444,4 +690,4 @@ ALTER TABLE ONLY open_telemetry.trace
 
 INSERT INTO public.schema_migrations (version) VALUES
     ('20250914000000'),
-    ('20250918000000');
+    ('20250919000000');

@@ -43,17 +43,7 @@ export class User extends CommonModel {
           type: DataTypes.BOOLEAN,
           allowNull: false,
           defaultValue: false,
-        },
-        auto_refresh_enabled: {
-          type: DataTypes.BOOLEAN,
-          allowNull: false,
-          defaultValue: false,
-        },
-        auto_refresh_interval_seconds: {
-          type: DataTypes.INTEGER,
-          allowNull: true,
-          defaultValue: null,
-        },
+        }
       },
       {
         sequelize,

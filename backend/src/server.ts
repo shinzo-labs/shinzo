@@ -4,7 +4,7 @@ import fastifyRateLimit from '@fastify/rate-limit'
 import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE } from './config'
 import { logger, pinoConfig } from './logger'
 import { sequelize } from './dbClient'
-import { authenticateJWT, authenticateIngestToken, AuthenticatedRequest } from './middleware/auth'
+import { authenticateJWT, AuthenticatedRequest } from './middleware/auth'
 
 // Import handlers
 import {
@@ -16,9 +16,7 @@ import {
   verifyUserSchema,
   handleResendVerification,
   resendVerificationSchema,
-  handleFetchUser,
-  handleUpdateRefreshSettings,
-  updateRefreshSettingsSchema
+  handleFetchUser
 } from './handlers/auth'
 
 import {
@@ -154,28 +152,6 @@ app.get('/auth/fetch_user', async (request: AuthenticatedRequest, reply: Fastify
   } catch (error: any) {
     logger.error({ message: 'Fetch user error', error })
     reply.status(500).send({ error: 'Internal server error' })
-  }
-})
-
-app.put('/auth/refresh_settings', async (request: AuthenticatedRequest, reply: FastifyReply) => {
-  const authenticated = await authenticateJWT(request, reply)
-  if (!authenticated) return
-
-  try {
-    const validatedBody = await updateRefreshSettingsSchema.validate(request.body, {
-      abortEarly: false,
-      stripUnknown: true,
-    })
-
-    const result = await handleUpdateRefreshSettings(request.user!.uuid, validatedBody)
-    reply.status(result.status || 200).send(result.response)
-  } catch (error: any) {
-    logger.error({ message: 'Update refresh settings error', error })
-    if (error.name === 'ValidationError') {
-      reply.status(400).send({ error: error.message })
-    } else {
-      reply.status(500).send({ error: 'Internal server error' })
-    }
   }
 })
 

@@ -18,7 +18,6 @@ interface AuthContextType {
   register: (email: string, password: string) => Promise<void>
   verify: (email: string, verification_token: string) => Promise<void>
   resendVerification: (email: string) => Promise<void>
-  updateRefreshSettings: (auto_refresh_enabled: boolean, auto_refresh_interval_seconds: number | null) => Promise<void>
   logout: () => void
   loading: boolean
   isAuthenticated: boolean
@@ -163,38 +162,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await response.json()
   }
 
-  const updateRefreshSettings = async (auto_refresh_enabled: boolean, auto_refresh_interval_seconds: number | null) => {
-    if (!token) {
-      throw new Error('Not authenticated')
-    }
-
-    const response = await fetch(`${API_BASE_URL}/auth/refresh_settings`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        auto_refresh_enabled,
-        auto_refresh_interval_seconds
-      }),
-    })
-
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(error || 'Failed to update refresh settings')
-    }
-
-    // Update the user state with new settings
-    if (user) {
-      setUser({
-        ...user,
-        auto_refresh_enabled,
-        auto_refresh_interval_seconds
-      })
-    }
-  }
-
   const logout = () => {
     localStorage.removeItem('auth_token')
     sessionStorage.removeItem('auth_token')
@@ -210,7 +177,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     register,
     verify,
     resendVerification,
-    updateRefreshSettings,
     logout,
     loading,
     isAuthenticated: !!token && !!user,
