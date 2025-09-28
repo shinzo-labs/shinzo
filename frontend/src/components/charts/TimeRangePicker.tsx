@@ -14,15 +14,10 @@ interface TimeRangePickerProps {
 }
 
 const presetRanges = [
-  { label: 'Last 5 minutes', getValue: () => ({ start: subMinutes(new Date(), 5), end: new Date() }) },
-  { label: 'Last 15 minutes', getValue: () => ({ start: subMinutes(new Date(), 15), end: new Date() }) },
-  { label: 'Last 30 minutes', getValue: () => ({ start: subMinutes(new Date(), 30), end: new Date() }) },
   { label: 'Last 1 hour', getValue: () => ({ start: subHours(new Date(), 1), end: new Date() }) },
-  { label: 'Last 6 hours', getValue: () => ({ start: subHours(new Date(), 6), end: new Date() }) },
-  { label: 'Last 1 day', getValue: () => ({ start: subDays(new Date(), 1), end: new Date() }) },
-  { label: 'Last 3 days', getValue: () => ({ start: subDays(new Date(), 3), end: new Date() }) },
-  { label: 'Last 1 week', getValue: () => ({ start: subWeeks(new Date(), 1), end: new Date() }) },
-  { label: 'Last 1 month', getValue: () => ({ start: subMonths(new Date(), 1), end: new Date() }) },
+  { label: 'Last 24 hours', getValue: () => ({ start: subHours(new Date(), 24), end: new Date() }) },
+  { label: 'Last 7 days', getValue: () => ({ start: subDays(new Date(), 7), end: new Date() }) },
+  { label: 'Last 30 days', getValue: () => ({ start: subDays(new Date(), 30), end: new Date() }) },
 ]
 
 
@@ -73,10 +68,10 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ onTimeRangeCha
           style={{
             position: 'absolute',
             top: '100%',
-            left: 0,
+            right: 0,
             zIndex: 1000,
-            width: '400px',
-            padding: '16px',
+            width: '200px',
+            padding: '12px',
             backgroundColor: 'var(--color-panel-solid)',
             border: '1px solid var(--gray-6)',
             borderRadius: 'var(--radius-3)',

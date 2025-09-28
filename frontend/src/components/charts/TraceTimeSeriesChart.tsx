@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useRef, useEffect, useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Card, Heading, Text, Box } from '@radix-ui/themes'
 import { TraceTimeSeriesData } from '../../utils/chartDataProcessing'
+import { chartPropsEqual } from '../../utils/chartUtils'
 
 interface TraceTimeSeriesChartProps {
   title: string
@@ -15,25 +16,35 @@ const chartColors = [
   '#f0e68c', '#ff6347', '#40e0d0', '#ee82ee', '#90ee90'
 ]
 
-export const TraceTimeSeriesChart: React.FC<TraceTimeSeriesChartProps> = ({
+const TraceTimeSeriesChartComponent: React.FC<TraceTimeSeriesChartProps> = ({
   title,
   data,
   height = 300
 }) => {
+  const hasAnimatedRef = useRef(false)
   const allTimeSlots = Object.values(data)[0] || []
   const seriesKeys = Object.keys(data)
 
-  const chartData = allTimeSlots.map(slot => {
-    const dataPoint: any = { timestamp: slot.timestamp }
+  // Mark as animated after first render
+  useEffect(() => {
+    if (!hasAnimatedRef.current && seriesKeys.length > 0) {
+      hasAnimatedRef.current = true
+    }
+  }, [seriesKeys.length])
 
-    seriesKeys.forEach(key => {
-      const seriesData = data[key]
-      const matchingSlot = seriesData.find(s => s.timestamp === slot.timestamp)
-      dataPoint[key] = matchingSlot ? matchingSlot.count : 0
+  const chartData = useMemo(() => {
+    return allTimeSlots.map(slot => {
+      const dataPoint: any = { timestamp: slot.timestamp }
+
+      seriesKeys.forEach(key => {
+        const seriesData = data[key]
+        const matchingSlot = seriesData.find(s => s.timestamp === slot.timestamp)
+        dataPoint[key] = matchingSlot ? matchingSlot.count : 0
+      })
+
+      return dataPoint
     })
-
-    return dataPoint
-  })
+  }, [allTimeSlots, seriesKeys, data])
 
   const formatTooltipValue = (value: number, name: string) => {
     return [`${value} calls`, name]
@@ -48,7 +59,11 @@ export const TraceTimeSeriesChart: React.FC<TraceTimeSeriesChartProps> = ({
         </Text>
 
         <ResponsiveContainer width="100%" height={height}>
-          <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+          <LineChart
+            data={chartData}
+            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+            id={`line-chart-${title.replace(/\s+/g, '-').toLowerCase()}`}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="var(--gray-6)" />
             <XAxis
               dataKey="timestamp"
@@ -81,6 +96,7 @@ export const TraceTimeSeriesChart: React.FC<TraceTimeSeriesChartProps> = ({
                 strokeWidth={2}
                 dot={{ r: 3 }}
                 activeDot={{ r: 5 }}
+                isAnimationActive={!hasAnimatedRef.current}
               />
             ))}
           </LineChart>
@@ -89,3 +105,5 @@ export const TraceTimeSeriesChart: React.FC<TraceTimeSeriesChartProps> = ({
     </Card>
   )
 }
+
+export const TraceTimeSeriesChart = React.memo(TraceTimeSeriesChartComponent, chartPropsEqual)

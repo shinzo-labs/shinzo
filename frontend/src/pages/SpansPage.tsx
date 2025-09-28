@@ -5,12 +5,13 @@ import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table
 import * as Icons from '@radix-ui/react-icons'
 import { DEFAULT_TIME_RANGE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
+import { useRefresh } from '../contexts/RefreshContext'
 import { telemetryService } from '../backendService'
 import { format, subHours, subDays } from 'date-fns'
-import { useAutoRefresh } from '../hooks/useAutoRefresh'
 
 export const SpansPage: React.FC = () => {
   const { token } = useAuth()
+  const { refreshTrigger } = useRefresh()
   const queryClient = useQueryClient()
   const [timeRange, setTimeRange] = useState(DEFAULT_TIME_RANGE)
   const [traceIdFilter, setTraceIdFilter] = useState('')
@@ -22,20 +23,17 @@ export const SpansPage: React.FC = () => {
     let start = new Date()
 
     switch (timeRange) {
-      case '15m':
-        start = new Date(end.getTime() - 15 * 60 * 1000)
-        break
       case '1h':
         start = subHours(end, 1)
-        break
-      case '6h':
-        start = subHours(end, 6)
         break
       case '24h':
         start = subHours(end, 24)
         break
       case '7d':
         start = subDays(end, 7)
+        break
+      case '30d':
+        start = subDays(end, 30)
         break
       default:
         start = subHours(end, 1)
@@ -49,21 +47,23 @@ export const SpansPage: React.FC = () => {
 
   // Fetch spans
   const { data: spans = [], isLoading, error } = useQuery(
-    ['spans', timeRange],
+    ['spans', timeRange, refreshTrigger],
     async () => {
       const timeParams = getTimeRange()
       return telemetryService.fetchSpans(token!, timeParams)
     },
-    { enabled: !!token }
+    {
+      enabled: !!token,
+      keepPreviousData: true,
+      refetchOnWindowFocus: false,
+      staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
+    }
   )
 
-  // Refresh function for manual and auto-refresh
+  // Refresh function for manual refresh
   const handleRefresh = useCallback(() => {
-    queryClient.invalidateQueries(['spans', timeRange])
-  }, [queryClient, timeRange])
-
-  // Set up auto-refresh
-  useAutoRefresh({ onRefresh: handleRefresh })
+    queryClient.invalidateQueries(['spans', timeRange, refreshTrigger])
+  }, [queryClient, timeRange, refreshTrigger])
 
   // Filter spans
   const filteredSpans = spans.filter((span: any) => {
@@ -77,11 +77,10 @@ export const SpansPage: React.FC = () => {
   })
 
   const timeRangeOptions = [
-    { value: '15m', label: 'Last 15 minutes' },
     { value: '1h', label: 'Last 1 hour' },
-    { value: '6h', label: 'Last 6 hours' },
     { value: '24h', label: 'Last 24 hours' },
     { value: '7d', label: 'Last 7 days' },
+    { value: '30d', label: 'Last 30 days' },
   ]
 
   return (
