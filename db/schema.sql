@@ -1,12 +1,11 @@
-\restrict wRidd0YoEx7a87t8H2QdBjhvb2hWhsUXbrnsheHV44VlPJQPXsLyKs4KuUILFuE
+\restrict AxXeTeNVbYPHaUW72SSKUiGdxpKvQoLwEvQHNKRKw0QF9N4KfsUP588WWUsNoFW
 
 -- Dumped from database version 15.14 (Homebrew)
--- Dumped by pg_dump version 17.6
+-- Dumped by pg_dump version 15.14 (Homebrew)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -52,15 +51,29 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE main."user" (
-    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uuid uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
     email text NOT NULL,
     password_hash text NOT NULL,
     password_salt text NOT NULL,
-    email_token text NOT NULL,
-    email_token_expiry timestamp without time zone NOT NULL,
+    email_token text,
+    email_token_expiry timestamp with time zone,
     verified boolean DEFAULT false NOT NULL
+);
+
+
+--
+-- Name: user_preferences; Type: TABLE; Schema: main; Owner: -
+--
+
+CREATE TABLE main.user_preferences (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    user_uuid uuid NOT NULL,
+    preference_key text NOT NULL,
+    preference_value jsonb NOT NULL
 );
 
 
@@ -69,13 +82,12 @@ CREATE TABLE main."user" (
 --
 
 CREATE TABLE open_telemetry.ingest_token (
-    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uuid uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
     user_uuid uuid NOT NULL,
     ingest_token text NOT NULL,
-    status text NOT NULL,
-    CONSTRAINT ingest_token_status_check CHECK ((status = ANY (ARRAY['live'::text, 'deprecated'::text])))
+    status text NOT NULL
 );
 
 
@@ -84,20 +96,19 @@ CREATE TABLE open_telemetry.ingest_token (
 --
 
 CREATE TABLE open_telemetry.metric (
-    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uuid uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
     resource_uuid uuid NOT NULL,
     ingest_token_uuid uuid NOT NULL,
     name text NOT NULL,
     description text,
     unit text,
     metric_type text NOT NULL,
-    "timestamp" timestamp without time zone NOT NULL,
+    "timestamp" timestamp with time zone NOT NULL,
     value double precision,
     scope_name text,
-    scope_version text,
-    CONSTRAINT metric_metric_type_check CHECK ((metric_type = ANY (ARRAY['counter'::text, 'gauge'::text, 'histogram'::text])))
+    scope_version text
 );
 
 
@@ -106,9 +117,9 @@ CREATE TABLE open_telemetry.metric (
 --
 
 CREATE TABLE open_telemetry.metric_attribute (
-    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uuid uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
     metric_uuid uuid NOT NULL,
     key text NOT NULL,
     value_type text NOT NULL,
@@ -116,8 +127,7 @@ CREATE TABLE open_telemetry.metric_attribute (
     int_value integer,
     double_value double precision,
     bool_value boolean,
-    array_value jsonb,
-    CONSTRAINT metric_attribute_value_type_check CHECK ((value_type = ANY (ARRAY['string'::text, 'int'::text, 'double'::text, 'bool'::text, 'array'::text])))
+    array_value jsonb
 );
 
 
@@ -126,15 +136,15 @@ CREATE TABLE open_telemetry.metric_attribute (
 --
 
 CREATE TABLE open_telemetry.resource (
-    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uuid uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
     user_uuid uuid NOT NULL,
     service_name text NOT NULL,
     service_version text,
     service_namespace text,
-    first_seen timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    last_seen timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    first_seen timestamp with time zone,
+    last_seen timestamp with time zone
 );
 
 
@@ -143,9 +153,9 @@ CREATE TABLE open_telemetry.resource (
 --
 
 CREATE TABLE open_telemetry.resource_attribute (
-    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uuid uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
     resource_uuid uuid NOT NULL,
     key text NOT NULL,
     value_type text NOT NULL,
@@ -153,8 +163,7 @@ CREATE TABLE open_telemetry.resource_attribute (
     int_value integer,
     double_value double precision,
     bool_value boolean,
-    array_value jsonb,
-    CONSTRAINT resource_attribute_value_type_check CHECK ((value_type = ANY (ARRAY['string'::text, 'int'::text, 'double'::text, 'bool'::text, 'array'::text])))
+    array_value jsonb
 );
 
 
@@ -163,14 +172,14 @@ CREATE TABLE open_telemetry.resource_attribute (
 --
 
 CREATE TABLE open_telemetry.span (
-    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uuid uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
     trace_uuid uuid NOT NULL,
     parent_span_uuid uuid,
     operation_name text NOT NULL,
-    start_time timestamp without time zone NOT NULL,
-    end_time timestamp without time zone,
+    start_time timestamp with time zone NOT NULL,
+    end_time timestamp with time zone,
     duration_ms integer,
     status_code integer,
     status_message text,
@@ -184,9 +193,9 @@ CREATE TABLE open_telemetry.span (
 --
 
 CREATE TABLE open_telemetry.span_attribute (
-    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uuid uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
     span_uuid uuid NOT NULL,
     key text NOT NULL,
     value_type text NOT NULL,
@@ -194,8 +203,7 @@ CREATE TABLE open_telemetry.span_attribute (
     int_value integer,
     double_value double precision,
     bool_value boolean,
-    array_value jsonb,
-    CONSTRAINT span_attribute_value_type_check CHECK ((value_type = ANY (ARRAY['string'::text, 'int'::text, 'double'::text, 'bool'::text, 'array'::text])))
+    array_value jsonb
 );
 
 
@@ -204,18 +212,17 @@ CREATE TABLE open_telemetry.span_attribute (
 --
 
 CREATE TABLE open_telemetry.trace (
-    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uuid uuid NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    updated_at timestamp with time zone NOT NULL,
     resource_uuid uuid NOT NULL,
     ingest_token_uuid uuid NOT NULL,
-    start_time timestamp without time zone NOT NULL,
-    end_time timestamp without time zone,
+    start_time timestamp with time zone NOT NULL,
+    end_time timestamp with time zone,
     service_name text NOT NULL,
     operation_name text,
     status text,
-    span_count integer DEFAULT 0,
-    CONSTRAINT trace_status_check CHECK ((status = ANY (ARRAY['ok'::text, 'error'::text, 'timeout'::text])))
+    span_count integer DEFAULT 0
 );
 
 
@@ -266,6 +273,22 @@ ALTER TABLE ONLY main."user"
 
 ALTER TABLE ONLY main."user"
     ADD CONSTRAINT user_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: user_preferences user_preferences_pkey; Type: CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.user_preferences
+    ADD CONSTRAINT user_preferences_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: user_preferences user_preferences_user_uuid_preference_key_key; Type: CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.user_preferences
+    ADD CONSTRAINT user_preferences_user_uuid_preference_key_key UNIQUE (user_uuid, preference_key);
 
 
 --
@@ -346,6 +369,13 @@ ALTER TABLE ONLY open_telemetry.trace
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: idx_user_preferences_user_key; Type: INDEX; Schema: main; Owner: -
+--
+
+CREATE INDEX idx_user_preferences_user_key ON main.user_preferences USING btree (user_uuid, preference_key);
 
 
 --
@@ -489,6 +519,13 @@ CREATE TRIGGER updated_at_user BEFORE UPDATE ON main."user" FOR EACH ROW EXECUTE
 
 
 --
+-- Name: user_preferences updated_at_user_preferences; Type: TRIGGER; Schema: main; Owner: -
+--
+
+CREATE TRIGGER updated_at_user_preferences BEFORE UPDATE ON main.user_preferences FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
 -- Name: ingest_token updated_at_ingest_token; Type: TRIGGER; Schema: open_telemetry; Owner: -
 --
 
@@ -545,11 +582,19 @@ CREATE TRIGGER updated_at_trace BEFORE UPDATE ON open_telemetry.trace FOR EACH R
 
 
 --
+-- Name: user_preferences user_preferences_user_uuid_fkey; Type: FK CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.user_preferences
+    ADD CONSTRAINT user_preferences_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
+
+
+--
 -- Name: ingest_token ingest_token_user_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
 --
 
 ALTER TABLE ONLY open_telemetry.ingest_token
-    ADD CONSTRAINT ingest_token_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
+    ADD CONSTRAINT ingest_token_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -557,7 +602,7 @@ ALTER TABLE ONLY open_telemetry.ingest_token
 --
 
 ALTER TABLE ONLY open_telemetry.metric_attribute
-    ADD CONSTRAINT metric_attribute_metric_uuid_fkey FOREIGN KEY (metric_uuid) REFERENCES open_telemetry.metric(uuid);
+    ADD CONSTRAINT metric_attribute_metric_uuid_fkey FOREIGN KEY (metric_uuid) REFERENCES open_telemetry.metric(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -565,7 +610,7 @@ ALTER TABLE ONLY open_telemetry.metric_attribute
 --
 
 ALTER TABLE ONLY open_telemetry.metric
-    ADD CONSTRAINT metric_ingest_token_uuid_fkey FOREIGN KEY (ingest_token_uuid) REFERENCES open_telemetry.ingest_token(uuid);
+    ADD CONSTRAINT metric_ingest_token_uuid_fkey FOREIGN KEY (ingest_token_uuid) REFERENCES open_telemetry.ingest_token(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -573,7 +618,7 @@ ALTER TABLE ONLY open_telemetry.metric
 --
 
 ALTER TABLE ONLY open_telemetry.metric
-    ADD CONSTRAINT metric_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid);
+    ADD CONSTRAINT metric_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -581,7 +626,7 @@ ALTER TABLE ONLY open_telemetry.metric
 --
 
 ALTER TABLE ONLY open_telemetry.resource_attribute
-    ADD CONSTRAINT resource_attribute_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid);
+    ADD CONSTRAINT resource_attribute_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -589,7 +634,7 @@ ALTER TABLE ONLY open_telemetry.resource_attribute
 --
 
 ALTER TABLE ONLY open_telemetry.resource
-    ADD CONSTRAINT resource_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
+    ADD CONSTRAINT resource_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -597,7 +642,7 @@ ALTER TABLE ONLY open_telemetry.resource
 --
 
 ALTER TABLE ONLY open_telemetry.span_attribute
-    ADD CONSTRAINT span_attribute_span_uuid_fkey FOREIGN KEY (span_uuid) REFERENCES open_telemetry.span(uuid);
+    ADD CONSTRAINT span_attribute_span_uuid_fkey FOREIGN KEY (span_uuid) REFERENCES open_telemetry.span(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -605,7 +650,7 @@ ALTER TABLE ONLY open_telemetry.span_attribute
 --
 
 ALTER TABLE ONLY open_telemetry.span
-    ADD CONSTRAINT span_parent_span_uuid_fkey FOREIGN KEY (parent_span_uuid) REFERENCES open_telemetry.span(uuid);
+    ADD CONSTRAINT span_parent_span_uuid_fkey FOREIGN KEY (parent_span_uuid) REFERENCES open_telemetry.span(uuid) ON UPDATE CASCADE ON DELETE SET NULL;
 
 
 --
@@ -613,7 +658,7 @@ ALTER TABLE ONLY open_telemetry.span
 --
 
 ALTER TABLE ONLY open_telemetry.span
-    ADD CONSTRAINT span_trace_uuid_fkey FOREIGN KEY (trace_uuid) REFERENCES open_telemetry.trace(uuid);
+    ADD CONSTRAINT span_trace_uuid_fkey FOREIGN KEY (trace_uuid) REFERENCES open_telemetry.trace(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -621,7 +666,7 @@ ALTER TABLE ONLY open_telemetry.span
 --
 
 ALTER TABLE ONLY open_telemetry.trace
-    ADD CONSTRAINT trace_ingest_token_uuid_fkey FOREIGN KEY (ingest_token_uuid) REFERENCES open_telemetry.ingest_token(uuid);
+    ADD CONSTRAINT trace_ingest_token_uuid_fkey FOREIGN KEY (ingest_token_uuid) REFERENCES open_telemetry.ingest_token(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
@@ -629,14 +674,14 @@ ALTER TABLE ONLY open_telemetry.trace
 --
 
 ALTER TABLE ONLY open_telemetry.trace
-    ADD CONSTRAINT trace_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid);
+    ADD CONSTRAINT trace_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wRidd0YoEx7a87t8H2QdBjhvb2hWhsUXbrnsheHV44VlPJQPXsLyKs4KuUILFuE
+\unrestrict AxXeTeNVbYPHaUW72SSKUiGdxpKvQoLwEvQHNKRKw0QF9N4KfsUP588WWUsNoFW
 
 
 --
@@ -644,4 +689,5 @@ ALTER TABLE ONLY open_telemetry.trace
 --
 
 INSERT INTO public.schema_migrations (version) VALUES
-    ('20250914000000');
+    ('20250914000000'),
+    ('20250919000000');

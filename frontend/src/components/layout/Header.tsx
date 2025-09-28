@@ -16,24 +16,30 @@ export const Header: React.FC = () => {
         backgroundColor: 'var(--color-background)',
         borderBottom: '1px solid var(--gray-6)',
         padding: '16px 24px',
-        minHeight: '64px'
+        minHeight: '64px',
+        flexShrink: 0
       }}
-      justify="end"
+      justify="between"
       align="center"
       gap="4"
     >
-      {/* Documentation button */}
-      <Button
-        variant="outline"
-        size="2"
-        onClick={() => window.open('https://docs.shinzo.ai', '_blank')}
-      >
-        <Icons.QuestionMarkCircledIcon />
-        Docs
-      </Button>
+      {/* Left side - could be used for page title or breadcrumbs later */}
+      <Flex />
 
-      {/* User menu */}
-      <DropdownMenu.Root>
+      {/* Right side */}
+      <Flex align="center" gap="4">
+        {/* Documentation button */}
+        <Button
+          variant="outline"
+          size="2"
+          onClick={() => window.open('https://docs.shinzo.ai', '_blank')}
+        >
+          <Icons.QuestionMarkCircledIcon />
+          Docs
+        </Button>
+
+        {/* User menu */}
+        <DropdownMenu.Root>
         <DropdownMenu.Trigger>
           <Button variant="ghost" size="2">
             <Avatar
@@ -56,6 +62,7 @@ export const Header: React.FC = () => {
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Root>
+      </Flex>
     </Flex>
   )
 }
