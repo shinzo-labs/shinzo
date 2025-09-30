@@ -24,6 +24,7 @@ import {
   handleFetchTraces,
   handleFetchSpans,
   handleFetchMetrics,
+  handleFetchClientBreakdown,
   fetchDataSchema
 } from './handlers/telemetry'
 
@@ -337,6 +338,28 @@ app.get('/telemetry/fetch_metrics', async (request: AuthenticatedRequest, reply:
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Fetch metrics error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/telemetry/fetch_client_breakdown', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedQuery = await fetchDataSchema.validate(request.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleFetchClientBreakdown(request.user!.uuid, validatedQuery)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch client breakdown error', error })
     if (error.name === 'ValidationError') {
       reply.status(400).send({ error: error.message })
     } else {

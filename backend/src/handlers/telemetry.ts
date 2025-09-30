@@ -378,3 +378,110 @@ export const handleFetchMetrics = async (userUuid: string, query: yup.InferType<
     }
   }
 }
+
+export const handleFetchClientBreakdown = async (userUuid: string, query: yup.InferType<typeof fetchDataSchema>) => {
+  try {
+    const startTime = new Date(query.start_time)
+    const endTime = new Date(query.end_time)
+
+    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+      return {
+        response: 'Invalid time format',
+        error: true,
+        status: 400
+      }
+    }
+
+    const userResources = await Resource.findAll({
+      where: { user_uuid: userUuid },
+      attributes: ['uuid']
+    })
+
+    const resourceUuids = userResources.map(r => r.uuid)
+
+    if (resourceUuids.length === 0) {
+      return {
+        response: [],
+        status: 200
+      }
+    }
+
+    // Fetch spans with client information in attributes
+    const spans = await Span.findAll({
+      where: {
+        start_time: {
+          [Op.gte]: startTime,
+          [Op.lte]: endTime
+        }
+      },
+      include: [
+        {
+          model: Trace,
+          as: 'trace',
+          required: true,
+          where: {
+            resource_uuid: { [Op.in]: resourceUuids }
+          }
+        },
+        {
+          model: SpanAttribute,
+          as: 'attributes',
+          required: false,
+          where: {
+            key: {
+              [Op.in]: ['mcp.client.name', 'mcp.client.version']
+            }
+          }
+        }
+      ]
+    })
+
+    // Aggregate client data
+    const clientMap = new Map<string, { name: string; version: string; count: number }>()
+
+    spans.forEach(span => {
+      let clientName = 'unknown'
+      let clientVersion = 'unknown'
+
+      if ((span as any).attributes && Array.isArray((span as any).attributes)) {
+        (span as any).attributes.forEach((attr: any) => {
+          if (attr.key === 'mcp.client.name' && attr.string_value) {
+            clientName = attr.string_value
+          }
+          if (attr.key === 'mcp.client.version' && attr.string_value) {
+            clientVersion = attr.string_value
+          }
+        })
+      }
+
+      const key = `${clientName}:${clientVersion}`
+      if (clientMap.has(key)) {
+        clientMap.get(key)!.count++
+      } else {
+        clientMap.set(key, { name: clientName, version: clientVersion, count: 1 })
+      }
+    })
+
+    // Convert to array and calculate percentages
+    const clients = Array.from(clientMap.values())
+    const totalCount = clients.reduce((sum, c) => sum + c.count, 0)
+
+    return {
+      response: clients.map(client => ({
+        name: client.name,
+        version: client.version,
+        count: client.count,
+        percentage: totalCount > 0 ? (client.count / totalCount) * 100 : 0
+      })).sort((a, b) => b.count - a.count),
+      status: 200
+    }
+
+  } catch (error) {
+    logger.error({ message: 'Error fetching client breakdown', error })
+    return {
+      response: 'Error fetching client breakdown',
+      error: true,
+      status: 500
+    }
+  }
+}
