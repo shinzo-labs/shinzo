@@ -9,6 +9,7 @@ export interface TracePieData {
   name: string
   value: number
   color?: string
+  serviceName?: string
 }
 
 export interface Trace {
@@ -70,6 +71,12 @@ const getTimeInterval = (timeRange: TimeRange) => {
   }
 }
 
+const cleanOperationName = (operationName: string | null): string => {
+  if (!operationName) return 'Unknown'
+  // Remove 'tools/call' prefix if present
+  return operationName.replace(/^tools\/call\//, '')
+}
+
 export const processTracesForTimeSeriesByOperation = (
   traces: Trace[],
   timeRange: TimeRange
@@ -77,11 +84,11 @@ export const processTracesForTimeSeriesByOperation = (
   const { intervalFunction } = getTimeInterval(timeRange)
   const timeSlots = intervalFunction({ start: timeRange.start, end: timeRange.end })
 
-  const operations = Array.from(new Set(traces.map(t => t.operation_name || 'Unknown')))
+  const operations = Array.from(new Set(traces.map(t => cleanOperationName(t.operation_name))))
   const result: Record<string, TraceTimeSeriesData[]> = {}
 
   operations.forEach(operation => {
-    const operationTraces = traces.filter(t => (t.operation_name || 'Unknown') === operation)
+    const operationTraces = traces.filter(t => cleanOperationName(t.operation_name) === operation)
 
     result[operation] = timeSlots.map(slot => {
       const slotEnd = new Date(slot.getTime() + (timeSlots[1]?.getTime() - timeSlots[0]?.getTime() || 60000))
@@ -131,15 +138,23 @@ export const processTracesForTimeSeriesBySession = (
 }
 
 export const processTracesForPieByOperation = (traces: Trace[]): TracePieData[] => {
-  const operationCounts = traces.reduce((acc, trace) => {
-    const operation = trace.operation_name || 'Unknown'
-    acc[operation] = (acc[operation] || 0) + 1
+  const operationData = traces.reduce((acc, trace) => {
+    const operation = cleanOperationName(trace.operation_name)
+    if (!acc[operation]) {
+      acc[operation] = {
+        count: 0,
+        services: new Set<string>()
+      }
+    }
+    acc[operation].count++
+    acc[operation].services.add(trace.service_name)
     return acc
-  }, {} as Record<string, number>)
+  }, {} as Record<string, { count: number; services: Set<string> }>)
 
-  return Object.entries(operationCounts).map(([name, value]) => ({
+  return Object.entries(operationData).map(([name, data]) => ({
     name,
-    value
+    value: data.count,
+    serviceName: Array.from(data.services).join(', ')
   }))
 }
 

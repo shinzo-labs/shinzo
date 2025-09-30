@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useMemo } from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
-import { Card, Heading, Text, Box } from '@radix-ui/themes'
+import React, { useRef, useEffect, useMemo, useState } from 'react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import { Card, Heading, Text, Box, Flex, Badge } from '@radix-ui/themes'
 import { TracePieData } from '../../utils/chartDataProcessing'
 import { chartPropsEqual } from '../../utils/chartUtils'
 
@@ -22,6 +22,7 @@ const TracePieChartComponent: React.FC<TracePieChartProps> = ({
   height = 300
 }) => {
   const hasAnimatedRef = useRef(false)
+  const [activeItems, setActiveItems] = useState<Set<string>>(new Set())
   const totalValue = useMemo(() => data.reduce((sum, item) => sum + item.value, 0), [data])
 
   // Mark as animated after first render
@@ -31,15 +32,36 @@ const TracePieChartComponent: React.FC<TracePieChartProps> = ({
     }
   }, [data.length])
 
-  const formatTooltip = useMemo(() => (value: number, name: string) => {
+  const formatTooltip = useMemo(() => (value: number, name: string, props: any) => {
     const percentage = ((value / totalValue) * 100).toFixed(2)
-    return [`${value} (${percentage}%)`, name]
-  }, [totalValue])
+    const entry = data.find(d => d.name === name)
+    const serviceName = entry?.serviceName
+    const nameWithService = serviceName ? `${name} (${serviceName})` : name
+    return [`${value} (${percentage}%)`, nameWithService]
+  }, [totalValue, data])
 
   const renderCustomLabel = useMemo(() => (entry: any) => {
     const percentage = ((entry.value / totalValue) * 100)
     return percentage > 5 ? `${percentage.toFixed(2)}%` : ''
   }, [totalValue])
+
+  // Filter data based on active items (if any are selected)
+  const filteredData = useMemo(() => {
+    if (activeItems.size === 0) return data
+    return data.filter(item => activeItems.has(item.name))
+  }, [data, activeItems])
+
+  const handleLegendClick = (itemName: string) => {
+    setActiveItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(itemName)) {
+        newSet.delete(itemName)
+      } else {
+        newSet.add(itemName)
+      }
+      return newSet
+    })
+  }
 
   return (
     <Card>
@@ -52,7 +74,7 @@ const TracePieChartComponent: React.FC<TracePieChartProps> = ({
         <ResponsiveContainer width="100%" height={height}>
           <PieChart id={`pie-chart-${title.replace(/\s+/g, '-').toLowerCase()}`}>
             <Pie
-              data={data}
+              data={filteredData}
               cx="50%"
               cy="50%"
               labelLine={false}
@@ -64,7 +86,7 @@ const TracePieChartComponent: React.FC<TracePieChartProps> = ({
               strokeWidth={2}
               isAnimationActive={!hasAnimatedRef.current}
             >
-              {data.map((entry, index) => (
+              {filteredData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={entry.color || chartColors[index % chartColors.length]}
@@ -76,21 +98,75 @@ const TracePieChartComponent: React.FC<TracePieChartProps> = ({
                 backgroundColor: 'var(--color-panel-solid)',
                 border: '1px solid var(--gray-6)',
                 borderRadius: 'var(--radius-2)',
-                color: 'var(--gray-12)'
+                color: 'var(--gray-12)',
+                maxHeight: '300px',
+                overflowY: 'auto'
               }}
-              formatter={formatTooltip}
-            />
-            <Legend
               wrapperStyle={{
-                fontSize: '12px',
-                color: 'var(--gray-11)'
+                zIndex: 1000
               }}
+              position={{ y: 0 }}
+              formatter={formatTooltip}
             />
           </PieChart>
         </ResponsiveContainer>
 
+        {/* Custom scrollable legend */}
+        <Box style={{
+          maxHeight: '150px',
+          overflowY: 'auto',
+          marginTop: '16px',
+          borderTop: '1px solid var(--gray-6)',
+          paddingTop: '12px'
+        }}>
+          <Flex direction="column" gap="2">
+            {data.map((entry, index) => {
+              const isActive = activeItems.size === 0 || activeItems.has(entry.name)
+              const percentage = ((entry.value / totalValue) * 100).toFixed(2)
+              return (
+                <Flex
+                  key={`legend-${index}`}
+                  align="center"
+                  gap="2"
+                  style={{
+                    cursor: 'pointer',
+                    opacity: isActive ? 1 : 0.4,
+                    padding: '4px 8px',
+                    borderRadius: 'var(--radius-2)',
+                    transition: 'all 0.2s'
+                  }}
+                  onClick={() => handleLegendClick(entry.name)}
+                >
+                  <Box
+                    style={{
+                      width: '12px',
+                      height: '12px',
+                      backgroundColor: entry.color || chartColors[index % chartColors.length],
+                      borderRadius: 'var(--radius-1)',
+                      flexShrink: 0
+                    }}
+                  />
+                  <Flex direction="column" style={{ flex: 1 }}>
+                    <Text size="1" style={{ fontSize: '12px' }}>
+                      {entry.name}
+                    </Text>
+                    {entry.serviceName && (
+                      <Text size="1" color="gray" style={{ fontSize: '10px' }}>
+                        {entry.serviceName}
+                      </Text>
+                    )}
+                  </Flex>
+                  <Badge size="1" variant="soft">
+                    {entry.value} ({percentage}%)
+                  </Badge>
+                </Flex>
+              )
+            })}
+          </Flex>
+        </Box>
+
         {/* Total count display */}
-        <Box style={{ textAlign: 'center', marginTop: '16px' }}>
+        <Box style={{ textAlign: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--gray-6)' }}>
           <Text size="3" weight="bold" style={{ display: 'block' }}>
             {totalValue.toLocaleString()}
           </Text>
