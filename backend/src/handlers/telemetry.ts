@@ -378,3 +378,69 @@ export const handleFetchMetrics = async (userUuid: string, query: yup.InferType<
     }
   }
 }
+
+export const handleFetchGeolocationBreakdown = async (userUuid: string) => {
+  try {
+    const userResources = await Resource.findAll({
+      where: { user_uuid: userUuid },
+      include: [
+        {
+          model: ResourceAttribute,
+          as: 'attributes',
+          required: false,
+          where: {
+            key: {
+              [Op.in]: ['geo.country', 'geo.country_code', 'geo.city']
+            }
+          }
+        }
+      ]
+    })
+
+    // Aggregate by country
+    const countryMap = new Map<string, { country: string; country_code: string; count: number }>()
+
+    userResources.forEach(resource => {
+      let country = 'Unknown'
+      let countryCode = 'Unknown'
+
+      if ((resource as any).attributes && Array.isArray((resource as any).attributes)) {
+        (resource as any).attributes.forEach((attr: any) => {
+          if (attr.key === 'geo.country' && attr.string_value) {
+            country = attr.string_value
+          }
+          if (attr.key === 'geo.country_code' && attr.string_value) {
+            countryCode = attr.string_value
+          }
+        })
+      }
+
+      if (countryMap.has(country)) {
+        countryMap.get(country)!.count++
+      } else {
+        countryMap.set(country, { country, country_code: countryCode, count: 1 })
+      }
+    })
+
+    const countries = Array.from(countryMap.values())
+    const totalCount = countries.reduce((sum, c) => sum + c.count, 0)
+
+    return {
+      response: countries.map(country => ({
+        country: country.country,
+        country_code: country.country_code,
+        count: country.count,
+        percentage: totalCount > 0 ? (country.count / totalCount) * 100 : 0
+      })).sort((a, b) => b.count - a.count),
+      status: 200
+    }
+
+  } catch (error) {
+    logger.error({ message: 'Error fetching geolocation breakdown', error })
+    return {
+      response: 'Error fetching geolocation breakdown',
+      error: true,
+      status: 500
+    }
+  }
+}

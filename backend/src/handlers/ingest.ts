@@ -12,6 +12,7 @@ import {
 import { logger } from '../logger'
 import { Transaction } from 'sequelize'
 import { sequelize } from '../dbClient'
+import { getGeolocation, GeolocationData } from '../services/geolocation'
 
 export const verifyIngestToken = async (token: string): Promise<IngestToken | null> => {
   try {
@@ -139,7 +140,8 @@ function getAttributeValue(attr: OTLPAttribute) {
 async function findOrCreateResource(
   userUuid: string,
   resourceAttrs: OTLPAttribute[],
-  transaction: Transaction
+  transaction: Transaction,
+  geoData?: GeolocationData | null
 ): Promise<Resource> {
   let serviceName = 'unknown'
   let serviceVersion: string | null = null
@@ -152,6 +154,38 @@ async function findOrCreateResource(
       serviceVersion = attr.value.stringValue || null
     } else if (attr.key === 'service.namespace') {
       serviceNamespace = attr.value.stringValue || null
+    }
+  }
+
+  // Add geolocation data to resource attributes if available
+  if (geoData) {
+    if (geoData.country) {
+      resourceAttrs.push({
+        key: 'geo.country',
+        value: { stringValue: geoData.country }
+      })
+    }
+    if (geoData.country_code) {
+      resourceAttrs.push({
+        key: 'geo.country_code',
+        value: { stringValue: geoData.country_code }
+      })
+    }
+    if (geoData.city) {
+      resourceAttrs.push({
+        key: 'geo.city',
+        value: { stringValue: geoData.city }
+      })
+    }
+    if (geoData.latitude !== undefined && geoData.longitude !== undefined) {
+      resourceAttrs.push({
+        key: 'geo.latitude',
+        value: { doubleValue: geoData.latitude }
+      })
+      resourceAttrs.push({
+        key: 'geo.longitude',
+        value: { doubleValue: geoData.longitude }
+      })
     }
   }
 
@@ -201,12 +235,22 @@ async function findOrCreateResource(
   return resource
 }
 
-export const handleIngestHTTP = async (ingestToken: IngestToken, data: OTLPData) => {
+export const handleIngestHTTP = async (
+  ingestToken: IngestToken,
+  data: OTLPData,
+  clientIp?: string | null
+) => {
   const transaction = await sequelize.transaction()
 
   try {
     let totalSpans = 0
     let totalMetrics = 0
+
+    // Get geolocation data if client IP is available
+    let geoData: GeolocationData | null = null
+    if (clientIp) {
+      geoData = await getGeolocation(clientIp)
+    }
 
     // Process traces and spans
     if (data.resourceSpans) {
@@ -214,7 +258,8 @@ export const handleIngestHTTP = async (ingestToken: IngestToken, data: OTLPData)
         const resource = await findOrCreateResource(
           ingestToken.user_uuid,
           resourceSpan.resource.attributes,
-          transaction
+          transaction,
+          geoData
         )
 
         for (const scopeSpan of resourceSpan.scopeSpans) {
@@ -286,7 +331,8 @@ export const handleIngestHTTP = async (ingestToken: IngestToken, data: OTLPData)
         const resource = await findOrCreateResource(
           ingestToken.user_uuid,
           resourceMetric.resource.attributes,
-          transaction
+          transaction,
+          geoData
         )
 
         for (const scopeMetric of resourceMetric.scopeMetrics) {

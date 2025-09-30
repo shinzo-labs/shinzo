@@ -24,6 +24,7 @@ import {
   handleFetchTraces,
   handleFetchSpans,
   handleFetchMetrics,
+  handleFetchGeolocationBreakdown,
   fetchDataSchema
 } from './handlers/telemetry'
 
@@ -31,6 +32,8 @@ import {
   handleIngestHTTP,
   verifyIngestToken
 } from './handlers/ingest'
+
+import { extractIpAddress } from './services/geolocation'
 
 import {
   handleGenerateIngestToken,
@@ -345,6 +348,19 @@ app.get('/telemetry/fetch_metrics', async (request: AuthenticatedRequest, reply:
   }
 })
 
+app.get('/telemetry/fetch_geolocation_breakdown', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleFetchGeolocationBreakdown(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch geolocation breakdown error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
 // Telemetry ingestion endpoints
 app.post('/telemetry/ingest_http', async (request: FastifyRequest, reply: FastifyReply) => {
   try {
@@ -362,7 +378,8 @@ app.post('/telemetry/ingest_http', async (request: FastifyRequest, reply: Fastif
       return
     }
 
-    const result = await handleIngestHTTP(ingestToken, request.body as any)
+    const clientIp = extractIpAddress(request.headers) || request.ip
+    const result = await handleIngestHTTP(ingestToken, request.body as any, clientIp)
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Ingest HTTP error', error })
@@ -387,7 +404,8 @@ app.post('/telemetry/ingest_http/metrics', async (request: FastifyRequest, reply
       return
     }
 
-    const result = await handleIngestHTTP(ingestToken, request.body as any)
+    const clientIp = extractIpAddress(request.headers) || request.ip
+    const result = await handleIngestHTTP(ingestToken, request.body as any, clientIp)
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Ingest HTTP metrics error', error })
@@ -411,7 +429,8 @@ app.post('/telemetry/ingest_http/traces', async (request: FastifyRequest, reply:
       return
     }
 
-    const result = await handleIngestHTTP(ingestToken, request.body as any)
+    const clientIp = extractIpAddress(request.headers) || request.ip
+    const result = await handleIngestHTTP(ingestToken, request.body as any, clientIp)
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Ingest HTTP traces error', error })
