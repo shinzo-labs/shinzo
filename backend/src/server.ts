@@ -46,6 +46,18 @@ import {
   getPreferenceSchema
 } from './handlers/userPreferences'
 
+import {
+  handleAnonymizeUser,
+  handleBatchAnonymizeUsers,
+  handleReverseAnonymization,
+  handleGetAnonymizationAudit,
+  handleExportMappings,
+  handleImportMappings,
+  anonymizeUserSchema,
+  batchAnonymizeSchema,
+  reverseAnonymizationSchema
+} from './handlers/anonymization'
+
 // Create Fastify instance
 const app = fastify({
   logger: pinoConfig('backend'),
@@ -366,6 +378,119 @@ app.post('/telemetry/ingest_http', async (request: FastifyRequest, reply: Fastif
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Ingest HTTP error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// User anonymization endpoints (admin)
+app.post('/admin/anonymize_user', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedBody = await anonymizeUserSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleAnonymizeUser(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Anonymize user error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.post('/admin/batch_anonymize_users', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedBody = await batchAnonymizeSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleBatchAnonymizeUsers(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Batch anonymize users error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.post('/admin/reverse_anonymization', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedBody = await reverseAnonymizationSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleReverseAnonymization(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Reverse anonymization error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/admin/anonymization_audit', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleGetAnonymizationAudit()
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Get anonymization audit error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.get('/admin/export_anonymization_mappings', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleExportMappings()
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Export anonymization mappings error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.post('/admin/import_anonymization_mappings', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { mappings } = request.body as { mappings: string }
+
+    if (!mappings || typeof mappings !== 'string') {
+      reply.status(400).send({ error: 'Invalid mappings data' })
+      return
+    }
+
+    const result = await handleImportMappings(mappings)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Import anonymization mappings error', error })
     reply.status(500).send({ error: 'Internal server error' })
   }
 })
