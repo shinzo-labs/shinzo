@@ -10,6 +10,11 @@ const navigation = [
     icon: Icons.DashboardIcon,
   },
   {
+    name: 'Getting Started',
+    href: '/getting-started',
+    icon: Icons.RocketIcon,
+  },
+  {
     name: 'Traces',
     href: '/traces',
     icon: Icons.ActivityLogIcon,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
-import { Button, Card, Flex, Text, Heading, Badge, Grid, Box } from '@radix-ui/themes'
+import { Button, Card, Flex, Text, Heading, Badge, Grid, Box, Callout } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
@@ -32,6 +32,7 @@ export const DashboardPage: React.FC = () => {
   const { refreshTrigger } = useRefresh()
   const queryClient = useQueryClient()
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false)
+  const [showFirstEventSuccess, setShowFirstEventSuccess] = useState(false)
 
   // State for time range
   const [timeRange, setTimeRange] = useState<TimeRange>({
@@ -89,6 +90,19 @@ export const DashboardPage: React.FC = () => {
     setShowWelcomeBanner(false)
     localStorage.setItem('welcomeBannerDismissed', 'true')
   }
+
+  // Check for first event success
+  useEffect(() => {
+    if (statsTraces.length > 0 && !localStorage.getItem('firstEventReceived')) {
+      setShowFirstEventSuccess(true)
+      localStorage.setItem('firstEventReceived', 'true')
+
+      // Auto-dismiss after 10 seconds
+      setTimeout(() => {
+        setShowFirstEventSuccess(false)
+      }, 10000)
+    }
+  }, [statsTraces.length])
 
   // Fetch resources
   const { data: resources = [], isLoading: resourcesLoading } = useQuery(
@@ -208,6 +222,23 @@ export const DashboardPage: React.FC = () => {
         {/* Welcome Banner for new users */}
         {showWelcomeBanner && (
           <WelcomeBanner onDismiss={handleDismissWelcomeBanner} />
+        )}
+
+        {/* First Event Success Banner */}
+        {showFirstEventSuccess && (
+          <Callout.Root color="green" style={{ marginBottom: '24px' }}>
+            <Callout.Icon>
+              <Icons.CheckCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              <Flex direction="column" gap="1">
+                <Text weight="bold">Success! We're receiving data from your MCP server! 🎉</Text>
+                <Text size="2">
+                  Your telemetry is now being collected and visualized below. Check out the charts to see your server's activity.
+                </Text>
+              </Flex>
+            </Callout.Text>
+          </Callout.Root>
         )}
 
         {/* Page header */}

@@ -14,6 +14,7 @@ import { VerifyPage } from './pages/auth/VerifyPage'
 
 // Main app pages
 import { DashboardPage } from './pages/DashboardPage'
+import { GettingStartedPage } from './pages/GettingStartedPage'
 import { TracesPage } from './pages/TracesPage'
 import { SpansPage } from './pages/SpansPage'
 import { MetricsPage } from './pages/MetricsPage'
@@ -51,6 +52,11 @@ function App() {
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
                     <DashboardPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/getting-started" element={
+                  <ProtectedRoute>
+                    <GettingStartedPage />
                   </ProtectedRoute>
                 } />
                 <Route path="/traces" element={
