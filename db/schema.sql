@@ -1,4 +1,4 @@
-\restrict LWpZDnTk7up10kjtdHToMwx1ktTLfaXUlPbk3eCj0g11I9NxHgD5DhvcD0DA5zN
+\restrict HJY0mHlPC4jvSBNsyOCIXPuloW8wcuPDDWp7b8f6zF7YbrseqQNU6tycBPBsy2r
 
 -- Dumped from database version 15.14 (Homebrew)
 -- Dumped by pg_dump version 15.14 (Homebrew)
@@ -165,6 +165,83 @@ CREATE TABLE open_telemetry.resource_attribute (
     bool_value boolean,
     array_value jsonb
 );
+
+
+--
+-- Name: session; Type: TABLE; Schema: open_telemetry; Owner: -
+--
+
+CREATE TABLE open_telemetry.session (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_uuid uuid NOT NULL,
+    resource_uuid uuid NOT NULL,
+    session_id character varying(255) NOT NULL,
+    start_time timestamp without time zone NOT NULL,
+    end_time timestamp without time zone,
+    status character varying(20) DEFAULT 'active'::character varying NOT NULL,
+    error_message text,
+    total_events integer DEFAULT 0 NOT NULL,
+    metadata jsonb,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT session_status_check CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'completed'::character varying, 'error'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE session; Type: COMMENT; Schema: open_telemetry; Owner: -
+--
+
+COMMENT ON TABLE open_telemetry.session IS 'Stores session metadata for MCP server interactions';
+
+
+--
+-- Name: COLUMN session.session_id; Type: COMMENT; Schema: open_telemetry; Owner: -
+--
+
+COMMENT ON COLUMN open_telemetry.session.session_id IS 'Unique identifier for the session from the SDK';
+
+
+--
+-- Name: COLUMN session.status; Type: COMMENT; Schema: open_telemetry; Owner: -
+--
+
+COMMENT ON COLUMN open_telemetry.session.status IS 'Current status of the session: active, completed, or error';
+
+
+--
+-- Name: session_event; Type: TABLE; Schema: open_telemetry; Owner: -
+--
+
+CREATE TABLE open_telemetry.session_event (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    session_uuid uuid NOT NULL,
+    "timestamp" timestamp without time zone NOT NULL,
+    event_type character varying(50) NOT NULL,
+    tool_name character varying(255),
+    input_data jsonb,
+    output_data jsonb,
+    error_data jsonb,
+    duration_ms integer,
+    metadata jsonb,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    CONSTRAINT session_event_event_type_check CHECK (((event_type)::text = ANY ((ARRAY['tool_call'::character varying, 'tool_response'::character varying, 'error'::character varying, 'user_input'::character varying, 'system_message'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE session_event; Type: COMMENT; Schema: open_telemetry; Owner: -
+--
+
+COMMENT ON TABLE open_telemetry.session_event IS 'Stores individual events within a session for replay and analysis';
+
+
+--
+-- Name: COLUMN session_event.event_type; Type: COMMENT; Schema: open_telemetry; Owner: -
+--
+
+COMMENT ON COLUMN open_telemetry.session_event.event_type IS 'Type of event: tool_call, tool_response, error, user_input, or system_message';
 
 
 --
@@ -340,6 +417,30 @@ ALTER TABLE ONLY open_telemetry.resource
 
 
 --
+-- Name: session_event session_event_pkey; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.session_event
+    ADD CONSTRAINT session_event_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: session session_pkey; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.session
+    ADD CONSTRAINT session_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: session session_session_id_key; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.session
+    ADD CONSTRAINT session_session_id_key UNIQUE (session_id);
+
+
+--
 -- Name: span_attribute span_attribute_pkey; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
 --
 
@@ -446,6 +547,69 @@ CREATE INDEX idx_resource_service ON open_telemetry.resource USING btree (servic
 --
 
 CREATE INDEX idx_resource_user ON open_telemetry.resource USING btree (user_uuid);
+
+
+--
+-- Name: idx_session_events_event_type; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_session_events_event_type ON open_telemetry.session_event USING btree (event_type);
+
+
+--
+-- Name: idx_session_events_session_uuid; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_session_events_session_uuid ON open_telemetry.session_event USING btree (session_uuid);
+
+
+--
+-- Name: idx_session_events_timestamp; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_session_events_timestamp ON open_telemetry.session_event USING btree ("timestamp");
+
+
+--
+-- Name: idx_session_events_tool_name; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_session_events_tool_name ON open_telemetry.session_event USING btree (tool_name);
+
+
+--
+-- Name: idx_sessions_resource_uuid; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_sessions_resource_uuid ON open_telemetry.session USING btree (resource_uuid);
+
+
+--
+-- Name: idx_sessions_session_id; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_sessions_session_id ON open_telemetry.session USING btree (session_id);
+
+
+--
+-- Name: idx_sessions_start_time; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_sessions_start_time ON open_telemetry.session USING btree (start_time);
+
+
+--
+-- Name: idx_sessions_status; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_sessions_status ON open_telemetry.session USING btree (status);
+
+
+--
+-- Name: idx_sessions_user_uuid; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_sessions_user_uuid ON open_telemetry.session USING btree (user_uuid);
 
 
 --
@@ -638,6 +802,30 @@ ALTER TABLE ONLY open_telemetry.resource
 
 
 --
+-- Name: session_event session_event_session_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.session_event
+    ADD CONSTRAINT session_event_session_uuid_fkey FOREIGN KEY (session_uuid) REFERENCES open_telemetry.session(uuid) ON DELETE CASCADE;
+
+
+--
+-- Name: session session_resource_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.session
+    ADD CONSTRAINT session_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid) ON DELETE CASCADE;
+
+
+--
+-- Name: session session_user_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.session
+    ADD CONSTRAINT session_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid) ON DELETE CASCADE;
+
+
+--
 -- Name: span_attribute span_attribute_span_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
 --
 
@@ -681,7 +869,7 @@ ALTER TABLE ONLY open_telemetry.trace
 -- PostgreSQL database dump complete
 --
 
-\unrestrict LWpZDnTk7up10kjtdHToMwx1ktTLfaXUlPbk3eCj0g11I9NxHgD5DhvcD0DA5zN
+\unrestrict HJY0mHlPC4jvSBNsyOCIXPuloW8wcuPDDWp7b8f6zF7YbrseqQNU6tycBPBsy2r
 
 
 --
@@ -690,4 +878,5 @@ ALTER TABLE ONLY open_telemetry.trace
 
 INSERT INTO public.schema_migrations (version) VALUES
     ('20250914000000'),
-    ('20250919000000');
+    ('20250919000000'),
+    ('20250930000000');

@@ -46,6 +46,21 @@ import {
   getPreferenceSchema
 } from './handlers/userPreferences'
 
+import {
+  handleCreateSession,
+  handleAddSessionEvent,
+  handleCompleteSession,
+  handleListSessions,
+  handleGetSessionDetails,
+  handleSearchSessionsByError,
+  handleExportSession,
+  createSessionSchema,
+  addSessionEventSchema,
+  completeSessionSchema,
+  listSessionsSchema,
+  searchSessionsSchema
+} from './handlers/sessions'
+
 // Create Fastify instance
 const app = fastify({
   logger: pinoConfig('backend'),
@@ -261,6 +276,148 @@ app.delete('/user/preferences/:preferenceKey', async (request: AuthenticatedRequ
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Delete user preference error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// Session management endpoints
+app.post('/sessions/create', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedBody = await createSessionSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleCreateSession(request.user!.uuid, validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Create session error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.post('/sessions/add_event', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedBody = await addSessionEventSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleAddSessionEvent(request.user!.uuid, validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Add session event error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.post('/sessions/complete', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedBody = await completeSessionSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleCompleteSession(request.user!.uuid, validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Complete session error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/sessions/list', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedQuery = await listSessionsSchema.validate(request.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleListSessions(request.user!.uuid, validatedQuery)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'List sessions error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/sessions/:sessionUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { sessionUuid } = request.params as { sessionUuid: string }
+    const result = await handleGetSessionDetails(request.user!.uuid, sessionUuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Get session details error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.get('/sessions/search/error', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedQuery = await searchSessionsSchema.validate(request.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleSearchSessionsByError(request.user!.uuid, validatedQuery)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Search sessions by error error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/sessions/:sessionUuid/export', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { sessionUuid } = request.params as { sessionUuid: string }
+    const { filter_sensitive } = request.query as { filter_sensitive?: string }
+    const applySensitiveFilter = filter_sensitive !== 'false'
+
+    const result = await handleExportSession(request.user!.uuid, sessionUuid, applySensitiveFilter)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Export session error', error })
     reply.status(500).send({ error: 'Internal server error' })
   }
 })
