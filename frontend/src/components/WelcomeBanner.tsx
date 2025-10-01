@@ -50,7 +50,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({ onDismiss }) => {
           <Flex direction="column" gap="2">
             <Flex align="center" gap="2">
               <CheckIcon color="var(--blue-11)" />
-              <Text size="3" weight="medium" color="blue">Welcome to Shinzo Platform!</Text>
+              <Text size="3" weight="medium" color="blue">Welcome to the Shinzo Platform!</Text>
             </Flex>
             <Text size="2" color="gray">
               Your account has been verified and we've generated your first ingest token to get you started.
