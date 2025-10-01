@@ -287,12 +287,16 @@ export const DashboardPage: React.FC = () => {
               title="Traces by Operation"
               data={operationPieData}
               height={300}
+              groupBy="tool"
+              traces={traces}
             />
             <TracePieChart
               key="session-pie"
               title="Traces by Session ID"
               data={sessionPieData}
               height={300}
+              groupBy="session"
+              traces={traces}
             />
           </Grid>
         </Flex>

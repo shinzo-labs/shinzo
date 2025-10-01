@@ -73,8 +73,10 @@ const getTimeInterval = (timeRange: TimeRange) => {
 
 const cleanOperationName = (operationName: string | null): string => {
   if (!operationName) return 'Unknown'
-  // Remove 'tools/call' prefix if present
-  return operationName.replace(/^tools\/call\//, '')
+  // Split on space, remove first element, rejoin
+  const parts = operationName.split(' ')
+  if (parts.length <= 1) return operationName
+  return parts.slice(1).join(' ')
 }
 
 export const processTracesForTimeSeriesByOperation = (
@@ -151,11 +153,17 @@ export const processTracesForPieByOperation = (traces: Trace[]): TracePieData[] 
     return acc
   }, {} as Record<string, { count: number; services: Set<string> }>)
 
-  return Object.entries(operationData).map(([name, data]) => ({
-    name,
-    value: data.count,
-    serviceName: Array.from(data.services).join(', ')
-  }))
+  return Object.entries(operationData)
+    .sort((a, b) => {
+      // Sort by count descending, then by name alphanumeric
+      if (b[1].count !== a[1].count) return b[1].count - a[1].count
+      return a[0].localeCompare(b[0])
+    })
+    .map(([name, data]) => ({
+      name,
+      value: data.count,
+      serviceName: Array.from(data.services).join(', ')
+    }))
 }
 
 export const processTracesForPieBySession = (traces: Trace[]): TracePieData[] => {
@@ -165,10 +173,16 @@ export const processTracesForPieBySession = (traces: Trace[]): TracePieData[] =>
     return acc
   }, {} as Record<string, number>)
 
-  return Object.entries(sessionCounts).map(([name, value]) => ({
-    name,
-    value
-  }))
+  return Object.entries(sessionCounts)
+    .sort((a, b) => {
+      // Sort by count descending, then by name alphanumeric
+      if (b[1] !== a[1]) return b[1] - a[1]
+      return a[0].localeCompare(b[0])
+    })
+    .map(([name, value]) => ({
+      name,
+      value
+    }))
 }
 
 const chartColors = [

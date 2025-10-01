@@ -24,7 +24,19 @@ const TraceTimeSeriesChartComponent: React.FC<TraceTimeSeriesChartProps> = ({
   const hasAnimatedRef = useRef(false)
   const [activeSeries, setActiveSeries] = useState<Set<string>>(new Set())
   const allTimeSlots = Object.values(data)[0] || []
-  const seriesKeys = Object.keys(data)
+
+  // Sort series keys by total count descending, then alphanumeric
+  const seriesKeys = useMemo(() => {
+    const keys = Object.keys(data)
+    const totals: Record<string, number> = {}
+    keys.forEach(key => {
+      totals[key] = data[key].reduce((sum, point) => sum + point.count, 0)
+    })
+    return keys.sort((a, b) => {
+      if (totals[b] !== totals[a]) return totals[b] - totals[a]
+      return a.localeCompare(b)
+    })
+  }, [data])
 
   // Mark as animated after first render
   useEffect(() => {
