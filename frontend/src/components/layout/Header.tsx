@@ -43,7 +43,7 @@ export const Header: React.FC = () => {
           <DropdownMenu.Trigger>
             <Button variant="outline" size="2">
               <Icons.ChatBubbleIcon />
-              Live Support
+              Need support?
               <Icons.ChevronDownIcon />
             </Button>
           </DropdownMenu.Trigger>
