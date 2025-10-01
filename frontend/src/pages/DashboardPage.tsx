@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, Card, Flex, Text, Heading, Badge, Grid, Box } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
+import { useRefresh } from '../contexts/RefreshContext'
 import { telemetryService, ingestTokenService } from '../backendService'
-import { subHours } from 'date-fns'
+import { subHours, subDays } from 'date-fns'
 import { TimeRangePicker, TimeRange } from '../components/charts/TimeRangePicker'
 import { TraceTimeSeriesChart } from '../components/charts/TraceTimeSeriesChart'
 import { TracePieChart } from '../components/charts/TracePieChart'
@@ -28,6 +29,7 @@ interface DashboardStats {
 
 export const DashboardPage: React.FC = () => {
   const { token } = useAuth()
+  const { refreshTrigger } = useRefresh()
   const queryClient = useQueryClient()
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false)
 
@@ -37,6 +39,27 @@ export const DashboardPage: React.FC = () => {
     end: new Date(),
     label: 'Last 1 hour'
   })
+
+  // Helper function to get current time range with updated end time for preset ranges
+  const getCurrentTimeRange = (): TimeRange => {
+    // For preset ranges, always update the end time to "now" to ensure real-time updates
+    if (timeRange.label !== 'Custom') {
+      const now = new Date()
+      switch (timeRange.label) {
+        case 'Last 1 hour':
+          return { ...timeRange, start: subHours(now, 1), end: now }
+        case 'Last 24 hours':
+          return { ...timeRange, start: subHours(now, 24), end: now }
+        case 'Last 7 days':
+          return { ...timeRange, start: subDays(now, 7), end: now }
+        case 'Last 30 days':
+          return { ...timeRange, start: subDays(now, 30), end: now }
+        default:
+          return timeRange
+      }
+    }
+    return timeRange
+  }
 
   // Check if user should see welcome banner (new user with fresh token)
   useEffect(() => {
@@ -69,7 +92,7 @@ export const DashboardPage: React.FC = () => {
 
   // Fetch resources
   const { data: resources = [], isLoading: resourcesLoading } = useQuery(
-    'resources',
+    ['resources', refreshTrigger],
     async () => {
       const response = await fetch(`${API_BASE_URL}/telemetry/fetch_resources`, {
         headers: {
@@ -79,36 +102,51 @@ export const DashboardPage: React.FC = () => {
       if (!response.ok) throw new Error('Failed to fetch resources')
       return response.json()
     },
-    { enabled: !!token }
+    {
+      enabled: !!token,
+      keepPreviousData: true,
+      refetchOnWindowFocus: false,
+      staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
+    }
   )
 
   // Fetch traces for the selected time range for charts
   const { data: traces = [] } = useQuery(
-    ['dashboard-traces', timeRange.start.toISOString(), timeRange.end.toISOString()],
+    ['dashboard-traces', timeRange.label, refreshTrigger],
     async () => {
+      const currentRange = getCurrentTimeRange()
       return telemetryService.fetchTraces(token!, {
-        start_time: timeRange.start.toISOString(),
-        end_time: timeRange.end.toISOString(),
+        start_time: currentRange.start.toISOString(),
+        end_time: currentRange.end.toISOString(),
       })
     },
-    { enabled: !!token }
+    {
+      enabled: !!token,
+      keepPreviousData: true,
+      refetchOnWindowFocus: false,
+      staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
+    }
   )
 
-  // Fetch traces for last 24 hours to calculate stats
+  // Fetch traces for the selected time range to calculate stats
   const { data: statsTraces = [] } = useQuery(
-    'dashboard-stats-traces',
+    ['dashboard-stats-traces', timeRange.label, refreshTrigger],
     async () => {
-      const end = new Date()
-      const start = subHours(end, 24)
+      const currentRange = getCurrentTimeRange()
       return telemetryService.fetchTraces(token!, {
-        start_time: start.toISOString(),
-        end_time: end.toISOString(),
+        start_time: currentRange.start.toISOString(),
+        end_time: currentRange.end.toISOString(),
       })
     },
-    { enabled: !!token }
+    {
+      enabled: !!token,
+      keepPreviousData: true,
+      refetchOnWindowFocus: false,
+      staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
+    }
   )
 
-  // Calculate real stats from last 24 hours data
+  // Calculate real stats from selected time range data
   const stats: DashboardStats = {
     totalTraces: statsTraces.length,
     activeServices: resources.length,
@@ -120,38 +158,49 @@ export const DashboardPage: React.FC = () => {
       : 0,
   }
 
-  // Process chart data
-  const operationTimeSeriesData = processTracesForTimeSeriesByOperation(traces, timeRange)
-  const sessionTimeSeriesData = processTracesForTimeSeriesBySession(traces, timeRange)
-  const operationPieData = addColorsToData(processTracesForPieByOperation(traces))
-  const sessionPieData = addColorsToData(processTracesForPieBySession(traces))
+  // Process chart data with memoization to prevent unnecessary recalculations
+  const operationTimeSeriesData = useMemo(() => {
+    const currentRange = getCurrentTimeRange()
+    return processTracesForTimeSeriesByOperation(traces, currentRange)
+  }, [traces, timeRange.label, refreshTrigger])
 
-  const statCards = [
+  const sessionTimeSeriesData = useMemo(() => {
+    const currentRange = getCurrentTimeRange()
+    return processTracesForTimeSeriesBySession(traces, currentRange)
+  }, [traces, timeRange.label, refreshTrigger])
+
+  const operationPieData = useMemo(() =>
+    addColorsToData(processTracesForPieByOperation(traces)),
+    [traces]
+  )
+
+  const sessionPieData = useMemo(() =>
+    addColorsToData(processTracesForPieBySession(traces)),
+    [traces]
+  )
+
+  const statCards = useMemo(() => [
     {
       title: 'Total Traces',
       value: stats.totalTraces.toLocaleString(),
-      subtitle: 'Last 24 hours',
       icon: Icons.ActivityLogIcon,
     },
     {
       title: 'Active Services',
       value: stats.activeServices.toString(),
-      subtitle: 'Currently running',
       icon: Icons.ComponentInstanceIcon,
     },
     {
       title: 'Error Rate',
       value: `${stats.errorRate.toFixed(2)}%`,
-      subtitle: 'Last 24 hours',
       icon: Icons.ExclamationTriangleIcon,
     },
     {
       title: 'Avg Response Time',
       value: `${stats.avgResponseTime.toFixed(2)}ms`,
-      subtitle: 'Last 24 hours',
       icon: Icons.ClockIcon,
     },
-  ]
+  ], [stats.totalTraces, stats.activeServices, stats.errorRate, stats.avgResponseTime])
 
   return (
     <AppLayout>
@@ -173,18 +222,8 @@ export const DashboardPage: React.FC = () => {
             <TimeRangePicker
               currentRange={timeRange}
               onTimeRangeChange={setTimeRange}
+              preferenceKey="dashboard_time_range"
             />
-            <Button
-              variant="outline"
-              onClick={() => {
-                queryClient.invalidateQueries('resources')
-                queryClient.invalidateQueries(['dashboard-traces'])
-                queryClient.invalidateQueries('dashboard-stats-traces')
-              }}
-            >
-              <Icons.ReloadIcon />
-              Refresh
-            </Button>
           </Flex>
         </Flex>
 
@@ -213,13 +252,54 @@ export const DashboardPage: React.FC = () => {
                     <Text size="6" weight="bold" style={{ marginBottom: '8px', display: 'block' }}>{stat.value}</Text>
                   </Box>
                 </Flex>
-                <Flex justify="start" align="center" style={{ marginTop: '20px' }}>
-                  <Text size="2" color="gray">{stat.subtitle}</Text>
-                </Flex>
               </Card>
             )
           })}
         </Grid>
+
+        {/* Charts Section */}
+        <Flex direction="column" gap="4">
+          <Box>
+            <Heading size="4">Analytics</Heading>
+            <Text size="2" color="gray">Telemetry data visualization for {timeRange.label.toLowerCase()}</Text>
+          </Box>
+
+          {/* Top row - Line charts */}
+          <Grid columns={{ initial: '1', lg: '2' }} gap="4">
+            <TraceTimeSeriesChart
+              key="operation-timeseries"
+              title="Trace Count by Operation"
+              data={operationTimeSeriesData}
+              height={300}
+            />
+            <TraceTimeSeriesChart
+              key="session-timeseries"
+              title="Trace Count by Session ID"
+              data={sessionTimeSeriesData}
+              height={300}
+            />
+          </Grid>
+
+          {/* Bottom row - Pie charts */}
+          <Grid columns={{ initial: '1', lg: '2' }} gap="4">
+            <TracePieChart
+              key="operation-pie"
+              title="Traces by Operation"
+              data={operationPieData}
+              height={300}
+              groupBy="tool"
+              traces={traces}
+            />
+            <TracePieChart
+              key="session-pie"
+              title="Traces by Session ID"
+              data={sessionPieData}
+              height={300}
+              groupBy="session"
+              traces={traces}
+            />
+          </Grid>
+        </Flex>
 
         {/* Service overview */}
         <Card style={{ padding: '24px' }}>
@@ -268,42 +348,6 @@ export const DashboardPage: React.FC = () => {
             </Box>
           </Flex>
         </Card>
-
-        {/* Charts Section */}
-        <Flex direction="column" gap="4">
-          <Box>
-            <Heading size="4">Analytics</Heading>
-            <Text size="2" color="gray">Telemetry data visualization for {timeRange.label.toLowerCase()}</Text>
-          </Box>
-
-          {/* Top row - Line charts */}
-          <Grid columns={{ initial: '1', lg: '2' }} gap="4">
-            <TraceTimeSeriesChart
-              title="Trace Count by Operation"
-              data={operationTimeSeriesData}
-              height={300}
-            />
-            <TraceTimeSeriesChart
-              title="Trace Count by Session ID"
-              data={sessionTimeSeriesData}
-              height={300}
-            />
-          </Grid>
-
-          {/* Bottom row - Pie charts */}
-          <Grid columns={{ initial: '1', lg: '2' }} gap="4">
-            <TracePieChart
-              title="Traces by Operation"
-              data={operationPieData}
-              height={300}
-            />
-            <TracePieChart
-              title="Traces by Session ID"
-              data={sessionPieData}
-              height={300}
-            />
-          </Grid>
-        </Flex>
 
       </Flex>
     </AppLayout>

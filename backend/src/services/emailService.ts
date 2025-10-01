@@ -308,11 +308,11 @@ export class EmailService {
                 <strong>Important:</strong> This verification link will expire in 10 minutes for security reasons. If it expires, you can request a new one from the sign-up page.
             </div>
 
-            <p>If you didn't create an account with Shinzo Platform, you can safely ignore this email.</p>
+            <p>If you didn't create an account for Shinzo, you can safely ignore this email.</p>
         </div>
 
         <div class="footer">
-            <p class="signature">Best regards,<br>The Shinzo Platform Team</p>
+            <p class="signature">Best regards,<br>Shinzo Labs</p>
             <p class="disclaimer">This is an automated email. Please do not reply to this message.</p>
         </div>
     </div>

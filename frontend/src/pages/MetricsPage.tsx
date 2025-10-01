@@ -1,10 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { DEFAULT_TIME_RANGE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
+import { useUserPreferences } from '../contexts/UserPreferencesContext'
+import { useRefresh } from '../contexts/RefreshContext'
 import { telemetryService } from '../backendService'
 import { format, subHours, subDays } from 'date-fns'
 
@@ -28,10 +30,28 @@ interface Metric {
 
 export const MetricsPage: React.FC = () => {
   const { token } = useAuth()
+  const { refreshTrigger } = useRefresh()
   const queryClient = useQueryClient()
+  const { savePreference, getPreference } = useUserPreferences()
   const [timeRange, setTimeRange] = useState(DEFAULT_TIME_RANGE)
   const [metricNameFilter, setMetricNameFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
+
+  // Load saved time range preference on mount
+  useEffect(() => {
+    const savedTimeRange = getPreference('metrics_time_range', DEFAULT_TIME_RANGE)
+    setTimeRange(savedTimeRange)
+  }, [getPreference])
+
+  // Save time range preference when it changes
+  const handleTimeRangeChange = async (newTimeRange: string) => {
+    setTimeRange(newTimeRange)
+    try {
+      await savePreference('metrics_time_range', newTimeRange)
+    } catch (error) {
+      console.error('Failed to save time range preference:', error)
+    }
+  }
 
   // Calculate time range
   const getTimeRange = () => {
@@ -39,20 +59,17 @@ export const MetricsPage: React.FC = () => {
     let start = new Date()
 
     switch (timeRange) {
-      case '15m':
-        start = new Date(end.getTime() - 15 * 60 * 1000)
-        break
       case '1h':
         start = subHours(end, 1)
-        break
-      case '6h':
-        start = subHours(end, 6)
         break
       case '24h':
         start = subHours(end, 24)
         break
       case '7d':
         start = subDays(end, 7)
+        break
+      case '30d':
+        start = subDays(end, 30)
         break
       default:
         start = subHours(end, 1)
@@ -66,13 +83,23 @@ export const MetricsPage: React.FC = () => {
 
   // Fetch metrics
   const { data: metrics = [], isLoading, error } = useQuery(
-    ['metrics', timeRange],
+    ['metrics', timeRange, refreshTrigger],
     async () => {
       const timeParams = getTimeRange()
       return telemetryService.fetchMetrics(token!, timeParams)
     },
-    { enabled: !!token }
+    {
+      enabled: !!token,
+      keepPreviousData: true,
+      refetchOnWindowFocus: false,
+      staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
+    }
   )
+
+  // Refresh function for manual refresh
+  const handleRefresh = useCallback(() => {
+    queryClient.invalidateQueries(['metrics', timeRange, refreshTrigger])
+  }, [queryClient, timeRange, refreshTrigger])
 
   // Filter metrics
   const filteredMetrics = metrics.filter((metric: Metric) => {
@@ -86,11 +113,10 @@ export const MetricsPage: React.FC = () => {
   })
 
   const timeRangeOptions = [
-    { value: '15m', label: 'Last 15 minutes' },
     { value: '1h', label: 'Last 1 hour' },
-    { value: '6h', label: 'Last 6 hours' },
     { value: '24h', label: 'Last 24 hours' },
     { value: '7d', label: 'Last 7 days' },
+    { value: '30d', label: 'Last 30 days' },
   ]
 
   const typeOptions = [
@@ -105,21 +131,12 @@ export const MetricsPage: React.FC = () => {
     <AppLayout>
       <Flex direction="column" gap="6">
         {/* Page header */}
-        <Flex justify="between" align="center">
-          <Box>
-            <Heading size="6">Metrics</Heading>
-            <Text color="gray">
-              Application metrics and performance indicators
-            </Text>
-          </Box>
-          <Button
-            variant="outline"
-            onClick={() => queryClient.invalidateQueries(['metrics', timeRange])}
-          >
-            <Icons.ReloadIcon />
-            Refresh
-          </Button>
-        </Flex>
+        <Box>
+          <Heading size="6">Metrics</Heading>
+          <Text color="gray">
+            Application metrics and performance indicators
+          </Text>
+        </Box>
 
         {/* Filters */}
         <Card>
@@ -129,7 +146,7 @@ export const MetricsPage: React.FC = () => {
               {/* Time range */}
               <Flex direction="column" gap="2" style={{ minWidth: '180px' }}>
                 <Text size="2" weight="medium">Time Range</Text>
-                <Select.Root value={timeRange} onValueChange={setTimeRange}>
+                <Select.Root value={timeRange} onValueChange={handleTimeRangeChange}>
                   <Select.Trigger placeholder="Select time range" style={{ width: '100%' }} />
                   <Select.Content>
                     {timeRangeOptions.map((option) => (

@@ -251,3 +251,52 @@ export const telemetryService = {
     return handleResponse(response)
   }
 }
+
+interface UserPreference {
+  uuid: string
+  preference_key: string
+  preference_value: any
+  created_at: string
+  updated_at: string
+}
+
+interface SavePreferenceRequest {
+  preference_key: string
+  preference_value: any
+}
+
+export const userPreferencesService = {
+  async savePreference(token: string, data: SavePreferenceRequest): Promise<{ message: string; preference: UserPreference }> {
+    const response = await fetch(`${API_BASE_URL}/user/preferences`, {
+      method: 'POST',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(data)
+    })
+    return handleResponse(response)
+  },
+
+  async getPreferences(token: string): Promise<{ preferences: UserPreference[] }> {
+    const response = await fetch(`${API_BASE_URL}/user/preferences`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async getPreference(token: string, preferenceKey: string): Promise<{ preference: UserPreference }> {
+    const queryParams = new URLSearchParams()
+    queryParams.append('preference_key', preferenceKey)
+
+    const response = await fetch(`${API_BASE_URL}/user/preferences?${queryParams}`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async deletePreference(token: string, preferenceKey: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/user/preferences/${preferenceKey}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  }
+}

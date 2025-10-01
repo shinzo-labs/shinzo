@@ -165,6 +165,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     sessionStorage.removeItem('auth_token')
     setToken(null)
     setUser(null)
+    window.location.href = 'https://shinzo.ai'
   }
 
   const value = {

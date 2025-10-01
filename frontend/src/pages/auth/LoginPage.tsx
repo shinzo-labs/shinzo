@@ -32,8 +32,47 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="auth-page">
+      <a
+        href="https://shinzo.ai"
+        style={{
+          position: 'absolute',
+          top: '20px',
+          left: '20px',
+          textDecoration: 'none'
+        }}
+      >
+        <img
+          src="/ShinzoIcon512.png"
+          alt="Back to Shinzo"
+          style={{
+            width: '48px',
+            height: '48px',
+            cursor: 'pointer'
+          }}
+        />
+      </a>
       <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
-        <Flex direction="column" gap="6">
+        <Flex direction="column" gap="2">
+          <Flex justify="center" align="center" style={{ width: '100%' }}>
+            <a
+              href="https://www.shinzo.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: 'none' }}
+            >
+              <img
+                src="/ShinzoIcon512.png"
+                alt="Shinzo Labs"
+                style={{
+                  width: '128px',
+                  height: '128px',
+                  cursor: 'pointer'
+                }}
+              />
+            </a>
+            <div />
+          </Flex>
+
           <Flex direction="column" gap="2" align="center">
             <Heading size="6">Welcome to Shinzo</Heading>
             <Text size="2" color="gray">

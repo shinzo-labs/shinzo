@@ -47,7 +47,8 @@ export const Sidebar: React.FC = () => {
         backgroundColor: 'var(--gray-2)',
         borderRight: '1px solid var(--gray-6)',
         height: '100vh',
-        flexShrink: 0
+        flexShrink: 0,
+        overflow: 'hidden'
       }}
     >
       {/* Logo */}

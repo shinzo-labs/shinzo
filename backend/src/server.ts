@@ -4,7 +4,7 @@ import fastifyRateLimit from '@fastify/rate-limit'
 import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE } from './config'
 import { logger, pinoConfig } from './logger'
 import { sequelize } from './dbClient'
-import { authenticateJWT, authenticateIngestToken, AuthenticatedRequest } from './middleware/auth'
+import { authenticateJWT, AuthenticatedRequest } from './middleware/auth'
 
 // Import handlers
 import {
@@ -38,6 +38,14 @@ import {
   handleFetchIngestTokens,
   handleRevokeIngestToken
 } from './handlers/ingestToken'
+
+import {
+  handleSaveUserPreference,
+  handleGetUserPreferences,
+  handleDeleteUserPreference,
+  savePreferenceSchema,
+  getPreferenceSchema
+} from './handlers/userPreferences'
 
 // Create Fastify instance
 const app = fastify({
@@ -208,6 +216,65 @@ app.post('/auth/revoke_ingest_token/:tokenUuid', async (request: AuthenticatedRe
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Revoke ingest token error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// User preferences endpoints
+app.post('/user/preferences', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedBody = await savePreferenceSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleSaveUserPreference(request.user!.uuid, validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Save user preference error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/user/preferences', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedQuery = await getPreferenceSchema.validate(request.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleGetUserPreferences(request.user!.uuid, validatedQuery)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Get user preferences error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.delete('/user/preferences/:preferenceKey', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { preferenceKey } = request.params as { preferenceKey: string }
+    const result = await handleDeleteUserPreference(request.user!.uuid, preferenceKey)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Delete user preference error', error })
     reply.status(500).send({ error: 'Internal server error' })
   }
 })

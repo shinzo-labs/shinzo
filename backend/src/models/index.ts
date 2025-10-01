@@ -1,5 +1,6 @@
 import { User } from './main/User'
 import { SubscriptionTier } from './main/SubscriptionTier'
+import { UserPreferences } from './main/UserPreferences'
 import { Resource } from './open_telemetry/Resource'
 import { ResourceAttribute } from './open_telemetry/ResourceAttribute'
 import { IngestToken } from './open_telemetry/IngestToken'
@@ -12,6 +13,7 @@ import { MetricAttribute } from './open_telemetry/MetricAttribute'
 export {
   User,
   SubscriptionTier,
+  UserPreferences,
   Resource,
   ResourceAttribute,
   IngestToken,

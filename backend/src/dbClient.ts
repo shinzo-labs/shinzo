@@ -4,6 +4,7 @@ import { logger } from "./logger"
 import {
   User,
   SubscriptionTier,
+  UserPreferences,
   Resource,
   ResourceAttribute,
   IngestToken,
@@ -35,6 +36,7 @@ export const sequelize = new Sequelize(DATABASE_URL, {
 // Initialize models
 User.initialize(sequelize)
 SubscriptionTier.initialize(sequelize)
+UserPreferences.initialize(sequelize)
 Resource.initialize(sequelize)
 ResourceAttribute.initialize(sequelize)
 IngestToken.initialize(sequelize)
@@ -48,8 +50,11 @@ MetricAttribute.initialize(sequelize)
 User.hasMany(Resource, { foreignKey: 'user_uuid', as: 'resources' })
 User.hasMany(IngestToken, { foreignKey: 'user_uuid', as: 'ingestTokens' })
 User.belongsTo(SubscriptionTier, { foreignKey: 'subscription_tier_uuid', as: 'subscriptionTier' })
+User.hasMany(UserPreferences, { foreignKey: 'user_uuid', as: 'preferences' })
 
 SubscriptionTier.hasMany(User, { foreignKey: 'subscription_tier_uuid', as: 'users' })
+
+UserPreferences.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
 
 Resource.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
 Resource.hasMany(ResourceAttribute, { foreignKey: 'resource_uuid', as: 'attributes' })
