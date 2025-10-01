@@ -164,16 +164,6 @@ const TracePieChartComponent: React.FC<TracePieChartProps> = ({
             })}
           </Flex>
         </Box>
-
-        {/* Total count display */}
-        <Box style={{ textAlign: 'center', marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--gray-6)' }}>
-          <Text size="3" weight="bold" style={{ display: 'block' }}>
-            {totalValue.toLocaleString()}
-          </Text>
-          <Text size="2" color="gray">
-            Total traces
-          </Text>
-        </Box>
       </Box>
     </Card>
   )
