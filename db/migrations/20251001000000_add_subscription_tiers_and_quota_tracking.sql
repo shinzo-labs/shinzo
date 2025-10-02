@@ -15,7 +15,7 @@ for each row execute procedure updated_at();
 
 -- Insert default subscription tiers
 insert into main.subscription_tier (tier, monthly_quota) values
-    ('free', 3000),
+    ('free', 2000),
     ('growth', 10000),
     ('scale', null);
 
