@@ -1,48 +1,36 @@
 import { Model, DataTypes, Sequelize } from 'sequelize'
 import { CommonModel, commonFields } from '../Common'
 
-export class Resource extends CommonModel {
-  public user_uuid!: string
-  public service_name!: string
-  public service_version!: string | null
-  public service_namespace!: string | null
-  public first_seen!: Date | null
-  public last_seen!: Date | null
+export class SpanLink extends CommonModel {
+  public span_uuid!: string
+  public trace_id!: string
+  public span_id!: string
+  public trace_state!: string | null
   public dropped_attributes_count!: number
 
   static initialize(sequelize: Sequelize) {
-    Resource.init(
+    SpanLink.init(
       {
         ...commonFields,
-        user_uuid: {
+        span_uuid: {
           type: DataTypes.UUID,
           allowNull: false,
           references: {
-            model: 'user',
+            model: 'span',
             key: 'uuid',
           },
         },
-        service_name: {
+        trace_id: {
           type: DataTypes.TEXT,
           allowNull: false,
         },
-        service_version: {
+        span_id: {
+          type: DataTypes.TEXT,
+          allowNull: false,
+        },
+        trace_state: {
           type: DataTypes.TEXT,
           allowNull: true,
-        },
-        service_namespace: {
-          type: DataTypes.TEXT,
-          allowNull: true,
-        },
-        first_seen: {
-          type: DataTypes.DATE,
-          allowNull: true,
-          defaultValue: DataTypes.NOW,
-        },
-        last_seen: {
-          type: DataTypes.DATE,
-          allowNull: true,
-          defaultValue: DataTypes.NOW,
         },
         dropped_attributes_count: {
           type: DataTypes.INTEGER,
@@ -52,8 +40,8 @@ export class Resource extends CommonModel {
       },
       {
         sequelize,
-        modelName: 'Resource',
-        tableName: 'resource',
+        modelName: 'SpanLink',
+        tableName: 'span_link',
         schema: 'open_telemetry',
         timestamps: false,
       }

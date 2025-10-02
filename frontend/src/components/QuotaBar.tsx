@@ -61,10 +61,8 @@ export const QuotaBar: React.FC<QuotaBarProps> = ({ className }) => {
     return 'blue'
   }
 
-  const getStatusText = () => {
-    if (isOverLimit) return 'Quota Exceeded'
-    if (isNearLimit) return 'Approaching Limit'
-    return `${currentUsage.toLocaleString()} / ${monthlyQuota.toLocaleString()} datapoints used`
+  const getUsageText = () => {
+    return `${currentUsage.toLocaleString()} / ${monthlyQuota.toLocaleString()} credits used`
   }
 
   const getTierDisplayName = () => {
@@ -95,9 +93,21 @@ export const QuotaBar: React.FC<QuotaBarProps> = ({ className }) => {
         </Badge>
 
         <Flex direction="column" gap="1" style={{ flex: 1, maxWidth: '300px' }}>
-          <Text size="1" color="gray">
-            {getStatusText()}
-          </Text>
+          <Flex align="center" gap="2">
+            <Text size="1" color="gray">
+              {getUsageText()}
+            </Text>
+            {isOverLimit && (
+              <Badge color="red" variant="solid" size="1">
+                Quota Exceeded
+              </Badge>
+            )}
+            {isNearLimit && !isOverLimit && (
+              <Badge color="yellow" variant="solid" size="1">
+                Approaching Limit
+              </Badge>
+            )}
+          </Flex>
           <Progress
             value={usagePercentage}
             color={getStatusColor()}
@@ -106,52 +116,55 @@ export const QuotaBar: React.FC<QuotaBarProps> = ({ className }) => {
         </Flex>
       </Flex>
 
-      {(isNearLimit || isOverLimit) && (
-        <AlertDialog.Root>
-          <AlertDialog.Trigger>
-            <Button variant="soft" color={getStatusColor()} size="1">
-              <Icons.ExclamationTriangleIcon />
-              {isOverLimit ? 'Upgrade Required' : 'Upgrade Plan'}
-            </Button>
-          </AlertDialog.Trigger>
-          <AlertDialog.Content style={{ maxWidth: 450 }}>
-            <AlertDialog.Title>
-              {isOverLimit ? 'Monthly Quota Exceeded' : 'Approaching Monthly Limit'}
-            </AlertDialog.Title>
-            <AlertDialog.Description size="2">
-              {isOverLimit ? (
-                <>
-                  You have exceeded your monthly quota of {monthlyQuota.toLocaleString()} datapoints.
-                  New data ingestion is currently blocked. Please upgrade your subscription to continue.
-                </>
-              ) : (
-                <>
-                  You are approaching your monthly limit of {monthlyQuota.toLocaleString()} datapoints.
-                  Consider upgrading to avoid service interruption.
-                </>
-              )}
-            </AlertDialog.Description>
+      <AlertDialog.Root>
+        <AlertDialog.Trigger>
+          <Button variant="outline" color={getStatusColor()} size="2">
+            {(isNearLimit || isOverLimit) ? <Icons.ExclamationTriangleIcon /> : <Icons.RocketIcon />}
+            Upgrade Plan
+          </Button>
+        </AlertDialog.Trigger>
+        <AlertDialog.Content style={{ maxWidth: 450 }}>
+          <AlertDialog.Title>
+            {isOverLimit ? 'Monthly Quota Exceeded' : isNearLimit ? 'Approaching Monthly Limit' : 'Upgrade Your Plan'}
+          </AlertDialog.Title>
+          <AlertDialog.Description size="2">
+            {isOverLimit ? (
+              <>
+                You have exceeded your monthly quota of {monthlyQuota.toLocaleString()} credits.
+                New data ingestion is currently blocked. Please upgrade your subscription to continue.
+              </>
+            ) : isNearLimit ? (
+              <>
+                You are approaching your monthly limit of {monthlyQuota.toLocaleString()} credits.
+                Consider upgrading to avoid service interruption.
+              </>
+            ) : (
+              <>
+                Upgrade your plan to get more credits and unlock additional features.
+                Contact our sales team to learn more about our Growth and Scale plans.
+              </>
+            )}
+          </AlertDialog.Description>
 
-            <Flex gap="3" mt="4" justify="end">
-              <AlertDialog.Cancel>
-                <Button variant="soft" color="gray">
-                  Remind Me Later
-                </Button>
-              </AlertDialog.Cancel>
-              <AlertDialog.Action>
-                <Button color={getStatusColor()}>
-                  <a
-                    href="mailto:austin@shinzolabs.com?subject=Subscription Upgrade Request"
-                    style={{ textDecoration: 'none', color: 'inherit' }}
-                  >
-                    Contact Sales
-                  </a>
-                </Button>
-              </AlertDialog.Action>
-            </Flex>
-          </AlertDialog.Content>
-        </AlertDialog.Root>
-      )}
+          <Flex gap="3" mt="4" justify="end">
+            <AlertDialog.Cancel>
+              <Button variant="soft" color="gray">
+                {(isNearLimit || isOverLimit) ? 'I will upgrade later' : 'Cancel'}
+              </Button>
+            </AlertDialog.Cancel>
+            <AlertDialog.Action>
+              <Button color={getStatusColor()}>
+                <a
+                  href="mailto:austin@shinzolabs.com?subject=Subscription Upgrade Request"
+                  style={{ textDecoration: 'none', color: 'inherit' }}
+                >
+                  Contact Sales
+                </a>
+              </Button>
+            </AlertDialog.Action>
+          </Flex>
+        </AlertDialog.Content>
+      </AlertDialog.Root>
     </Flex>
   )
 }

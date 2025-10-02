@@ -1,4 +1,4 @@
-\restrict LWpZDnTk7up10kjtdHToMwx1ktTLfaXUlPbk3eCj0g11I9NxHgD5DhvcD0DA5zN
+\restrict weCtKr8lOjkNo8I3JQfQxDvkkHH3ep5T7Suq6wueAAg84DFnC2oU4TlvbR455Lf
 
 -- Dumped from database version 15.14 (Homebrew)
 -- Dumped by pg_dump version 15.14 (Homebrew)
@@ -65,14 +65,14 @@ CREATE TABLE main.subscription_tier (
 --
 
 CREATE TABLE main."user" (
-    uuid uuid NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     email text NOT NULL,
     password_hash text NOT NULL,
     password_salt text NOT NULL,
-    email_token text,
-    email_token_expiry timestamp with time zone,
+    email_token text NOT NULL,
+    email_token_expiry timestamp without time zone NOT NULL,
     verified boolean DEFAULT false NOT NULL,
     monthly_counter integer DEFAULT 0 NOT NULL,
     last_counter_reset timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -96,16 +96,32 @@ CREATE TABLE main.user_preferences (
 
 
 --
+-- Name: histogram_bucket; Type: TABLE; Schema: open_telemetry; Owner: -
+--
+
+CREATE TABLE open_telemetry.histogram_bucket (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    metric_uuid uuid NOT NULL,
+    bucket_index integer NOT NULL,
+    explicit_bound double precision,
+    bucket_count bigint NOT NULL
+);
+
+
+--
 -- Name: ingest_token; Type: TABLE; Schema: open_telemetry; Owner: -
 --
 
 CREATE TABLE open_telemetry.ingest_token (
-    uuid uuid NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     user_uuid uuid NOT NULL,
     ingest_token text NOT NULL,
-    status text NOT NULL
+    status text NOT NULL,
+    CONSTRAINT ingest_token_status_check CHECK ((status = ANY (ARRAY['live'::text, 'deprecated'::text])))
 );
 
 
@@ -114,19 +130,27 @@ CREATE TABLE open_telemetry.ingest_token (
 --
 
 CREATE TABLE open_telemetry.metric (
-    uuid uuid NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     resource_uuid uuid NOT NULL,
     ingest_token_uuid uuid NOT NULL,
     name text NOT NULL,
     description text,
     unit text,
     metric_type text NOT NULL,
-    "timestamp" timestamp with time zone NOT NULL,
+    "timestamp" timestamp without time zone NOT NULL,
     value double precision,
     scope_name text,
-    scope_version text
+    scope_version text,
+    start_timestamp timestamp without time zone,
+    aggregation_temporality integer,
+    is_monotonic boolean,
+    min_value double precision,
+    max_value double precision,
+    count bigint,
+    sum_value double precision,
+    CONSTRAINT metric_metric_type_check CHECK ((metric_type = ANY (ARRAY['counter'::text, 'gauge'::text, 'histogram'::text])))
 );
 
 
@@ -135,9 +159,9 @@ CREATE TABLE open_telemetry.metric (
 --
 
 CREATE TABLE open_telemetry.metric_attribute (
-    uuid uuid NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     metric_uuid uuid NOT NULL,
     key text NOT NULL,
     value_type text NOT NULL,
@@ -145,7 +169,8 @@ CREATE TABLE open_telemetry.metric_attribute (
     int_value integer,
     double_value double precision,
     bool_value boolean,
-    array_value jsonb
+    array_value jsonb,
+    CONSTRAINT metric_attribute_value_type_check CHECK ((value_type = ANY (ARRAY['string'::text, 'int'::text, 'double'::text, 'bool'::text, 'array'::text])))
 );
 
 
@@ -154,15 +179,16 @@ CREATE TABLE open_telemetry.metric_attribute (
 --
 
 CREATE TABLE open_telemetry.resource (
-    uuid uuid NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     user_uuid uuid NOT NULL,
     service_name text NOT NULL,
     service_version text,
     service_namespace text,
-    first_seen timestamp with time zone,
-    last_seen timestamp with time zone
+    first_seen timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    last_seen timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    dropped_attributes_count integer DEFAULT 0
 );
 
 
@@ -171,9 +197,9 @@ CREATE TABLE open_telemetry.resource (
 --
 
 CREATE TABLE open_telemetry.resource_attribute (
-    uuid uuid NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     resource_uuid uuid NOT NULL,
     key text NOT NULL,
     value_type text NOT NULL,
@@ -181,85 +207,9 @@ CREATE TABLE open_telemetry.resource_attribute (
     int_value integer,
     double_value double precision,
     bool_value boolean,
-    array_value jsonb
+    array_value jsonb,
+    CONSTRAINT resource_attribute_value_type_check CHECK ((value_type = ANY (ARRAY['string'::text, 'int'::text, 'double'::text, 'bool'::text, 'array'::text])))
 );
-
-
---
--- Name: session; Type: TABLE; Schema: open_telemetry; Owner: -
---
-
-CREATE TABLE open_telemetry.session (
-    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_uuid uuid NOT NULL,
-    resource_uuid uuid NOT NULL,
-    session_id character varying(255) NOT NULL,
-    start_time timestamp without time zone NOT NULL,
-    end_time timestamp without time zone,
-    status character varying(20) DEFAULT 'active'::character varying NOT NULL,
-    error_message text,
-    total_events integer DEFAULT 0 NOT NULL,
-    metadata jsonb,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    CONSTRAINT session_status_check CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'completed'::character varying, 'error'::character varying])::text[])))
-);
-
-
---
--- Name: TABLE session; Type: COMMENT; Schema: open_telemetry; Owner: -
---
-
-COMMENT ON TABLE open_telemetry.session IS 'Stores session metadata for MCP server interactions';
-
-
---
--- Name: COLUMN session.session_id; Type: COMMENT; Schema: open_telemetry; Owner: -
---
-
-COMMENT ON COLUMN open_telemetry.session.session_id IS 'Unique identifier for the session from the SDK';
-
-
---
--- Name: COLUMN session.status; Type: COMMENT; Schema: open_telemetry; Owner: -
---
-
-COMMENT ON COLUMN open_telemetry.session.status IS 'Current status of the session: active, completed, or error';
-
-
---
--- Name: session_event; Type: TABLE; Schema: open_telemetry; Owner: -
---
-
-CREATE TABLE open_telemetry.session_event (
-    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    session_uuid uuid NOT NULL,
-    "timestamp" timestamp without time zone NOT NULL,
-    event_type character varying(50) NOT NULL,
-    tool_name character varying(255),
-    input_data jsonb,
-    output_data jsonb,
-    error_data jsonb,
-    duration_ms integer,
-    metadata jsonb,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    CONSTRAINT session_event_event_type_check CHECK (((event_type)::text = ANY ((ARRAY['tool_call'::character varying, 'tool_response'::character varying, 'error'::character varying, 'user_input'::character varying, 'system_message'::character varying])::text[])))
-);
-
-
---
--- Name: TABLE session_event; Type: COMMENT; Schema: open_telemetry; Owner: -
---
-
-COMMENT ON TABLE open_telemetry.session_event IS 'Stores individual events within a session for replay and analysis';
-
-
---
--- Name: COLUMN session_event.event_type; Type: COMMENT; Schema: open_telemetry; Owner: -
---
-
-COMMENT ON COLUMN open_telemetry.session_event.event_type IS 'Type of event: tool_call, tool_response, error, user_input, or system_message';
 
 
 --
@@ -267,19 +217,27 @@ COMMENT ON COLUMN open_telemetry.session_event.event_type IS 'Type of event: too
 --
 
 CREATE TABLE open_telemetry.span (
-    uuid uuid NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     trace_uuid uuid NOT NULL,
     parent_span_uuid uuid,
     operation_name text NOT NULL,
-    start_time timestamp with time zone NOT NULL,
-    end_time timestamp with time zone,
+    start_time timestamp without time zone NOT NULL,
+    end_time timestamp without time zone,
     duration_ms integer,
     status_code integer,
     status_message text,
     span_kind text,
-    service_name text
+    service_name text,
+    trace_id text,
+    span_id text,
+    parent_span_id text,
+    scope_name text,
+    scope_version text,
+    dropped_attributes_count integer DEFAULT 0,
+    dropped_events_count integer DEFAULT 0,
+    dropped_links_count integer DEFAULT 0
 );
 
 
@@ -288,9 +246,9 @@ CREATE TABLE open_telemetry.span (
 --
 
 CREATE TABLE open_telemetry.span_attribute (
-    uuid uuid NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     span_uuid uuid NOT NULL,
     key text NOT NULL,
     value_type text NOT NULL,
@@ -298,7 +256,79 @@ CREATE TABLE open_telemetry.span_attribute (
     int_value integer,
     double_value double precision,
     bool_value boolean,
-    array_value jsonb
+    array_value jsonb,
+    CONSTRAINT span_attribute_value_type_check CHECK ((value_type = ANY (ARRAY['string'::text, 'int'::text, 'double'::text, 'bool'::text, 'array'::text])))
+);
+
+
+--
+-- Name: span_event; Type: TABLE; Schema: open_telemetry; Owner: -
+--
+
+CREATE TABLE open_telemetry.span_event (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    span_uuid uuid NOT NULL,
+    name text NOT NULL,
+    "timestamp" timestamp without time zone NOT NULL,
+    dropped_attributes_count integer DEFAULT 0
+);
+
+
+--
+-- Name: span_event_attribute; Type: TABLE; Schema: open_telemetry; Owner: -
+--
+
+CREATE TABLE open_telemetry.span_event_attribute (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    span_event_uuid uuid NOT NULL,
+    key text NOT NULL,
+    value_type text NOT NULL,
+    string_value text,
+    int_value integer,
+    double_value double precision,
+    bool_value boolean,
+    array_value jsonb,
+    CONSTRAINT span_event_attribute_value_type_check CHECK ((value_type = ANY (ARRAY['string'::text, 'int'::text, 'double'::text, 'bool'::text, 'array'::text])))
+);
+
+
+--
+-- Name: span_link; Type: TABLE; Schema: open_telemetry; Owner: -
+--
+
+CREATE TABLE open_telemetry.span_link (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    span_uuid uuid NOT NULL,
+    trace_id text NOT NULL,
+    span_id text NOT NULL,
+    trace_state text,
+    dropped_attributes_count integer DEFAULT 0
+);
+
+
+--
+-- Name: span_link_attribute; Type: TABLE; Schema: open_telemetry; Owner: -
+--
+
+CREATE TABLE open_telemetry.span_link_attribute (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    span_link_uuid uuid NOT NULL,
+    key text NOT NULL,
+    value_type text NOT NULL,
+    string_value text,
+    int_value integer,
+    double_value double precision,
+    bool_value boolean,
+    array_value jsonb,
+    CONSTRAINT span_link_attribute_value_type_check CHECK ((value_type = ANY (ARRAY['string'::text, 'int'::text, 'double'::text, 'bool'::text, 'array'::text])))
 );
 
 
@@ -307,17 +337,21 @@ CREATE TABLE open_telemetry.span_attribute (
 --
 
 CREATE TABLE open_telemetry.trace (
-    uuid uuid NOT NULL,
-    created_at timestamp with time zone NOT NULL,
-    updated_at timestamp with time zone NOT NULL,
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     resource_uuid uuid NOT NULL,
     ingest_token_uuid uuid NOT NULL,
-    start_time timestamp with time zone NOT NULL,
-    end_time timestamp with time zone,
+    start_time timestamp without time zone NOT NULL,
+    end_time timestamp without time zone,
     service_name text NOT NULL,
     operation_name text,
     status text,
-    span_count integer DEFAULT 0
+    span_count integer DEFAULT 0,
+    trace_id text,
+    scope_name text,
+    scope_version text,
+    CONSTRAINT trace_status_check CHECK ((status = ANY (ARRAY['ok'::text, 'error'::text, 'timeout'::text])))
 );
 
 
@@ -403,6 +437,22 @@ ALTER TABLE ONLY main.user_preferences
 
 
 --
+-- Name: histogram_bucket histogram_bucket_metric_uuid_bucket_index_key; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.histogram_bucket
+    ADD CONSTRAINT histogram_bucket_metric_uuid_bucket_index_key UNIQUE (metric_uuid, bucket_index);
+
+
+--
+-- Name: histogram_bucket histogram_bucket_pkey; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.histogram_bucket
+    ADD CONSTRAINT histogram_bucket_pkey PRIMARY KEY (uuid);
+
+
+--
 -- Name: ingest_token ingest_token_ingest_token_key; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
 --
 
@@ -451,35 +501,43 @@ ALTER TABLE ONLY open_telemetry.resource
 
 
 --
--- Name: session_event session_event_pkey; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
---
-
-ALTER TABLE ONLY open_telemetry.session_event
-    ADD CONSTRAINT session_event_pkey PRIMARY KEY (uuid);
-
-
---
--- Name: session session_pkey; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
---
-
-ALTER TABLE ONLY open_telemetry.session
-    ADD CONSTRAINT session_pkey PRIMARY KEY (uuid);
-
-
---
--- Name: session session_session_id_key; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
---
-
-ALTER TABLE ONLY open_telemetry.session
-    ADD CONSTRAINT session_session_id_key UNIQUE (session_id);
-
-
---
 -- Name: span_attribute span_attribute_pkey; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
 --
 
 ALTER TABLE ONLY open_telemetry.span_attribute
     ADD CONSTRAINT span_attribute_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: span_event_attribute span_event_attribute_pkey; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.span_event_attribute
+    ADD CONSTRAINT span_event_attribute_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: span_event span_event_pkey; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.span_event
+    ADD CONSTRAINT span_event_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: span_link_attribute span_link_attribute_pkey; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.span_link_attribute
+    ADD CONSTRAINT span_link_attribute_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: span_link span_link_pkey; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.span_link
+    ADD CONSTRAINT span_link_pkey PRIMARY KEY (uuid);
 
 
 --
@@ -528,6 +586,13 @@ CREATE INDEX idx_user_subscription_tier ON main."user" USING btree (subscription
 
 
 --
+-- Name: idx_histogram_bucket_metric; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_histogram_bucket_metric ON open_telemetry.histogram_bucket USING btree (metric_uuid);
+
+
+--
 -- Name: idx_ingest_token_status; Type: INDEX; Schema: open_telemetry; Owner: -
 --
 
@@ -570,6 +635,13 @@ CREATE INDEX idx_metric_resource ON open_telemetry.metric USING btree (resource_
 
 
 --
+-- Name: idx_metric_start_timestamp; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_metric_start_timestamp ON open_telemetry.metric USING btree (start_timestamp);
+
+
+--
 -- Name: idx_metric_timestamp; Type: INDEX; Schema: open_telemetry; Owner: -
 --
 
@@ -598,73 +670,52 @@ CREATE INDEX idx_resource_user ON open_telemetry.resource USING btree (user_uuid
 
 
 --
--- Name: idx_session_events_event_type; Type: INDEX; Schema: open_telemetry; Owner: -
---
-
-CREATE INDEX idx_session_events_event_type ON open_telemetry.session_event USING btree (event_type);
-
-
---
--- Name: idx_session_events_session_uuid; Type: INDEX; Schema: open_telemetry; Owner: -
---
-
-CREATE INDEX idx_session_events_session_uuid ON open_telemetry.session_event USING btree (session_uuid);
-
-
---
--- Name: idx_session_events_timestamp; Type: INDEX; Schema: open_telemetry; Owner: -
---
-
-CREATE INDEX idx_session_events_timestamp ON open_telemetry.session_event USING btree ("timestamp");
-
-
---
--- Name: idx_session_events_tool_name; Type: INDEX; Schema: open_telemetry; Owner: -
---
-
-CREATE INDEX idx_session_events_tool_name ON open_telemetry.session_event USING btree (tool_name);
-
-
---
--- Name: idx_sessions_resource_uuid; Type: INDEX; Schema: open_telemetry; Owner: -
---
-
-CREATE INDEX idx_sessions_resource_uuid ON open_telemetry.session USING btree (resource_uuid);
-
-
---
--- Name: idx_sessions_session_id; Type: INDEX; Schema: open_telemetry; Owner: -
---
-
-CREATE INDEX idx_sessions_session_id ON open_telemetry.session USING btree (session_id);
-
-
---
--- Name: idx_sessions_start_time; Type: INDEX; Schema: open_telemetry; Owner: -
---
-
-CREATE INDEX idx_sessions_start_time ON open_telemetry.session USING btree (start_time);
-
-
---
--- Name: idx_sessions_status; Type: INDEX; Schema: open_telemetry; Owner: -
---
-
-CREATE INDEX idx_sessions_status ON open_telemetry.session USING btree (status);
-
-
---
--- Name: idx_sessions_user_uuid; Type: INDEX; Schema: open_telemetry; Owner: -
---
-
-CREATE INDEX idx_sessions_user_uuid ON open_telemetry.session USING btree (user_uuid);
-
-
---
 -- Name: idx_span_attribute_span; Type: INDEX; Schema: open_telemetry; Owner: -
 --
 
 CREATE INDEX idx_span_attribute_span ON open_telemetry.span_attribute USING btree (span_uuid);
+
+
+--
+-- Name: idx_span_event_attribute_event; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_event_attribute_event ON open_telemetry.span_event_attribute USING btree (span_event_uuid);
+
+
+--
+-- Name: idx_span_event_span; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_event_span ON open_telemetry.span_event USING btree (span_uuid);
+
+
+--
+-- Name: idx_span_event_timestamp; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_event_timestamp ON open_telemetry.span_event USING btree ("timestamp");
+
+
+--
+-- Name: idx_span_link_attribute_link; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_link_attribute_link ON open_telemetry.span_link_attribute USING btree (span_link_uuid);
+
+
+--
+-- Name: idx_span_link_span; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_link_span ON open_telemetry.span_link USING btree (span_uuid);
+
+
+--
+-- Name: idx_span_link_trace_span; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_link_trace_span ON open_telemetry.span_link USING btree (trace_id, span_id);
 
 
 --
@@ -675,10 +726,24 @@ CREATE INDEX idx_span_parent ON open_telemetry.span USING btree (parent_span_uui
 
 
 --
+-- Name: idx_span_parent_span_id; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_parent_span_id ON open_telemetry.span USING btree (parent_span_id);
+
+
+--
 -- Name: idx_span_service; Type: INDEX; Schema: open_telemetry; Owner: -
 --
 
 CREATE INDEX idx_span_service ON open_telemetry.span USING btree (service_name);
+
+
+--
+-- Name: idx_span_span_id; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_span_id ON open_telemetry.span USING btree (span_id);
 
 
 --
@@ -693,6 +758,13 @@ CREATE INDEX idx_span_start_time ON open_telemetry.span USING btree (start_time)
 --
 
 CREATE INDEX idx_span_trace ON open_telemetry.span USING btree (trace_uuid);
+
+
+--
+-- Name: idx_span_trace_id; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_span_trace_id ON open_telemetry.span USING btree (trace_id);
 
 
 --
@@ -724,6 +796,13 @@ CREATE INDEX idx_trace_start_time ON open_telemetry.trace USING btree (start_tim
 
 
 --
+-- Name: idx_trace_trace_id; Type: INDEX; Schema: open_telemetry; Owner: -
+--
+
+CREATE INDEX idx_trace_trace_id ON open_telemetry.trace USING btree (trace_id);
+
+
+--
 -- Name: subscription_tier updated_at_subscription_tier; Type: TRIGGER; Schema: main; Owner: -
 --
 
@@ -742,6 +821,13 @@ CREATE TRIGGER updated_at_user BEFORE UPDATE ON main."user" FOR EACH ROW EXECUTE
 --
 
 CREATE TRIGGER updated_at_user_preferences BEFORE UPDATE ON main.user_preferences FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: histogram_bucket updated_at_histogram_bucket; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_histogram_bucket BEFORE UPDATE ON open_telemetry.histogram_bucket FOR EACH ROW EXECUTE FUNCTION public.updated_at();
 
 
 --
@@ -794,6 +880,34 @@ CREATE TRIGGER updated_at_span_attribute BEFORE UPDATE ON open_telemetry.span_at
 
 
 --
+-- Name: span_event updated_at_span_event; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_span_event BEFORE UPDATE ON open_telemetry.span_event FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: span_event_attribute updated_at_span_event_attribute; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_span_event_attribute BEFORE UPDATE ON open_telemetry.span_event_attribute FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: span_link updated_at_span_link; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_span_link BEFORE UPDATE ON open_telemetry.span_link FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: span_link_attribute updated_at_span_link_attribute; Type: TRIGGER; Schema: open_telemetry; Owner: -
+--
+
+CREATE TRIGGER updated_at_span_link_attribute BEFORE UPDATE ON open_telemetry.span_link_attribute FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
 -- Name: trace updated_at_trace; Type: TRIGGER; Schema: open_telemetry; Owner: -
 --
 
@@ -817,11 +931,19 @@ ALTER TABLE ONLY main."user"
 
 
 --
+-- Name: histogram_bucket histogram_bucket_metric_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.histogram_bucket
+    ADD CONSTRAINT histogram_bucket_metric_uuid_fkey FOREIGN KEY (metric_uuid) REFERENCES open_telemetry.metric(uuid);
+
+
+--
 -- Name: ingest_token ingest_token_user_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
 --
 
 ALTER TABLE ONLY open_telemetry.ingest_token
-    ADD CONSTRAINT ingest_token_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT ingest_token_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
 
 
 --
@@ -829,7 +951,7 @@ ALTER TABLE ONLY open_telemetry.ingest_token
 --
 
 ALTER TABLE ONLY open_telemetry.metric_attribute
-    ADD CONSTRAINT metric_attribute_metric_uuid_fkey FOREIGN KEY (metric_uuid) REFERENCES open_telemetry.metric(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT metric_attribute_metric_uuid_fkey FOREIGN KEY (metric_uuid) REFERENCES open_telemetry.metric(uuid);
 
 
 --
@@ -837,7 +959,7 @@ ALTER TABLE ONLY open_telemetry.metric_attribute
 --
 
 ALTER TABLE ONLY open_telemetry.metric
-    ADD CONSTRAINT metric_ingest_token_uuid_fkey FOREIGN KEY (ingest_token_uuid) REFERENCES open_telemetry.ingest_token(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT metric_ingest_token_uuid_fkey FOREIGN KEY (ingest_token_uuid) REFERENCES open_telemetry.ingest_token(uuid);
 
 
 --
@@ -845,7 +967,7 @@ ALTER TABLE ONLY open_telemetry.metric
 --
 
 ALTER TABLE ONLY open_telemetry.metric
-    ADD CONSTRAINT metric_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT metric_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid);
 
 
 --
@@ -853,7 +975,7 @@ ALTER TABLE ONLY open_telemetry.metric
 --
 
 ALTER TABLE ONLY open_telemetry.resource_attribute
-    ADD CONSTRAINT resource_attribute_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT resource_attribute_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid);
 
 
 --
@@ -861,31 +983,7 @@ ALTER TABLE ONLY open_telemetry.resource_attribute
 --
 
 ALTER TABLE ONLY open_telemetry.resource
-    ADD CONSTRAINT resource_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
-
-
---
--- Name: session_event session_event_session_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
---
-
-ALTER TABLE ONLY open_telemetry.session_event
-    ADD CONSTRAINT session_event_session_uuid_fkey FOREIGN KEY (session_uuid) REFERENCES open_telemetry.session(uuid) ON DELETE CASCADE;
-
-
---
--- Name: session session_resource_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
---
-
-ALTER TABLE ONLY open_telemetry.session
-    ADD CONSTRAINT session_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid) ON DELETE CASCADE;
-
-
---
--- Name: session session_user_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
---
-
-ALTER TABLE ONLY open_telemetry.session
-    ADD CONSTRAINT session_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid) ON DELETE CASCADE;
+    ADD CONSTRAINT resource_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
 
 
 --
@@ -893,7 +991,39 @@ ALTER TABLE ONLY open_telemetry.session
 --
 
 ALTER TABLE ONLY open_telemetry.span_attribute
-    ADD CONSTRAINT span_attribute_span_uuid_fkey FOREIGN KEY (span_uuid) REFERENCES open_telemetry.span(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT span_attribute_span_uuid_fkey FOREIGN KEY (span_uuid) REFERENCES open_telemetry.span(uuid);
+
+
+--
+-- Name: span_event_attribute span_event_attribute_span_event_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.span_event_attribute
+    ADD CONSTRAINT span_event_attribute_span_event_uuid_fkey FOREIGN KEY (span_event_uuid) REFERENCES open_telemetry.span_event(uuid);
+
+
+--
+-- Name: span_event span_event_span_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.span_event
+    ADD CONSTRAINT span_event_span_uuid_fkey FOREIGN KEY (span_uuid) REFERENCES open_telemetry.span(uuid);
+
+
+--
+-- Name: span_link_attribute span_link_attribute_span_link_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.span_link_attribute
+    ADD CONSTRAINT span_link_attribute_span_link_uuid_fkey FOREIGN KEY (span_link_uuid) REFERENCES open_telemetry.span_link(uuid);
+
+
+--
+-- Name: span_link span_link_span_uuid_fkey; Type: FK CONSTRAINT; Schema: open_telemetry; Owner: -
+--
+
+ALTER TABLE ONLY open_telemetry.span_link
+    ADD CONSTRAINT span_link_span_uuid_fkey FOREIGN KEY (span_uuid) REFERENCES open_telemetry.span(uuid);
 
 
 --
@@ -901,7 +1031,7 @@ ALTER TABLE ONLY open_telemetry.span_attribute
 --
 
 ALTER TABLE ONLY open_telemetry.span
-    ADD CONSTRAINT span_parent_span_uuid_fkey FOREIGN KEY (parent_span_uuid) REFERENCES open_telemetry.span(uuid) ON UPDATE CASCADE ON DELETE SET NULL;
+    ADD CONSTRAINT span_parent_span_uuid_fkey FOREIGN KEY (parent_span_uuid) REFERENCES open_telemetry.span(uuid);
 
 
 --
@@ -909,7 +1039,7 @@ ALTER TABLE ONLY open_telemetry.span
 --
 
 ALTER TABLE ONLY open_telemetry.span
-    ADD CONSTRAINT span_trace_uuid_fkey FOREIGN KEY (trace_uuid) REFERENCES open_telemetry.trace(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT span_trace_uuid_fkey FOREIGN KEY (trace_uuid) REFERENCES open_telemetry.trace(uuid);
 
 
 --
@@ -917,7 +1047,7 @@ ALTER TABLE ONLY open_telemetry.span
 --
 
 ALTER TABLE ONLY open_telemetry.trace
-    ADD CONSTRAINT trace_ingest_token_uuid_fkey FOREIGN KEY (ingest_token_uuid) REFERENCES open_telemetry.ingest_token(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT trace_ingest_token_uuid_fkey FOREIGN KEY (ingest_token_uuid) REFERENCES open_telemetry.ingest_token(uuid);
 
 
 --
@@ -925,14 +1055,14 @@ ALTER TABLE ONLY open_telemetry.trace
 --
 
 ALTER TABLE ONLY open_telemetry.trace
-    ADD CONSTRAINT trace_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid) ON UPDATE CASCADE ON DELETE CASCADE;
+    ADD CONSTRAINT trace_resource_uuid_fkey FOREIGN KEY (resource_uuid) REFERENCES open_telemetry.resource(uuid);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict LWpZDnTk7up10kjtdHToMwx1ktTLfaXUlPbk3eCj0g11I9NxHgD5DhvcD0DA5zN
+\unrestrict weCtKr8lOjkNo8I3JQfQxDvkkHH3ep5T7Suq6wueAAg84DFnC2oU4TlvbR455Lf
 
 
 --
@@ -943,4 +1073,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20250914000000'),
     ('20250918000000'),
     ('20250919000000'),
-    ('20250930000000');
+    ('20250930000000'),
+    ('20251001000000'),
+    ('20251002000000');

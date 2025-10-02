@@ -62,6 +62,17 @@ export const handleCreateUser = async (request: yup.InferType<typeof createUserS
       }
     }
 
+    // Get the free tier for new users
+    const freeTier = await SubscriptionTier.findOne({ where: { tier: 'free' } })
+    if (!freeTier) {
+      logger.error({ message: 'Free subscription tier not found in database' })
+      return {
+        response: 'System configuration error',
+        error: true,
+        status: 500
+      }
+    }
+
     const salt = generateSalt()
     const passwordHash = hashPassword(request.password, salt)
     const emailToken = generateEmailToken()
@@ -74,6 +85,7 @@ export const handleCreateUser = async (request: yup.InferType<typeof createUserS
       email_token: emailToken,
       email_token_expiry: emailTokenExpiry,
       verified: false,
+      subscription_tier_uuid: freeTier.uuid,
     })
 
     logger.info({ message: 'User created successfully', email: request.email, uuid: user.uuid })

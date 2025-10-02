@@ -12,6 +12,13 @@ export class Metric extends CommonModel {
   public value!: number | null
   public scope_name!: string | null
   public scope_version!: string | null
+  public start_timestamp!: Date | null
+  public aggregation_temporality!: number | null
+  public is_monotonic!: boolean | null
+  public min_value!: number | null
+  public max_value!: number | null
+  public count!: number | null
+  public sum_value!: number | null
 
   static initialize(sequelize: Sequelize) {
     Metric.init(
@@ -66,6 +73,34 @@ export class Metric extends CommonModel {
         },
         scope_version: {
           type: DataTypes.TEXT,
+          allowNull: true,
+        },
+        start_timestamp: {
+          type: DataTypes.DATE,
+          allowNull: true,
+        },
+        aggregation_temporality: {
+          type: DataTypes.INTEGER,
+          allowNull: true,
+        },
+        is_monotonic: {
+          type: DataTypes.BOOLEAN,
+          allowNull: true,
+        },
+        min_value: {
+          type: DataTypes.DOUBLE,
+          allowNull: true,
+        },
+        max_value: {
+          type: DataTypes.DOUBLE,
+          allowNull: true,
+        },
+        count: {
+          type: DataTypes.BIGINT,
+          allowNull: true,
+        },
+        sum_value: {
+          type: DataTypes.DOUBLE,
           allowNull: true,
         },
       },

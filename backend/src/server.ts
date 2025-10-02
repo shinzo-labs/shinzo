@@ -1,7 +1,7 @@
 import fastify, { FastifyReply, FastifyRequest } from 'fastify'
 import fastifyCors from '@fastify/cors'
 import fastifyRateLimit from '@fastify/rate-limit'
-import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE } from './config'
+import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE, LOG_LEVEL } from './config'
 import { logger, pinoConfig } from './logger'
 import { sequelize } from './dbClient'
 import { authenticateJWT, AuthenticatedRequest } from './middleware/auth'
@@ -62,6 +62,19 @@ app.register(fastifyCors, {
 app.register(fastifyRateLimit, {
   max: RATE_LIMIT_MAX,
   timeWindow: RATE_LIMIT_WINDOW
+})
+
+// Request logging hook for debug/trace level
+app.addHook('preHandler', async (request, reply) => {
+  if (LOG_LEVEL === 'debug' || LOG_LEVEL === 'trace') {
+    logger.debug({
+      message: 'Incoming request',
+      method: request.method,
+      url: request.url,
+      headers: request.headers,
+      body: request.body
+    })
+  }
 })
 
 // Health check endpoint

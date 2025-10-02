@@ -11,8 +11,13 @@ import {
   Trace,
   Span,
   SpanAttribute,
+  SpanEvent,
+  SpanEventAttribute,
+  SpanLink,
+  SpanLinkAttribute,
   Metric,
-  MetricAttribute
+  MetricAttribute,
+  HistogramBucket
 } from './models'
 
 export const sequelize = new Sequelize(DATABASE_URL, {
@@ -43,8 +48,13 @@ IngestToken.initialize(sequelize)
 Trace.initialize(sequelize)
 Span.initialize(sequelize)
 SpanAttribute.initialize(sequelize)
+SpanEvent.initialize(sequelize)
+SpanEventAttribute.initialize(sequelize)
+SpanLink.initialize(sequelize)
+SpanLinkAttribute.initialize(sequelize)
 Metric.initialize(sequelize)
 MetricAttribute.initialize(sequelize)
+HistogramBucket.initialize(sequelize)
 
 // Set up associations
 User.hasMany(Resource, { foreignKey: 'user_uuid', as: 'resources' })
@@ -75,13 +85,28 @@ Span.belongsTo(Trace, { foreignKey: 'trace_uuid', as: 'trace' })
 Span.belongsTo(Span, { foreignKey: 'parent_span_uuid', as: 'parentSpan' })
 Span.hasMany(Span, { foreignKey: 'parent_span_uuid', as: 'childSpans' })
 Span.hasMany(SpanAttribute, { foreignKey: 'span_uuid', as: 'attributes' })
+Span.hasMany(SpanEvent, { foreignKey: 'span_uuid', as: 'events' })
+Span.hasMany(SpanLink, { foreignKey: 'span_uuid', as: 'links' })
 
 SpanAttribute.belongsTo(Span, { foreignKey: 'span_uuid', as: 'span' })
+
+SpanEvent.belongsTo(Span, { foreignKey: 'span_uuid', as: 'span' })
+SpanEvent.hasMany(SpanEventAttribute, { foreignKey: 'span_event_uuid', as: 'attributes' })
+
+SpanEventAttribute.belongsTo(SpanEvent, { foreignKey: 'span_event_uuid', as: 'event' })
+
+SpanLink.belongsTo(Span, { foreignKey: 'span_uuid', as: 'span' })
+SpanLink.hasMany(SpanLinkAttribute, { foreignKey: 'span_link_uuid', as: 'attributes' })
+
+SpanLinkAttribute.belongsTo(SpanLink, { foreignKey: 'span_link_uuid', as: 'link' })
 
 Metric.belongsTo(Resource, { foreignKey: 'resource_uuid', as: 'resource' })
 Metric.belongsTo(IngestToken, { foreignKey: 'ingest_token_uuid', as: 'ingestToken' })
 Metric.hasMany(MetricAttribute, { foreignKey: 'metric_uuid', as: 'attributes' })
+Metric.hasMany(HistogramBucket, { foreignKey: 'metric_uuid', as: 'histogram_buckets' })
 
 MetricAttribute.belongsTo(Metric, { foreignKey: 'metric_uuid', as: 'metric' })
+
+HistogramBucket.belongsTo(Metric, { foreignKey: 'metric_uuid', as: 'metric' })
 
 export const dbClient = sequelize
