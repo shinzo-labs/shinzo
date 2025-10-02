@@ -8,6 +8,10 @@ export class User extends CommonModel {
   public email_token!: string
   public email_token_expiry!: Date
   public verified!: boolean
+  public monthly_counter!: number
+  public last_counter_reset!: Date
+  public subscription_tier_uuid!: string
+  public subscribed_on!: Date | null
 
   static initialize(sequelize: Sequelize) {
     User.init(
@@ -41,6 +45,24 @@ export class User extends CommonModel {
           type: DataTypes.BOOLEAN,
           allowNull: false,
           defaultValue: false,
+        },
+        monthly_counter: {
+          type: DataTypes.INTEGER,
+          allowNull: false,
+          defaultValue: 0,
+        },
+        last_counter_reset: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: DataTypes.NOW,
+        },
+        subscription_tier_uuid: {
+          type: DataTypes.UUID,
+          allowNull: false,
+        },
+        subscribed_on: {
+          type: DataTypes.DATE,
+          allowNull: true,
         },
       },
       {
