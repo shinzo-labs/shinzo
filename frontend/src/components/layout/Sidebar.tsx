@@ -2,6 +2,7 @@ import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import * as Icons from '@radix-ui/react-icons'
 import { Flex, Text, Badge, Avatar } from '@radix-ui/themes'
+import { useHasTelemetry } from '../../hooks/useHasTelemetry'
 
 const navigation = [
   {
@@ -43,6 +44,12 @@ const navigation = [
 
 export const Sidebar: React.FC = () => {
   const location = useLocation()
+  const { hasTelemetry, loading } = useHasTelemetry()
+
+  // Filter navigation items based on whether user has telemetry data
+  const visibleNavigation = hasTelemetry
+    ? navigation.filter(item => item.href !== '/getting-started')
+    : navigation.filter(item => item.href === '/getting-started')
 
   return (
     <Flex
@@ -72,7 +79,7 @@ export const Sidebar: React.FC = () => {
 
       {/* Navigation */}
       <Flex direction="column" style={{ flex: 1, padding: '16px', gap: '4px' }}>
-        {navigation.map((item) => {
+        {visibleNavigation.map((item) => {
           const isActive = location.pathname === item.href
           const Icon = item.icon
 

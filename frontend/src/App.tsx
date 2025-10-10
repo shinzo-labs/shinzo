@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { UserPreferencesProvider } from './contexts/UserPreferencesContext'
 import { RefreshProvider } from './contexts/RefreshContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { OnboardingRoute } from './components/OnboardingRoute'
 
 // Auth pages
 import { LoginPage } from './pages/auth/LoginPage'
@@ -51,7 +52,9 @@ function App() {
                 {/* Protected routes */}
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
-                    <DashboardPage />
+                    <OnboardingRoute>
+                      <DashboardPage />
+                    </OnboardingRoute>
                   </ProtectedRoute>
                 } />
                 <Route path="/getting-started" element={
@@ -61,32 +64,42 @@ function App() {
                 } />
                 <Route path="/traces" element={
                   <ProtectedRoute>
-                    <TracesPage />
+                    <OnboardingRoute>
+                      <TracesPage />
+                    </OnboardingRoute>
                   </ProtectedRoute>
                 } />
                 <Route path="/spans" element={
                   <ProtectedRoute>
-                    <SpansPage />
+                    <OnboardingRoute>
+                      <SpansPage />
+                    </OnboardingRoute>
                   </ProtectedRoute>
                 } />
                 <Route path="/metrics" element={
                   <ProtectedRoute>
-                    <MetricsPage />
+                    <OnboardingRoute>
+                      <MetricsPage />
+                    </OnboardingRoute>
                   </ProtectedRoute>
                 } />
                 <Route path="/resources" element={
                   <ProtectedRoute>
-                    <ResourcesPage />
+                    <OnboardingRoute>
+                      <ResourcesPage />
+                    </OnboardingRoute>
                   </ProtectedRoute>
                 } />
                 <Route path="/settings" element={
                   <ProtectedRoute>
-                    <SettingsPage />
+                    <OnboardingRoute>
+                      <SettingsPage />
+                    </OnboardingRoute>
                   </ProtectedRoute>
                 } />
 
                 {/* Default redirect */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/" element={<Navigate to="/getting-started" replace />} />
               </Routes>
               </div>
               </Router>

@@ -1,22 +1,25 @@
 import React, { useState, useEffect } from 'react'
 import { AppLayout } from '../components/layout/AppLayout'
-import { Card, Flex, Text, Heading, Box, Button, Code, Tabs, Badge, Callout } from '@radix-ui/themes'
+import { Card, Flex, Text, Heading, Box, Button, Code, Tabs, Badge, Callout, Spinner } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { useAuth } from '../contexts/AuthContext'
-import { ingestTokenService } from '../backendService'
+import { ingestTokenService, telemetryService } from '../backendService'
+import { subHours } from 'date-fns'
+import { BACKEND_URL } from '../config'
 
 export const GettingStartedPage: React.FC = () => {
   const { token } = useAuth()
   const [ingestToken, setIngestToken] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [hasTelemetry, setHasTelemetry] = useState(false)
 
   useEffect(() => {
     const fetchIngestToken = async () => {
       try {
         const tokens = await ingestTokenService.fetchAll(token!)
         if (tokens.length > 0) {
-          setIngestToken(tokens[0].token)
+          setIngestToken(tokens[0].ingest_token)
         }
       } catch (error) {
         console.error('Failed to fetch ingest token:', error)
@@ -30,35 +33,64 @@ export const GettingStartedPage: React.FC = () => {
     }
   }, [token])
 
+  // Poll for telemetry data every 5 seconds
+  useEffect(() => {
+    if (!token) {
+      return
+    }
+
+    const checkForTelemetry = async () => {
+      try {
+        const traces = await telemetryService.fetchTraces(token, {
+          start_time: subHours(new Date(), 1).toISOString(),
+          end_time: new Date().toISOString(),
+          limit: 1
+        })
+
+        setHasTelemetry(traces.length > 0)
+      } catch (error) {
+        console.error('Error checking for telemetry:', error)
+      }
+    }
+
+    // Initial check
+    checkForTelemetry()
+
+    // Poll every 5 seconds
+    const interval = setInterval(checkForTelemetry, 5000)
+
+    return () => clearInterval(interval)
+  }, [token])
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const typescriptSnippet = `import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
-import { instrumentServer } from "@shinzolabs/instrumentation-mcp"
+  const typescriptSnippet = `import { instrumentServer } from "@shinzolabs/instrumentation-mcp"
+// import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 
-const server = new McpServer({
-  name: "my-mcp-server",
-  version: "1.0.0"
-})
+// Instantiate your MCP server as usual here...
+// const server = new McpServer({
+//  name: "my-mcp-server",
+//  version: "1.0.0"
+// })
 
-// Add this to enable telemetry
 instrumentServer(server, {
   serverName: "my-mcp-server",
   serverVersion: "1.0.0",
-  exporterEndpoint: "https://api.app.shinzo.ai/telemetry/ingest_http",
+  exporterEndpoint: "${BACKEND_URL}/telemetry/ingest_http",
   exporterAuth: {
     type: "bearer",
-    token: "${ingestToken || 'your-token-here'}"
+    token: "${ingestToken || 'your-token-here'}" // you can create additional tokens in the Settings page after this is complete
   }
 })
 
-// Continue with your server setup
-server.tool("example", { /* ... */ }, async (args) => {
-  // Your tool implementation
-})`
+// Continue with server tool setup...
+// server.tool(...)
+// 
+// NOTE: The telemetry only works with server.tool(...) registration at the moment. Other registration methods are coming soon!`
 
   return (
     <AppLayout>
@@ -105,7 +137,7 @@ server.tool("example", { /* ... */ }, async (args) => {
             </Flex>
 
             <Text color="gray">
-              Add the Shinzo instrumentation SDK to your MCP server project:
+              Add the Shinzo instrumentation SDK to your MCP server:
             </Text>
 
             <Tabs.Root defaultValue="npm">
@@ -254,7 +286,7 @@ server.tool("example", { /* ... */ }, async (args) => {
             </Flex>
 
             <Text color="gray">
-              Start your MCP server as usual. Telemetry data will automatically be sent to Shinzo Platform when:
+              Start your MCP server as usual. Telemetry data will automatically be sent to Shinzo Platform when
             </Text>
 
             <Flex direction="column" gap="2" style={{ paddingLeft: '20px' }}>
@@ -264,15 +296,7 @@ server.tool("example", { /* ... */ }, async (args) => {
               </Flex>
               <Flex align="center" gap="2">
                 <Icons.CheckIcon color="var(--green-9)" />
-                <Text size="2">Resources are accessed</Text>
-              </Flex>
-              <Flex align="center" gap="2">
-                <Icons.CheckIcon color="var(--green-9)" />
                 <Text size="2">Errors occur</Text>
-              </Flex>
-              <Flex align="center" gap="2">
-                <Icons.CheckIcon color="var(--green-9)" />
-                <Text size="2">Server starts or stops</Text>
               </Flex>
             </Flex>
 
@@ -287,54 +311,78 @@ server.tool("example", { /* ... */ }, async (args) => {
           </Flex>
         </Card>
 
-        {/* Next steps */}
-        <Card>
+        <Card style={{
+          backgroundColor: hasTelemetry ? 'var(--green-2)' : 'var(--gray-2)',
+          borderColor: hasTelemetry ? 'var(--green-6)' : 'var(--gray-6)'
+        }}>
           <Flex direction="column" gap="4">
-            <Heading size="4">Next Steps</Heading>
-
-            <Flex direction="column" gap="3">
-              <Button
-                variant="soft"
-                size="3"
-                onClick={() => window.location.href = '/dashboard'}
-                style={{ justifyContent: 'flex-start' }}
+            <Flex align="center" gap="3">
+              <Flex
+                align="center"
+                justify="center"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  backgroundColor: hasTelemetry ? 'var(--green-3)' : 'var(--blue-3)',
+                  borderRadius: '50%',
+                  color: hasTelemetry ? 'var(--green-9)' : 'var(--blue-9)',
+                  fontWeight: 'bold'
+                }}
               >
-                <Icons.DashboardIcon />
-                <Flex direction="column" align="start" style={{ flex: 1 }}>
-                  <Text weight="medium">View Dashboard</Text>
-                  <Text size="1" color="gray">See your telemetry data in real-time</Text>
-                </Flex>
-                <Icons.ArrowRightIcon />
-              </Button>
-
-              <Button
-                variant="soft"
-                size="3"
-                onClick={() => window.open('https://docs.shinzo.ai', '_blank')}
-                style={{ justifyContent: 'flex-start' }}
-              >
-                <Icons.ReaderIcon />
-                <Flex direction="column" align="start" style={{ flex: 1 }}>
-                  <Text weight="medium">Read Documentation</Text>
-                  <Text size="1" color="gray">Learn about advanced configuration options</Text>
-                </Flex>
-                <Icons.ArrowRightIcon />
-              </Button>
-
-              <Button
-                variant="soft"
-                size="3"
-                onClick={() => window.location.href = '/settings'}
-                style={{ justifyContent: 'flex-start' }}
-              >
-                <Icons.GearIcon />
-                <Flex direction="column" align="start" style={{ flex: 1 }}>
-                  <Text weight="medium">Manage Ingest Tokens</Text>
-                  <Text size="1" color="gray">Create additional tokens or revoke existing ones</Text>
-                </Flex>
-                <Icons.ArrowRightIcon />
-              </Button>
+                {hasTelemetry ? <Icons.CheckIcon width="20" height="20" /> : '4'}
+              </Flex>
+              <Heading size="4">See Live Telemetry via the Dashboard</Heading>
             </Flex>
+
+            {hasTelemetry ? (
+              <>
+                <Callout.Root color="green">
+                  <Callout.Icon>
+                    <Icons.CheckCircledIcon />
+                  </Callout.Icon>
+                  <Callout.Text>
+                    <Text weight="bold">Great! We're receiving telemetry from your server!</Text>
+                    <Text size="2" style={{ marginTop: '4px', display: 'block' }}>
+                      Click the button below to view your data in the Dashboard.
+                    </Text>
+                  </Callout.Text>
+                </Callout.Root>
+                <Button
+                  variant="solid"
+                  size="3"
+                  color="green"
+                  onClick={() => window.location.href = '/dashboard'}
+                  style={{ alignSelf: 'flex-start' }}
+                >
+                  <Icons.DashboardIcon />
+                  <span style={{ marginLeft: 8 }}>Open Dashboard</span>
+                  <Icons.ArrowRightIcon style={{ marginLeft: 8 }} />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Flex align="center" gap="3">
+                  <Spinner size="3" />
+                  <Flex direction="column" gap="1">
+                    <Text weight="medium">Waiting for telemetry data...</Text>
+                    <Text size="2" color="gray">
+                      Once your MCP server sends data, the Dashboard will be unlocked automatically.
+                    </Text>
+                  </Flex>
+                </Flex>
+                <Callout.Root>
+                  <Callout.Icon>
+                    <Icons.InfoCircledIcon />
+                  </Callout.Icon>
+                  <Callout.Text>
+                    <Text size="2">
+                      Make sure your MCP server is running with the instrumentation code from Step 2.
+                      The platform is actively checking for incoming telemetry events every 5 seconds.
+                    </Text>
+                  </Callout.Text>
+                </Callout.Root>
+              </>
+            )}
           </Flex>
         </Card>
 

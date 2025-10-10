@@ -30,7 +30,7 @@ export const Header: React.FC = () => {
       <Flex align="center" gap="4">
         {/* Documentation button */}
         <Button
-          variant="outline"
+          variant="solid"
           size="2"
           onClick={() => window.open('https://docs.shinzo.ai', '_blank')}
         >

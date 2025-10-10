@@ -32,7 +32,6 @@ export const DashboardPage: React.FC = () => {
   const { refreshTrigger } = useRefresh()
   const queryClient = useQueryClient()
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false)
-  const [showFirstEventSuccess, setShowFirstEventSuccess] = useState(false)
 
   // State for time range
   const [timeRange, setTimeRange] = useState<TimeRange>({
@@ -91,19 +90,6 @@ export const DashboardPage: React.FC = () => {
     localStorage.setItem('welcomeBannerDismissed', 'true')
   }
 
-  // Check for first event success
-  useEffect(() => {
-    if (statsTraces.length > 0 && !localStorage.getItem('firstEventReceived')) {
-      setShowFirstEventSuccess(true)
-      localStorage.setItem('firstEventReceived', 'true')
-
-      // Auto-dismiss after 10 seconds
-      setTimeout(() => {
-        setShowFirstEventSuccess(false)
-      }, 10000)
-    }
-  }, [statsTraces.length])
-
   // Fetch resources
   const { data: resources = [], isLoading: resourcesLoading } = useQuery(
     ['resources', refreshTrigger],
@@ -159,6 +145,7 @@ export const DashboardPage: React.FC = () => {
       staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
     }
   )
+
 
   // Calculate real stats from selected time range data
   const stats: DashboardStats = {
@@ -222,23 +209,6 @@ export const DashboardPage: React.FC = () => {
         {/* Welcome Banner for new users */}
         {showWelcomeBanner && (
           <WelcomeBanner onDismiss={handleDismissWelcomeBanner} />
-        )}
-
-        {/* First Event Success Banner */}
-        {showFirstEventSuccess && (
-          <Callout.Root color="green" style={{ marginBottom: '24px' }}>
-            <Callout.Icon>
-              <Icons.CheckCircledIcon />
-            </Callout.Icon>
-            <Callout.Text>
-              <Flex direction="column" gap="1">
-                <Text weight="bold">Success! We're receiving data from your MCP server! 🎉</Text>
-                <Text size="2">
-                  Your telemetry is now being collected and visualized below. Check out the charts to see your server's activity.
-                </Text>
-              </Flex>
-            </Callout.Text>
-          </Callout.Root>
         )}
 
         {/* Page header */}
