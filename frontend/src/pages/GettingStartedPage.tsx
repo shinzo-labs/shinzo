@@ -137,7 +137,7 @@ instrumentServer(server, {
             </Flex>
 
             <Text color="gray">
-              Add the Shinzo instrumentation SDK to your MCP server:
+              Add the Shinzo instrumentation SDK to your TypeScript MCP server:
             </Text>
 
             <Tabs.Root defaultValue="npm">
@@ -383,26 +383,6 @@ instrumentServer(server, {
                 </Callout.Root>
               </>
             )}
-          </Flex>
-        </Card>
-
-        {/* Help section */}
-        <Card style={{ backgroundColor: 'var(--blue-2)', borderColor: 'var(--blue-6)' }}>
-          <Flex direction="column" gap="3">
-            <Heading size="4">Need Help?</Heading>
-            <Text size="2">
-              If you're not seeing data or run into issues, check out our troubleshooting guide or contact support.
-            </Text>
-            <Flex gap="2">
-              <Button variant="solid" onClick={() => window.open('https://docs.shinzo.ai', '_blank')}>
-                <Icons.QuestionMarkCircledIcon />
-                Documentation
-              </Button>
-              <Button variant="outline" onClick={() => window.open('https://discord.gg/UYUdSdp5N8', '_blank')}>
-                <Icons.DiscordLogoIcon />
-                Join Discord
-              </Button>
-            </Flex>
           </Flex>
         </Card>
       </Flex>
