@@ -1,7 +1,7 @@
 import fastify, { FastifyReply, FastifyRequest } from 'fastify'
 import fastifyCors from '@fastify/cors'
 import fastifyRateLimit from '@fastify/rate-limit'
-import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE } from './config'
+import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE, LOG_LEVEL } from './config'
 import { logger, pinoConfig } from './logger'
 import { sequelize } from './dbClient'
 import { authenticateJWT, AuthenticatedRequest } from './middleware/auth'
@@ -16,7 +16,8 @@ import {
   verifyUserSchema,
   handleResendVerification,
   resendVerificationSchema,
-  handleFetchUser
+  handleFetchUser,
+  handleFetchUserQuota
 } from './handlers/auth'
 
 import {
@@ -61,6 +62,19 @@ app.register(fastifyCors, {
 app.register(fastifyRateLimit, {
   max: RATE_LIMIT_MAX,
   timeWindow: RATE_LIMIT_WINDOW
+})
+
+// Request logging hook for debug/trace level
+app.addHook('preHandler', async (request, reply) => {
+  if (LOG_LEVEL === 'debug' || LOG_LEVEL === 'trace') {
+    logger.debug({
+      message: 'Incoming request',
+      method: request.method,
+      url: request.url,
+      headers: request.headers,
+      body: request.body
+    })
+  }
 })
 
 // Health check endpoint
@@ -159,6 +173,19 @@ app.get('/auth/fetch_user', async (request: AuthenticatedRequest, reply: Fastify
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Fetch user error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.get('/auth/fetch_user_quota', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleFetchUserQuota(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch user quota error', error })
     reply.status(500).send({ error: 'Internal server error' })
   }
 })

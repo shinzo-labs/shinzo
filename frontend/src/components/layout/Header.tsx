@@ -38,6 +38,27 @@ export const Header: React.FC = () => {
           Docs
         </Button>
 
+        {/* Live Support dropdown */}
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger>
+            <Button variant="outline" size="2">
+              <Icons.ChatBubbleIcon />
+              Need support?
+              <Icons.ChevronDownIcon />
+            </Button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content align="end">
+            <DropdownMenu.Item onSelect={() => window.open('https://calendly.com/shinzolabs/meet-extended', '_blank')}>
+              <Icons.CalendarIcon />
+              Schedule a Meeting
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={() => window.open('https://discord.gg/UYUdSdp5N8', '_blank')}>
+              <Icons.DiscordLogoIcon />
+              Join Discord
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
+
         {/* User menu */}
         <DropdownMenu.Root>
         <DropdownMenu.Trigger>

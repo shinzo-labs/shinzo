@@ -1,5 +1,5 @@
 import * as yup from 'yup'
-import { User } from '../models'
+import { User, SubscriptionTier } from '../models'
 import { logger } from '../logger'
 import * as crypto from 'crypto'
 import * as jwt from 'jsonwebtoken'
@@ -62,6 +62,17 @@ export const handleCreateUser = async (request: yup.InferType<typeof createUserS
       }
     }
 
+    // Get the free tier for new users
+    const freeTier = await SubscriptionTier.findOne({ where: { tier: 'free' } })
+    if (!freeTier) {
+      logger.error({ message: 'Free subscription tier not found in database' })
+      return {
+        response: 'System configuration error',
+        error: true,
+        status: 500
+      }
+    }
+
     const salt = generateSalt()
     const passwordHash = hashPassword(request.password, salt)
     const emailToken = generateEmailToken()
@@ -74,6 +85,7 @@ export const handleCreateUser = async (request: yup.InferType<typeof createUserS
       email_token: emailToken,
       email_token_expiry: emailTokenExpiry,
       verified: false,
+      subscription_tier_uuid: freeTier.uuid,
     })
 
     logger.info({ message: 'User created successfully', email: request.email, uuid: user.uuid })
@@ -337,5 +349,60 @@ export const verifyJWT = (token: string): { uuid: string; email: string; verifie
   } catch (error) {
     logger.error({ message: 'JWT verification failed', error })
     return null
+  }
+}
+
+export const handleFetchUserQuota = async (userUuid: string) => {
+  try {
+    const user = await User.findOne({
+      where: { uuid: userUuid },
+      include: [{
+        model: SubscriptionTier,
+        as: 'subscriptionTier'
+      }]
+    })
+
+    if (!user) {
+      return {
+        response: 'User not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    const now = new Date()
+    const lastReset = new Date(user.last_counter_reset)
+    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+
+    // Check if we need to reset the counter (if more than 1 month has passed)
+    let currentCounter = user.monthly_counter
+    if (lastReset <= oneMonthAgo) {
+      await user.update({
+        monthly_counter: 0,
+        last_counter_reset: now
+      })
+      currentCounter = 0
+    }
+
+    const subscriptionTier = (user as any).subscriptionTier
+
+    return {
+      response: {
+        currentUsage: currentCounter,
+        monthlyQuota: subscriptionTier?.monthly_quota,
+        tier: subscriptionTier?.tier,
+        lastCounterReset: user.last_counter_reset,
+        subscribedOn: user.subscribed_on
+      },
+      status: 200
+    }
+
+  } catch (error) {
+    logger.error({ message: 'Error fetching user quota', error })
+    return {
+      response: 'Error fetching user quota',
+      error: true,
+      status: 500
+    }
   }
 }

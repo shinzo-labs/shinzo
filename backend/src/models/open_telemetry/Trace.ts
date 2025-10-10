@@ -10,6 +10,9 @@ export class Trace extends CommonModel {
   public operation_name!: string | null
   public status!: 'ok' | 'error' | 'timeout' | null
   public span_count!: number
+  public trace_id!: string | null
+  public scope_name!: string | null
+  public scope_version!: string | null
 
   static initialize(sequelize: Sequelize) {
     Trace.init(
@@ -58,6 +61,18 @@ export class Trace extends CommonModel {
           type: DataTypes.INTEGER,
           allowNull: true,
           defaultValue: 0,
+        },
+        trace_id: {
+          type: DataTypes.TEXT,
+          allowNull: true,
+        },
+        scope_name: {
+          type: DataTypes.TEXT,
+          allowNull: true,
+        },
+        scope_version: {
+          type: DataTypes.TEXT,
+          allowNull: true,
         },
       },
       {
