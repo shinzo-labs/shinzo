@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { UserPreferencesProvider } from './contexts/UserPreferencesContext'
 import { RefreshProvider } from './contexts/RefreshContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { OnboardingRoute } from './components/OnboardingRoute'
 
 // Auth pages
 import { LoginPage } from './pages/auth/LoginPage'
@@ -14,6 +15,7 @@ import { VerifyPage } from './pages/auth/VerifyPage'
 
 // Main app pages
 import { DashboardPage } from './pages/DashboardPage'
+import { GettingStartedPage } from './pages/GettingStartedPage'
 import { TracesPage } from './pages/TracesPage'
 import { SpansPage } from './pages/SpansPage'
 import { MetricsPage } from './pages/MetricsPage'
@@ -50,37 +52,54 @@ function App() {
                 {/* Protected routes */}
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
-                    <DashboardPage />
+                    <OnboardingRoute>
+                      <DashboardPage />
+                    </OnboardingRoute>
+                  </ProtectedRoute>
+                } />
+                <Route path="/getting-started" element={
+                  <ProtectedRoute>
+                    <GettingStartedPage />
                   </ProtectedRoute>
                 } />
                 <Route path="/traces" element={
                   <ProtectedRoute>
-                    <TracesPage />
+                    <OnboardingRoute>
+                      <TracesPage />
+                    </OnboardingRoute>
                   </ProtectedRoute>
                 } />
                 <Route path="/spans" element={
                   <ProtectedRoute>
-                    <SpansPage />
+                    <OnboardingRoute>
+                      <SpansPage />
+                    </OnboardingRoute>
                   </ProtectedRoute>
                 } />
                 <Route path="/metrics" element={
                   <ProtectedRoute>
-                    <MetricsPage />
+                    <OnboardingRoute>
+                      <MetricsPage />
+                    </OnboardingRoute>
                   </ProtectedRoute>
                 } />
                 <Route path="/resources" element={
                   <ProtectedRoute>
-                    <ResourcesPage />
+                    <OnboardingRoute>
+                      <ResourcesPage />
+                    </OnboardingRoute>
                   </ProtectedRoute>
                 } />
                 <Route path="/settings" element={
                   <ProtectedRoute>
-                    <SettingsPage />
+                    <OnboardingRoute>
+                      <SettingsPage />
+                    </OnboardingRoute>
                   </ProtectedRoute>
                 } />
 
                 {/* Default redirect */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/" element={<Navigate to="/getting-started" replace />} />
               </Routes>
               </div>
               </Router>

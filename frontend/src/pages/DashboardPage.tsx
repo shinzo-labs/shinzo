@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
-import { Button, Card, Flex, Text, Heading, Badge, Grid, Box } from '@radix-ui/themes'
+import { Button, Card, Flex, Text, Heading, Badge, Grid, Box, Callout } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../contexts/AuthContext'
@@ -145,6 +145,7 @@ export const DashboardPage: React.FC = () => {
       staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
     }
   )
+
 
   // Calculate real stats from selected time range data
   const stats: DashboardStats = {

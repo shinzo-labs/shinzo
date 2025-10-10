@@ -99,10 +99,19 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({ onDismiss }) => {
           </Flex>
         </Box>
 
-        <Text size="2" color="gray">
-          Use this token to send telemetry data to the platform. You can manage your tokens in{' '}
-          <Text weight="medium" color="blue">Settings → Ingest Tokens</Text>.
-        </Text>
+        <Flex gap="2">
+          <Button
+            size="2"
+            variant="solid"
+            onClick={() => window.location.href = '/getting-started'}
+          >
+            Get Started
+          </Button>
+          <Text size="2" color="gray" style={{ alignSelf: 'center' }}>
+            or manage your tokens in{' '}
+            <Text weight="medium" color="blue">Settings → Ingest Tokens</Text>.
+          </Text>
+        </Flex>
       </Flex>
     </Card>
   )
