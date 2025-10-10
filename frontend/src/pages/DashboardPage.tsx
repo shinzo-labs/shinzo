@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from 'react-query'
+import { useNavigate } from 'react-router-dom'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, Card, Flex, Text, Heading, Badge, Grid, Box } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
@@ -31,6 +32,7 @@ export const DashboardPage: React.FC = () => {
   const { token } = useAuth()
   const { refreshTrigger } = useRefresh()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false)
 
   // State for time range
@@ -318,7 +320,24 @@ export const DashboardPage: React.FC = () => {
               ) : resources.length > 0 ? (
                 <Flex direction="column" gap="5">
                   {resources.slice(0, 5).map((resource: any) => (
-                    <Flex key={resource.uuid} justify="between" align="center" style={{ padding: '8px 0' }}>
+                    <Flex
+                      key={resource.uuid}
+                      justify="between"
+                      align="center"
+                      style={{
+                        padding: '12px 16px',
+                        borderRadius: 'var(--radius-2)',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--gray-3)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                      onClick={() => navigate(`/server-analytics?resourceId=${resource.uuid}`)}
+                    >
                       <Flex align="center" gap="4">
                         <Badge color="green" variant="soft" style={{ width: '8px', height: '8px', padding: 0 }} />
                         <Box>
@@ -330,9 +349,12 @@ export const DashboardPage: React.FC = () => {
                           </Text>
                         </Box>
                       </Flex>
-                      <Text size="1" color="gray">
-                        Last seen: {new Date(resource.last_seen).toLocaleTimeString()}
-                      </Text>
+                      <Flex align="center" gap="3">
+                        <Text size="1" color="gray">
+                          Last seen: {new Date(resource.last_seen).toLocaleTimeString()}
+                        </Text>
+                        <Icons.ChevronRightIcon width="16" height="16" color="var(--gray-9)" />
+                      </Flex>
                     </Flex>
                   ))}
                 </Flex>

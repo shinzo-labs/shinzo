@@ -19,6 +19,7 @@ import { SpansPage } from './pages/SpansPage'
 import { MetricsPage } from './pages/MetricsPage'
 import { ResourcesPage } from './pages/ResourcesPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { ServerAnalyticsPage } from './pages/ServerAnalyticsPage'
 
 import './App.css'
 
@@ -76,6 +77,11 @@ function App() {
                 <Route path="/settings" element={
                   <ProtectedRoute>
                     <SettingsPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/server-analytics" element={
+                  <ProtectedRoute>
+                    <ServerAnalyticsPage />
                   </ProtectedRoute>
                 } />
 

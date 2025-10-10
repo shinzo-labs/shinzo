@@ -378,3 +378,195 @@ export const handleFetchMetrics = async (userUuid: string, query: yup.InferType<
     }
   }
 }
+
+export const handleFetchResourceAnalytics = async (userUuid: string, resourceUuid: string, query: yup.InferType<typeof fetchDataSchema>) => {
+  try {
+    const startTime = new Date(query.start_time)
+    const endTime = new Date(query.end_time)
+
+    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+      return {
+        response: 'Invalid time format',
+        error: true,
+        status: 400
+      }
+    }
+
+    // Verify resource belongs to user
+    const resource = await Resource.findOne({
+      where: {
+        uuid: resourceUuid,
+        user_uuid: userUuid
+      },
+      include: [
+        {
+          model: ResourceAttribute,
+          as: 'attributes',
+          required: false
+        }
+      ]
+    })
+
+    if (!resource) {
+      return {
+        response: 'Resource not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    // Transform resource attributes
+    const resourceAttributes: Record<string, any> = {}
+    if ((resource as any).attributes && Array.isArray((resource as any).attributes)) {
+      (resource as any).attributes.forEach((attr: any) => {
+        let value: any
+        switch (attr.value_type) {
+          case 'string':
+            value = attr.string_value
+            break
+          case 'int':
+            value = attr.int_value
+            break
+          case 'double':
+            value = attr.double_value
+            break
+          case 'bool':
+            value = attr.bool_value
+            break
+          case 'array':
+            value = attr.array_value
+            break
+          default:
+            value = attr.string_value
+        }
+        resourceAttributes[attr.key] = value
+      })
+    }
+
+    // Fetch traces for this resource
+    const traces = await Trace.findAll({
+      where: {
+        resource_uuid: resourceUuid,
+        start_time: {
+          [Op.gte]: startTime,
+          [Op.lte]: endTime
+        }
+      },
+      order: [['start_time', 'DESC']]
+    })
+
+    // Fetch spans for this resource's traces
+    const traceUuids = traces.map(t => t.uuid)
+    const spans = traceUuids.length > 0 ? await Span.findAll({
+      where: {
+        trace_uuid: { [Op.in]: traceUuids }
+      },
+      include: [
+        {
+          model: SpanAttribute,
+          as: 'attributes',
+          required: false
+        }
+      ],
+      order: [['start_time', 'DESC']]
+    }) : []
+
+    // Process traces into analytics
+    const traceData = traces.map(trace => ({
+      uuid: trace.uuid,
+      start_time: trace.start_time,
+      end_time: trace.end_time,
+      service_name: trace.service_name,
+      operation_name: trace.operation_name,
+      status: trace.status,
+      span_count: trace.span_count,
+      duration_ms: trace.end_time && trace.start_time
+        ? new Date(trace.end_time).getTime() - new Date(trace.start_time).getTime()
+        : null
+    }))
+
+    // Process spans into analytics
+    const spanData = spans.map(span => {
+      const attributes: Record<string, any> = {}
+      if ((span as any).attributes && Array.isArray((span as any).attributes)) {
+        (span as any).attributes.forEach((attr: any) => {
+          let value: any
+          switch (attr.value_type) {
+            case 'string':
+              value = attr.string_value
+              break
+            case 'int':
+              value = attr.int_value
+              break
+            case 'double':
+              value = attr.double_value
+              break
+            case 'bool':
+              value = attr.bool_value
+              break
+            case 'array':
+              value = attr.array_value
+              break
+            default:
+              value = attr.string_value
+          }
+          attributes[attr.key] = value
+        })
+      }
+
+      return {
+        uuid: span.uuid,
+        trace_uuid: span.trace_uuid,
+        operation_name: span.operation_name,
+        start_time: span.start_time,
+        end_time: span.end_time,
+        duration_ms: span.duration_ms,
+        status_code: span.status_code,
+        attributes
+      }
+    })
+
+    // Calculate performance metrics
+    const totalTraces = traces.length
+    const errorTraces = traces.filter(t => t.status === 'error').length
+    const avgDuration = traces.length > 0
+      ? traces.reduce((sum, t) => {
+          const duration = t.end_time && t.start_time
+            ? new Date(t.end_time).getTime() - new Date(t.start_time).getTime()
+            : 0
+          return sum + duration
+        }, 0) / traces.length
+      : 0
+
+    return {
+      response: {
+        resource: {
+          uuid: resource.uuid,
+          service_name: resource.service_name,
+          service_version: resource.service_version,
+          service_namespace: resource.service_namespace,
+          first_seen: resource.first_seen,
+          last_seen: resource.last_seen,
+          attributes: resourceAttributes
+        },
+        metrics: {
+          totalTraces,
+          errorTraces,
+          errorRate: totalTraces > 0 ? (errorTraces / totalTraces) * 100 : 0,
+          avgDuration
+        },
+        traces: traceData,
+        spans: spanData
+      },
+      status: 200
+    }
+
+  } catch (error) {
+    logger.error({ message: 'Error fetching resource analytics', error })
+    return {
+      response: 'Error fetching resource analytics',
+      error: true,
+      status: 500
+    }
+  }
+}
