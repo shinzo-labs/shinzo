@@ -127,7 +127,7 @@ instrumentServer(server, {
             flexShrink: 0
           }}>
             <iframe
-              src="https://www.youtube.com/embed/sHGAJCpZyNw"
+              src="https://www.youtube.com/embed/ngv4QTURY6c"
               title="Get Onboarded to the Shinzo Analytics Platform in 60 Seconds or Less"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
