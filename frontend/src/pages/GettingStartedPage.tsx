@@ -13,7 +13,6 @@ export const GettingStartedPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [hasTelemetry, setHasTelemetry] = useState(false)
-  const [isVideoExpanded, setIsVideoExpanded] = useState(false)
 
   useEffect(() => {
     const fetchIngestToken = async () => {
