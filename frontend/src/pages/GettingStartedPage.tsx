@@ -95,25 +95,51 @@ instrumentServer(server, {
   return (
     <AppLayout>
       <Flex direction="column" gap="6">
-        {/* Page header */}
-        <Box>
-          <Heading size="6">Getting Started</Heading>
-          <Text color="gray">
-            Set up your MCP server with Shinzo Platform in under 5 minutes
-          </Text>
-        </Box>
+        {/* Header section with video on the right */}
+        <Flex gap="6" align="start">
+          {/* Left: Header and success banner */}
+          <Flex direction="column" gap="4" style={{ flex: 1 }}>
+            {/* Page header */}
+            <Box>
+              <Heading size="6">Getting Started</Heading>
+              <Text color="gray">
+                Set up your MCP server with Shinzo Platform in under 60 seconds
+              </Text>
+            </Box>
 
-        {/* Success banner if token exists */}
-        {ingestToken && (
-          <Callout.Root color="green">
-            <Callout.Icon>
-              <Icons.CheckCircledIcon />
-            </Callout.Icon>
-            <Callout.Text>
-              Your ingest token has been automatically generated! Copy the code below and start sending telemetry data.
-            </Callout.Text>
-          </Callout.Root>
-        )}
+            {/* Success banner if token exists */}
+            {ingestToken && (
+              <Callout.Root color="green">
+                <Callout.Icon>
+                  <Icons.CheckCircledIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  Your ingest token has been automatically generated! Copy the code below and start sending telemetry data.
+                </Callout.Text>
+              </Callout.Root>
+            )}
+          </Flex>
+
+          {/* Right: Video tutorial */}
+          <Box style={{
+            width: '400px',
+            height: '225px',
+            flexShrink: 0
+          }}>
+            <iframe
+              src="https://www.youtube.com/embed/sHGAJCpZyNw"
+              title="Get Onboarded to the Shinzo Analytics Platform in 60 Seconds or Less"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                borderRadius: 'var(--radius-3)'
+              }}
+            />
+          </Box>
+        </Flex>
 
         {/* Step 1: Install SDK */}
         <Card>
