@@ -5,6 +5,7 @@ import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE, LOG_LEVEL } 
 import { logger, pinoConfig } from './logger'
 import { sequelize } from './dbClient'
 import { authenticateJWT, AuthenticatedRequest } from './middleware/auth'
+import * as $root from '@opentelemetry/otlp-transformer/build/esm/generated/root'
 
 // Import handlers
 import {
@@ -62,6 +63,40 @@ app.register(fastifyCors, {
 app.register(fastifyRateLimit, {
   max: RATE_LIMIT_MAX,
   timeWindow: RATE_LIMIT_WINDOW
+})
+
+// Add content-type parser for protobuf (OpenTelemetry OTLP format)
+app.addContentTypeParser('application/x-protobuf', { parseAs: 'buffer' }, async (request: FastifyRequest, payload: Buffer) => {
+  try {
+    // Determine the type of data based on the endpoint
+    const url = request.url
+
+    // Get the protobuf types from the generated root
+    const ExportTraceServiceRequest = ($root as any).opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest
+    const ExportMetricsServiceRequest = ($root as any).opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest
+
+    if (url.includes('/traces')) {
+      // Decode protobuf trace data
+      const decoded = ExportTraceServiceRequest.decode(payload)
+      return ExportTraceServiceRequest.toObject(decoded, { longs: String })
+    } else if (url.includes('/metrics')) {
+      // Decode protobuf metrics data
+      const decoded = ExportMetricsServiceRequest.decode(payload)
+      return ExportMetricsServiceRequest.toObject(decoded, { longs: String })
+    }
+
+    // For generic /telemetry/ingest_http endpoint, try traces first
+    try {
+      const decoded = ExportTraceServiceRequest.decode(payload)
+      return ExportTraceServiceRequest.toObject(decoded, { longs: String })
+    } catch {
+      const decoded = ExportMetricsServiceRequest.decode(payload)
+      return ExportMetricsServiceRequest.toObject(decoded, { longs: String })
+    }
+  } catch (error) {
+    logger.error({ message: 'Error parsing protobuf payload', error })
+    throw error
+  }
 })
 
 // Request logging hook for debug/trace level
