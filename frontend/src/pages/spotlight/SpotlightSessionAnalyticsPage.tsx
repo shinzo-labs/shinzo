@@ -3,6 +3,7 @@ import { useQuery } from 'react-query'
 import { Flex, Text, Card, Table, Badge, Button } from '@radix-ui/themes'
 import { Link } from 'react-router-dom'
 import { AppLayout } from '../../components/layout/AppLayout'
+import { useAuth } from '../../contexts/AuthContext'
 import axios from 'axios'
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000'
@@ -23,27 +24,41 @@ interface SessionAnalytics {
 }
 
 export const SpotlightSessionAnalyticsPage: React.FC = () => {
-  const { data: analytics, isLoading } = useQuery<SessionAnalytics>(
+  const { token } = useAuth()
+  const { data: analytics, isLoading, error } = useQuery<SessionAnalytics>(
     'spotlight-session-analytics',
     async () => {
-      const token = localStorage.getItem('token')
       const response = await axios.get(`${BACKEND_URL}/spotlight/analytics/sessions`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       return response.data
+    },
+    {
+      retry: false
     }
   )
 
   return (
     <AppLayout>
       <Flex direction="column" gap="4" style={{ padding: '24px' }}>
-        <div>
+        <Flex direction="column" gap="2">
           <Text size="6" weight="bold">Session Analytics</Text>
           <Text size="2" color="gray">Review conversation sessions and interaction details</Text>
-        </div>
+        </Flex>
 
         {isLoading ? (
-          <Text>Loading...</Text>
+          <Card>
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Text>Loading...</Text>
+            </Flex>
+          </Card>
+        ) : error ? (
+          <Card>
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Text size="3" color="red">Failed to load analytics</Text>
+              <Text size="2" color="gray">Please try refreshing the page</Text>
+            </Flex>
+          </Card>
         ) : (
           <>
             <Card>
@@ -52,8 +67,8 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
             </Card>
 
             <Card>
-              <Text size="4" weight="bold" mb="3">Recent Sessions</Text>
-              {analytics?.sessions.length === 0 ? (
+              <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Recent Sessions</Text>
+              {!analytics || analytics?.sessions.length === 0 ? (
                 <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
                   <Text size="3" color="gray">No sessions yet</Text>
                   <Text size="2" color="gray">Start using Spotlight to see sessions</Text>

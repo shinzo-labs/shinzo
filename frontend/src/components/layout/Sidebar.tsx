@@ -44,11 +44,6 @@ const navigation = [
 
 const spotlightNavigation = [
   {
-    name: 'API Keys',
-    href: '/spotlight/api-keys',
-    icon: Icons.LockClosedIcon,
-  },
-  {
     name: 'Token Analytics',
     href: '/spotlight/token-analytics',
     icon: Icons.BarChartIcon,
@@ -67,6 +62,11 @@ const spotlightNavigation = [
     name: 'User Analytics',
     href: '/spotlight/user-analytics',
     icon: Icons.PersonIcon,
+  },
+  {
+    name: 'API Keys',
+    href: '/spotlight/api-keys',
+    icon: Icons.LockClosedIcon,
   },
 ]
 

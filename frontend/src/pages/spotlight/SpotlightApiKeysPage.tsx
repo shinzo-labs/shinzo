@@ -4,6 +4,7 @@ import { Flex, Text, Button, Table, Card, Dialog, TextField, Select, Badge } fro
 import { PlusIcon, TrashIcon, Pencil1Icon } from '@radix-ui/react-icons'
 import { AppLayout } from '../../components/layout/AppLayout'
 import { useToast } from '../../hooks/useToast'
+import { useAuth } from '../../contexts/AuthContext'
 import axios from 'axios'
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000'
@@ -28,22 +29,29 @@ export const SpotlightApiKeysPage: React.FC = () => {
     provider_base_url: '',
   })
   const { showToast } = useToast()
+  const { token } = useAuth()
   const queryClient = useQueryClient()
 
-  const { data: apiKeys, isLoading } = useQuery<{ api_keys: ApiKey[] }>(
+  const { data: apiKeys, isLoading, error } = useQuery<{ api_keys: ApiKey[] }>(
     'spotlight-api-keys',
     async () => {
-      const token = localStorage.getItem('token')
       const response = await axios.get(`${BACKEND_URL}/spotlight/api_keys`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       return response.data
+    },
+    {
+      retry: false,
+      onError: (error: any) => {
+        if (error.response?.status === 401) {
+          console.error('Authentication failed')
+        }
+      }
     }
   )
 
   const createMutation = useMutation(
     async (data: typeof formData) => {
-      const token = localStorage.getItem('token')
       const response = await axios.post(`${BACKEND_URL}/spotlight/api_keys`, data, {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -64,7 +72,6 @@ export const SpotlightApiKeysPage: React.FC = () => {
 
   const deleteMutation = useMutation(
     async (keyUuid: string) => {
-      const token = localStorage.getItem('token')
       await axios.delete(`${BACKEND_URL}/spotlight/api_keys/${keyUuid}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
@@ -94,10 +101,10 @@ export const SpotlightApiKeysPage: React.FC = () => {
     <AppLayout>
       <Flex direction="column" gap="4" style={{ padding: '24px' }}>
         <Flex justify="between" align="center">
-          <div>
+          <Flex direction="column" gap="2">
             <Text size="6" weight="bold">API Keys</Text>
             <Text size="2" color="gray">Manage your Spotlight API keys for AI model proxying</Text>
-          </div>
+          </Flex>
           <Dialog.Root open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <Dialog.Trigger>
               <Button>
@@ -188,8 +195,15 @@ export const SpotlightApiKeysPage: React.FC = () => {
 
         <Card>
           {isLoading ? (
-            <Text>Loading...</Text>
-          ) : apiKeys?.api_keys.length === 0 ? (
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Text>Loading...</Text>
+            </Flex>
+          ) : error ? (
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Text size="3" color="red">Failed to load API keys</Text>
+              <Text size="2" color="gray">Please try refreshing the page</Text>
+            </Flex>
+          ) : !apiKeys || apiKeys?.api_keys.length === 0 ? (
             <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
               <Text size="3" color="gray">No API keys yet</Text>
               <Text size="2" color="gray">Create your first API key to get started</Text>

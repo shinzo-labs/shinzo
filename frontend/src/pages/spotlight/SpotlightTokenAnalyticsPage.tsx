@@ -2,6 +2,7 @@ import React from 'react'
 import { useQuery } from 'react-query'
 import { Flex, Text, Card, Table, Badge, Grid } from '@radix-ui/themes'
 import { AppLayout } from '../../components/layout/AppLayout'
+import { useAuth } from '../../contexts/AuthContext'
 import axios from 'axios'
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000'
@@ -24,27 +25,41 @@ interface TokenAnalytics {
 }
 
 export const SpotlightTokenAnalyticsPage: React.FC = () => {
-  const { data: analytics, isLoading } = useQuery<TokenAnalytics>(
+  const { token } = useAuth()
+  const { data: analytics, isLoading, error } = useQuery<TokenAnalytics>(
     'spotlight-token-analytics',
     async () => {
-      const token = localStorage.getItem('token')
       const response = await axios.get(`${BACKEND_URL}/spotlight/analytics/tokens`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       return response.data
+    },
+    {
+      retry: false
     }
   )
 
   return (
     <AppLayout>
       <Flex direction="column" gap="4" style={{ padding: '24px' }}>
-        <div>
+        <Flex direction="column" gap="2">
           <Text size="6" weight="bold">Token Analytics</Text>
           <Text size="2" color="gray">Track token usage across models and sessions</Text>
-        </div>
+        </Flex>
 
         {isLoading ? (
-          <Text>Loading...</Text>
+          <Card>
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Text>Loading...</Text>
+            </Flex>
+          </Card>
+        ) : error ? (
+          <Card>
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Text size="3" color="red">Failed to load analytics</Text>
+              <Text size="2" color="gray">Please try refreshing the page</Text>
+            </Flex>
+          </Card>
         ) : (
           <>
             <Grid columns="4" gap="4">
@@ -67,8 +82,8 @@ export const SpotlightTokenAnalyticsPage: React.FC = () => {
             </Grid>
 
             <Card>
-              <Text size="4" weight="bold" mb="3">Token Usage by Model</Text>
-              {Object.keys(analytics?.by_model || {}).length === 0 ? (
+              <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Token Usage by Model</Text>
+              {!analytics || Object.keys(analytics?.by_model || {}).length === 0 ? (
                 <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
                   <Text size="3" color="gray">No data yet</Text>
                   <Text size="2" color="gray">Start using Spotlight to see analytics</Text>

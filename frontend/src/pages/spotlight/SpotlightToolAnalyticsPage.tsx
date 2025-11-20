@@ -2,6 +2,7 @@ import React from 'react'
 import { useQuery } from 'react-query'
 import { Flex, Text, Card, Table, Badge } from '@radix-ui/themes'
 import { AppLayout } from '../../components/layout/AppLayout'
+import { useAuth } from '../../contexts/AuthContext'
 import axios from 'axios'
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000'
@@ -21,27 +22,41 @@ interface ToolAnalytics {
 }
 
 export const SpotlightToolAnalyticsPage: React.FC = () => {
-  const { data: analytics, isLoading } = useQuery<ToolAnalytics>(
+  const { token } = useAuth()
+  const { data: analytics, isLoading, error } = useQuery<ToolAnalytics>(
     'spotlight-tool-analytics',
     async () => {
-      const token = localStorage.getItem('token')
       const response = await axios.get(`${BACKEND_URL}/spotlight/analytics/tools`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       return response.data
+    },
+    {
+      retry: false
     }
   )
 
   return (
     <AppLayout>
       <Flex direction="column" gap="4" style={{ padding: '24px' }}>
-        <div>
+        <Flex direction="column" gap="2">
           <Text size="6" weight="bold">Tool Analytics</Text>
           <Text size="2" color="gray">Track tool usage and performance</Text>
-        </div>
+        </Flex>
 
         {isLoading ? (
-          <Text>Loading...</Text>
+          <Card>
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Text>Loading...</Text>
+            </Flex>
+          </Card>
+        ) : error ? (
+          <Card>
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Text size="3" color="red">Failed to load analytics</Text>
+              <Text size="2" color="gray">Please try refreshing the page</Text>
+            </Flex>
+          </Card>
         ) : (
           <>
             <Flex gap="4">
@@ -56,8 +71,8 @@ export const SpotlightToolAnalyticsPage: React.FC = () => {
             </Flex>
 
             <Card>
-              <Text size="4" weight="bold" mb="3">Tool Usage</Text>
-              {analytics?.tools.length === 0 ? (
+              <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Tool Usage</Text>
+              {!analytics || analytics?.tools.length === 0 ? (
                 <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
                   <Text size="3" color="gray">No tools used yet</Text>
                   <Text size="2" color="gray">Start using tools to see analytics</Text>
