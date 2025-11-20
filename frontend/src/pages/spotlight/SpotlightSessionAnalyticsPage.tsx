@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery } from 'react-query'
-import { Flex, Text, Card, Table, Badge, Dialog, Code, Box } from '@radix-ui/themes'
+import { Flex, Text, Card, Table, Badge, Dialog, Code, Box, Tooltip } from '@radix-ui/themes'
 import { AppLayout } from '../../components/layout/AppLayout'
 import { useAuth } from '../../contexts/AuthContext'
-import { ChevronDownIcon, ChevronUpIcon } from '@radix-ui/react-icons'
+import { ChevronDownIcon, ChevronUpIcon, InfoCircledIcon } from '@radix-ui/react-icons'
 import axios from 'axios'
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000'
@@ -231,6 +231,20 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
   const getInteractionToolResults = (interaction: Interaction): number =>
     interaction.status === 'success' ? getToolCount(interaction, 'tool_result') : 0
 
+  const isLikelyMaxTokenError = (interaction: Interaction): boolean => {
+    if (interaction.status !== 'error') return false
+    
+    const maxTokens = interaction.request_data?.max_tokens
+    if (!maxTokens) return false
+    
+    const { count: inputTokens } = getTokenCount(
+      interaction.input_tokens, 
+      JSON.stringify(interaction.request_data?.messages || '')
+    )
+    
+    return inputTokens > maxTokens
+  }
+
   const formatMessages = (messages: any[]) => {
     if (!Array.isArray(messages)) return 'N/A'
 
@@ -294,7 +308,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
         ) : (
           <>
             <Card>
-              <Text size="2" color="gray">Total Sessions</Text>
+              <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Total Sessions</Text>
               <Text size="6" weight="bold">{analytics?.total_sessions}</Text>
             </Card>
 
@@ -448,9 +462,16 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                         <Table.Cell>{getInteractionToolUses(interaction)}</Table.Cell>
                         <Table.Cell>{getInteractionToolResults(interaction)}</Table.Cell>
                         <Table.Cell>
-                          <Badge color={interaction.status === 'success' ? 'green' : 'red'}>
-                            {interaction.status}
-                          </Badge>
+                          <Flex align="center" gap="2">
+                            <Badge color={interaction.status === 'success' ? 'green' : 'red'}>
+                              {interaction.status}
+                            </Badge>
+                            {isLikelyMaxTokenError(interaction) && (
+                              <Tooltip content="This error was likely caused by exceeding the max token limit">
+                                <InfoCircledIcon style={{ color: 'var(--orange-9)', cursor: 'help' }} />
+                              </Tooltip>
+                            )}
+                          </Flex>
                         </Table.Cell>
                       </Table.Row>
 

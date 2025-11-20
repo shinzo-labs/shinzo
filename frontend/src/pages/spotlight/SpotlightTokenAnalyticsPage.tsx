@@ -64,19 +64,19 @@ export const SpotlightTokenAnalyticsPage: React.FC = () => {
           <>
             <Grid columns="4" gap="4">
               <Card>
-                <Text size="2" color="gray">Total Requests</Text>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Total Requests</Text>
                 <Text size="6" weight="bold">{analytics?.summary.total_requests.toLocaleString()}</Text>
               </Card>
               <Card>
-                <Text size="2" color="gray">Input Tokens</Text>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Input Tokens</Text>
                 <Text size="6" weight="bold">{analytics?.summary.total_input_tokens.toLocaleString()}</Text>
               </Card>
               <Card>
-                <Text size="2" color="gray">Output Tokens</Text>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Output Tokens</Text>
                 <Text size="6" weight="bold">{analytics?.summary.total_output_tokens.toLocaleString()}</Text>
               </Card>
               <Card>
-                <Text size="2" color="gray">Cached Tokens</Text>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Cached Tokens</Text>
                 <Text size="6" weight="bold">{analytics?.summary.total_cached_tokens.toLocaleString()}</Text>
               </Card>
             </Grid>

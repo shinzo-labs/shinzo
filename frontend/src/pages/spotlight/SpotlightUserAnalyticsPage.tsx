@@ -61,11 +61,11 @@ export const SpotlightUserAnalyticsPage: React.FC = () => {
           <>
             <Flex gap="4">
               <Card style={{ flex: 1 }}>
-                <Text size="2" color="gray">Unique Users</Text>
+                <Text size="2" color="gray" style={{ marginBottom: '8px' }}>Unique Users</Text>
                 <Text size="6" weight="bold">{analytics?.total_unique_users}</Text>
               </Card>
               <Card style={{ flex: 1 }}>
-                <Text size="2" color="gray">Total Requests</Text>
+                <Text size="2" color="gray" style={{ marginBottom: '8px' }}>Total Requests</Text>
                 <Text size="6" weight="bold">{analytics?.total_requests.toLocaleString()}</Text>
               </Card>
             </Flex>
