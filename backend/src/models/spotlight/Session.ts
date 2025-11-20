@@ -4,6 +4,7 @@ import { CommonModel, commonFields } from '../Common'
 export class Session extends CommonModel {
   public user_uuid!: string
   public api_key_uuid!: string
+  public shinzo_api_key_uuid!: string
   public session_id!: string
   public start_time!: Date
   public end_time!: Date | null
@@ -21,6 +22,10 @@ export class Session extends CommonModel {
           allowNull: false,
         },
         api_key_uuid: {
+          type: DataTypes.UUID,
+          allowNull: false,
+        },
+        shinzo_api_key_uuid: {
           type: DataTypes.UUID,
           allowNull: false,
         },

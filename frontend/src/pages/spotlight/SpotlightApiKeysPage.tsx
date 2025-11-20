@@ -11,11 +11,9 @@ import {
   Select,
   Badge,
   Tabs,
-  Code,
-  Callout,
-  Separator
+  Code
 } from '@radix-ui/themes'
-import { PlusIcon, TrashIcon, CheckIcon, Cross2Icon, CopyIcon, InfoCircledIcon } from '@radix-ui/react-icons'
+import { PlusIcon, TrashIcon, CheckIcon, CopyIcon } from '@radix-ui/react-icons'
 import { AppLayout } from '../../components/layout/AppLayout'
 import { useToast } from '../../hooks/useToast'
 import { useAuth } from '../../contexts/AuthContext'
@@ -223,9 +221,8 @@ export const SpotlightApiKeysPage: React.FC = () => {
           </Text>
         </Flex>
 
-        <Tabs.Root defaultValue="setup">
+        <Tabs.Root defaultValue="shinzo-keys">
           <Tabs.List>
-            <Tabs.Trigger value="setup">Setup Guide</Tabs.Trigger>
             <Tabs.Trigger value="shinzo-keys">
               Shinzo API Keys
               {shinzoKeys && shinzoKeys.shinzo_api_keys.length > 0 && (
@@ -239,96 +236,6 @@ export const SpotlightApiKeysPage: React.FC = () => {
               )}
             </Tabs.Trigger>
           </Tabs.List>
-
-          {/* Setup Guide Tab */}
-          <Tabs.Content value="setup">
-            <Card mt="4">
-              <Flex direction="column" gap="4" p="4">
-                <Text size="5" weight="bold">Getting Started with Shinzo Spotlight</Text>
-
-                <Callout.Root color="blue">
-                  <Callout.Icon>
-                    <InfoCircledIcon />
-                  </Callout.Icon>
-                  <Callout.Text>
-                    Shinzo Spotlight lets you track and analyze all your AI agent requests through a secure proxy.
-                  </Callout.Text>
-                </Callout.Root>
-
-                <Separator size="4" />
-
-                <Flex direction="column" gap="3">
-                  <Text size="4" weight="bold">Step 1: Add Your Provider API Key</Text>
-                  <Text size="2" color="gray">
-                    First, securely store your AI provider's API key (e.g., Anthropic, OpenAI) in Shinzo.
-                    We encrypt it with AES-256-GCM for maximum security.
-                  </Text>
-                  <Button
-                    onClick={() => setIsCreateProviderKeyOpen(true)}
-                    style={{ width: 'fit-content' }}
-                  >
-                    <PlusIcon /> Add Provider Key
-                  </Button>
-                </Flex>
-
-                <Separator size="4" />
-
-                <Flex direction="column" gap="3">
-                  <Text size="4" weight="bold">Step 2: Generate a Shinzo API Key</Text>
-                  <Text size="2" color="gray">
-                    Create a Shinzo API key to use in your applications. This key authenticates your requests
-                    to the Shinzo proxy.
-                  </Text>
-                  <Button
-                    onClick={() => setIsCreateShinzoKeyOpen(true)}
-                    style={{ width: 'fit-content' }}
-                  >
-                    <PlusIcon /> Generate Shinzo API Key
-                  </Button>
-                </Flex>
-
-                <Separator size="4" />
-
-                <Flex direction="column" gap="3">
-                  <Text size="4" weight="bold">Step 3: Update Your Application</Text>
-                  <Text size="2" color="gray">
-                    Configure your AI application to use Shinzo's proxy endpoint:
-                  </Text>
-                  <Card style={{ background: 'var(--gray-2)' }}>
-                    <Flex direction="column" gap="2">
-                      <Text size="2" weight="bold">For Anthropic Claude:</Text>
-                      <Code size="2">
-                        export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"
-                      </Code>
-                      <Code size="2">
-                        export ANTHROPIC_API_KEY="sk_shinzo_live_..."
-                      </Code>
-                    </Flex>
-                  </Card>
-                  <Card style={{ background: 'var(--gray-2)' }}>
-                    <Flex direction="column" gap="2">
-                      <Text size="2" weight="bold">For OpenAI:</Text>
-                      <Code size="2">
-                        export OPENAI_BASE_URL="https://api.app.shinzo.ai/spotlight/openai"
-                      </Code>
-                      <Code size="2">
-                        export OPENAI_API_KEY="sk_shinzo_live_..."
-                      </Code>
-                    </Flex>
-                  </Card>
-                </Flex>
-
-                <Callout.Root color="green">
-                  <Callout.Icon>
-                    <CheckIcon />
-                  </Callout.Icon>
-                  <Callout.Text>
-                    That's it! Your AI requests will now be tracked and analyzed in the Shinzo dashboard.
-                  </Callout.Text>
-                </Callout.Root>
-              </Flex>
-            </Card>
-          </Tabs.Content>
 
           {/* Shinzo Keys Tab */}
           <Tabs.Content value="shinzo-keys">

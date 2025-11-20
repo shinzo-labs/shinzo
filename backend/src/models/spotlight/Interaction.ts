@@ -5,6 +5,7 @@ export class Interaction extends CommonModel {
   public session_uuid!: string
   public user_uuid!: string
   public api_key_uuid!: string
+  public shinzo_api_key_uuid!: string
   public request_timestamp!: Date
   public model!: string
   public provider!: string
@@ -38,6 +39,10 @@ export class Interaction extends CommonModel {
           allowNull: false,
         },
         api_key_uuid: {
+          type: DataTypes.UUID,
+          allowNull: false,
+        },
+        shinzo_api_key_uuid: {
           type: DataTypes.UUID,
           allowNull: false,
         },

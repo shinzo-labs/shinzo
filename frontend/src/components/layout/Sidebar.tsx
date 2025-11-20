@@ -59,11 +59,6 @@ const spotlightNavigation = [
     icon: Icons.ActivityLogIcon,
   },
   {
-    name: 'User Analytics',
-    href: '/spotlight/user-analytics',
-    icon: Icons.PersonIcon,
-  },
-  {
     name: 'API Keys',
     href: '/spotlight/api-keys',
     icon: Icons.LockClosedIcon,

@@ -27,7 +27,6 @@ import { SpotlightApiKeysPage } from './pages/spotlight/SpotlightApiKeysPage'
 import { SpotlightTokenAnalyticsPage } from './pages/spotlight/SpotlightTokenAnalyticsPage'
 import { SpotlightToolAnalyticsPage } from './pages/spotlight/SpotlightToolAnalyticsPage'
 import { SpotlightSessionAnalyticsPage } from './pages/spotlight/SpotlightSessionAnalyticsPage'
-import { SpotlightUserAnalyticsPage } from './pages/spotlight/SpotlightUserAnalyticsPage'
 
 import './App.css'
 
@@ -131,13 +130,6 @@ function App() {
                   <ProtectedRoute>
                     <OnboardingRoute>
                       <SpotlightSessionAnalyticsPage />
-                    </OnboardingRoute>
-                  </ProtectedRoute>
-                } />
-                <Route path="/spotlight/user-analytics" element={
-                  <ProtectedRoute>
-                    <OnboardingRoute>
-                      <SpotlightUserAnalyticsPage />
                     </OnboardingRoute>
                   </ProtectedRoute>
                 } />

@@ -871,6 +871,8 @@ export const handleFetchSessionAnalytics = async (
 
 export const handleFetchSessionDetail = async (userUuid: string, sessionUuid: string) => {
   try {
+    logger.debug({ message: 'Fetching session detail', userUuid, sessionUuid })
+    
     const session = await Session.findOne({
       where: { uuid: sessionUuid, user_uuid: userUuid },
       include: [
@@ -883,12 +885,16 @@ export const handleFetchSessionDetail = async (userUuid: string, sessionUuid: st
               as: 'toolUsages',
             }
           ],
-          order: [['request_timestamp', 'ASC']],
+          separate: true,
+          order: [['request_timestamp', 'DESC']],
         }
       ]
     })
 
+    logger.debug({ message: 'Session query result', session: session ? 'found' : 'not found', interactionCount: session ? (session as any).interactions?.length : 0 })
+
     if (!session) {
+      logger.warn({ message: 'Session not found', userUuid, sessionUuid })
       return {
         response: 'Session not found',
         error: true,
@@ -896,39 +902,43 @@ export const handleFetchSessionDetail = async (userUuid: string, sessionUuid: st
       }
     }
 
-    return {
-      response: {
-        session: {
-          uuid: session.uuid,
-          session_id: session.session_id,
-          start_time: session.start_time,
-          end_time: session.end_time,
-          total_requests: session.total_requests,
-          total_input_tokens: session.total_input_tokens,
-          total_output_tokens: session.total_output_tokens,
-          total_cached_tokens: session.total_cached_tokens,
-        },
-        interactions: (session as any).interactions.map((interaction: any) => ({
-          uuid: interaction.uuid,
-          request_timestamp: interaction.request_timestamp,
-          response_timestamp: interaction.response_timestamp,
-          model: interaction.model,
-          provider: interaction.provider,
-          input_tokens: interaction.input_tokens,
-          output_tokens: interaction.output_tokens,
-          cache_read_input_tokens: interaction.cache_read_input_tokens,
-          cache_creation_input_tokens: interaction.cache_creation_input_tokens,
-          latency_ms: interaction.latency_ms,
-          status: interaction.status,
-          request_data: interaction.request_data,
-          response_data: interaction.response_data,
-          tool_usages: interaction.toolUsages.map((tu: any) => ({
-            tool_name: tu.tool_name,
-            tool_input: tu.tool_input,
-            tool_output: tu.tool_output,
-          })),
-        })),
+    const response = {
+      session: {
+        uuid: session.uuid,
+        session_id: session.session_id,
+        start_time: session.start_time,
+        end_time: session.end_time,
+        total_requests: session.total_requests,
+        total_input_tokens: session.total_input_tokens,
+        total_output_tokens: session.total_output_tokens,
+        total_cached_tokens: session.total_cached_tokens,
       },
+      interactions: (session as any).interactions?.map((interaction: any) => ({
+        uuid: interaction.uuid,
+        request_timestamp: interaction.request_timestamp,
+        response_timestamp: interaction.response_timestamp,
+        model: interaction.model,
+        provider: interaction.provider,
+        input_tokens: interaction.input_tokens || 0,
+        output_tokens: interaction.output_tokens || 0,
+        cache_read_input_tokens: interaction.cache_read_input_tokens || 0,
+        cache_creation_input_tokens: interaction.cache_creation_input_tokens || 0,
+        latency_ms: interaction.latency_ms || 0,
+        status: interaction.status,
+        request_data: interaction.request_data,
+        response_data: interaction.response_data,
+        tool_usages: interaction.toolUsages?.map((tu: any) => ({
+          tool_name: tu.tool_name,
+          tool_input: tu.tool_input,
+          tool_output: tu.tool_output,
+        })) || [],
+      })) || [],
+    }
+
+    logger.debug({ message: 'Session detail response prepared', sessionUuid, interactionCount: response.interactions.length })
+
+    return {
+      response,
       status: 200
     }
   } catch (error) {
@@ -941,38 +951,3 @@ export const handleFetchSessionDetail = async (userUuid: string, sessionUuid: st
   }
 }
 
-export const handleFetchUserAnalytics = async (
-  userUuid: string,
-  filters: yup.InferType<typeof fetchAnalyticsSchema> = {}
-) => {
-  try {
-    const userAnalytics = await UserAnalytics.findAll({
-      where: { user_uuid: userUuid },
-      order: [['total_requests', 'DESC']],
-    })
-
-    return {
-      response: {
-        users: userAnalytics.map(ua => ({
-          end_user_id: ua.end_user_id,
-          total_requests: ua.total_requests,
-          total_input_tokens: ua.total_input_tokens,
-          total_output_tokens: ua.total_output_tokens,
-          total_cached_tokens: ua.total_cached_tokens,
-          first_request: ua.first_request,
-          last_request: ua.last_request,
-        })),
-        total_unique_users: userAnalytics.length,
-        total_requests: userAnalytics.reduce((sum, ua) => sum + ua.total_requests, 0),
-      },
-      status: 200
-    }
-  } catch (error) {
-    logger.error({ message: 'Error fetching user analytics', error, userUuid })
-    return {
-      response: 'Error fetching user analytics',
-      error: true,
-      status: 500
-    }
-  }
-}

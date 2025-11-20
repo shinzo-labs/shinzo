@@ -71,7 +71,6 @@ import {
   handleFetchToolAnalytics,
   handleFetchSessionAnalytics,
   handleFetchSessionDetail,
-  handleFetchUserAnalytics,
   fetchAnalyticsSchema
 } from './handlers/spotlight'
 
@@ -762,28 +761,6 @@ app.get('/spotlight/analytics/sessions/:sessionUuid', async (request: Authentica
   } catch (error: any) {
     logger.error({ message: 'Fetch session detail error', error })
     reply.status(500).send({ error: 'Internal server error' })
-  }
-})
-
-app.get('/spotlight/analytics/users', async (request: AuthenticatedRequest, reply: FastifyReply) => {
-  const authenticated = await authenticateJWT(request, reply)
-  if (!authenticated) return
-
-  try {
-    const validatedQuery = await fetchAnalyticsSchema.validate(request.query, {
-      abortEarly: false,
-      stripUnknown: true,
-    })
-
-    const result = await handleFetchUserAnalytics(request.user!.uuid, validatedQuery)
-    reply.status(result.status || 200).send(result.response)
-  } catch (error: any) {
-    logger.error({ message: 'Fetch user analytics error', error })
-    if (error.name === 'ValidationError') {
-      reply.status(400).send({ error: error.message })
-    } else {
-      reply.status(500).send({ error: 'Internal server error' })
-    }
   }
 })
 
