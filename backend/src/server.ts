@@ -48,18 +48,30 @@ import {
 } from './handlers/userPreferences'
 
 import {
-  handleCreateApiKey,
-  handleFetchApiKeys,
-  handleUpdateApiKey,
-  handleDeleteApiKey,
+  // Shinzo API Key handlers
+  handleCreateShinzoApiKey,
+  handleFetchShinzoApiKeys,
+  handleUpdateShinzoApiKey,
+  handleDeleteShinzoApiKey,
+  createShinzoApiKeySchema,
+  updateShinzoApiKeySchema,
+  // Provider Key handlers
+  handleCreateProviderKey,
+  handleFetchProviderKeys,
+  handleUpdateProviderKey,
+  handleDeleteProviderKey,
+  handleTestProviderKey,
+  createProviderKeySchema,
+  updateProviderKeySchema,
+  testProviderKeySchema,
+  // Model Proxy
   handleModelProxy,
+  // Analytics handlers
   handleFetchTokenAnalytics,
   handleFetchToolAnalytics,
   handleFetchSessionAnalytics,
   handleFetchSessionDetail,
   handleFetchUserAnalytics,
-  createApiKeySchema,
-  updateApiKeySchema,
   fetchAnalyticsSchema
 } from './handlers/spotlight'
 
@@ -462,21 +474,24 @@ app.post('/telemetry/ingest_http/traces', async (request: FastifyRequest, reply:
   }
 })
 
-// Spotlight API Key Management endpoints
-app.post('/spotlight/api_keys', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+// ============================================================================
+// Spotlight - Shinzo API Key Management
+// ============================================================================
+
+app.post('/spotlight/shinzo_keys', async (request: AuthenticatedRequest, reply: FastifyReply) => {
   const authenticated = await authenticateJWT(request, reply)
   if (!authenticated) return
 
   try {
-    const validatedBody = await createApiKeySchema.validate(request.body, {
+    const validatedBody = await createShinzoApiKeySchema.validate(request.body, {
       abortEarly: false,
       stripUnknown: true,
     })
 
-    const result = await handleCreateApiKey(request.user!.uuid, validatedBody)
+    const result = await handleCreateShinzoApiKey(request.user!.uuid, validatedBody)
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
-    logger.error({ message: 'Create API key error', error })
+    logger.error({ message: 'Create Shinzo API key error', error })
     if (error.name === 'ValidationError') {
       reply.status(400).send({ error: error.message })
     } else {
@@ -485,34 +500,34 @@ app.post('/spotlight/api_keys', async (request: AuthenticatedRequest, reply: Fas
   }
 })
 
-app.get('/spotlight/api_keys', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+app.get('/spotlight/shinzo_keys', async (request: AuthenticatedRequest, reply: FastifyReply) => {
   const authenticated = await authenticateJWT(request, reply)
   if (!authenticated) return
 
   try {
-    const result = await handleFetchApiKeys(request.user!.uuid)
+    const result = await handleFetchShinzoApiKeys(request.user!.uuid)
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
-    logger.error({ message: 'Fetch API keys error', error })
+    logger.error({ message: 'Fetch Shinzo API keys error', error })
     reply.status(500).send({ error: 'Internal server error' })
   }
 })
 
-app.put('/spotlight/api_keys/:keyUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+app.put('/spotlight/shinzo_keys/:keyUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
   const authenticated = await authenticateJWT(request, reply)
   if (!authenticated) return
 
   try {
     const { keyUuid } = request.params as { keyUuid: string }
-    const validatedBody = await updateApiKeySchema.validate(request.body, {
+    const validatedBody = await updateShinzoApiKeySchema.validate(request.body, {
       abortEarly: false,
       stripUnknown: true,
     })
 
-    const result = await handleUpdateApiKey(request.user!.uuid, keyUuid, validatedBody)
+    const result = await handleUpdateShinzoApiKey(request.user!.uuid, keyUuid, validatedBody)
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
-    logger.error({ message: 'Update API key error', error })
+    logger.error({ message: 'Update Shinzo API key error', error })
     if (error.name === 'ValidationError') {
       reply.status(400).send({ error: error.message })
     } else {
@@ -521,31 +536,147 @@ app.put('/spotlight/api_keys/:keyUuid', async (request: AuthenticatedRequest, re
   }
 })
 
-app.delete('/spotlight/api_keys/:keyUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+app.delete('/spotlight/shinzo_keys/:keyUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
   const authenticated = await authenticateJWT(request, reply)
   if (!authenticated) return
 
   try {
     const { keyUuid } = request.params as { keyUuid: string }
-    const result = await handleDeleteApiKey(request.user!.uuid, keyUuid)
+    const result = await handleDeleteShinzoApiKey(request.user!.uuid, keyUuid)
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
-    logger.error({ message: 'Delete API key error', error })
+    logger.error({ message: 'Delete Shinzo API key error', error })
     reply.status(500).send({ error: 'Internal server error' })
   }
 })
 
-// Spotlight Model Proxy endpoint
-app.post('/spotlight/v1/messages', async (request: FastifyRequest, reply: FastifyReply) => {
-  try {
-    const apiKey = request.headers['x-api-key'] as string
+// ============================================================================
+// Spotlight - Provider Key Management
+// ============================================================================
 
-    if (!apiKey) {
-      reply.status(401).send({ error: { type: 'authentication_error', message: 'Missing x-api-key header' } })
+app.post('/spotlight/provider_keys/test', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const validatedBody = await testProviderKeySchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleTestProviderKey(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Test provider key error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.post('/spotlight/provider_keys', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedBody = await createProviderKeySchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleCreateProviderKey(request.user!.uuid, validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Create provider key error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/spotlight/provider_keys', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleFetchProviderKeys(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch provider keys error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.put('/spotlight/provider_keys/:keyUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { keyUuid } = request.params as { keyUuid: string }
+    const validatedBody = await updateProviderKeySchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleUpdateProviderKey(request.user!.uuid, keyUuid, validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Update provider key error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.delete('/spotlight/provider_keys/:keyUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { keyUuid } = request.params as { keyUuid: string }
+    const result = await handleDeleteProviderKey(request.user!.uuid, keyUuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Delete provider key error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// ============================================================================
+// Spotlight - Model Proxy (Updated Architecture)
+// ============================================================================
+
+app.post('/spotlight/:provider/v1/messages', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const { provider } = request.params as { provider: string }
+    const shinzoApiKey = request.headers.authorization?.replace('Bearer ', '')
+
+    if (!shinzoApiKey) {
+      reply.status(401).send({
+        error: {
+          type: 'authentication_error',
+          message: 'Missing Authorization header with Shinzo API key'
+        }
+      })
       return
     }
 
-    const result = await handleModelProxy(apiKey, request.body as any)
+    // Validate provider
+    const validProviders = ['anthropic', 'openai', 'google']
+    if (!validProviders.includes(provider)) {
+      reply.status(400).send({
+        error: {
+          type: 'invalid_request',
+          message: `Invalid provider: ${provider}. Supported providers: ${validProviders.join(', ')}`
+        }
+      })
+      return
+    }
+
+    const result = await handleModelProxy(shinzoApiKey, provider, request.body as any)
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Model proxy error', error })

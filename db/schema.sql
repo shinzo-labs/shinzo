@@ -1,4 +1,4 @@
-\restrict dkOnjqMNVGW9sQb7c8PeXiVd8Tf41ht2MtFYHRjQxthYXI37p22JjMTkcM5IK89
+\restrict 23tUHISVuQFzk4FMyCfLCWKjrPdzrGcq6uWrOeNSx6k4f9Uhrl8dIXO5fJWac76
 
 -- Dumped from database version 15.14 (Homebrew)
 -- Dumped by pg_dump version 15.14 (Homebrew)
@@ -422,6 +422,7 @@ CREATE TABLE spotlight.interaction (
     error_message text,
     error_type text,
     status text DEFAULT 'pending'::text NOT NULL,
+    shinzo_api_key_uuid uuid,
     CONSTRAINT interaction_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'success'::text, 'error'::text])))
 );
 
@@ -445,6 +446,29 @@ CREATE TABLE spotlight.message (
 
 
 --
+-- Name: provider_key; Type: TABLE; Schema: spotlight; Owner: -
+--
+
+CREATE TABLE spotlight.provider_key (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    user_uuid uuid NOT NULL,
+    provider text NOT NULL,
+    provider_base_url text,
+    label text,
+    encrypted_key text NOT NULL,
+    key_prefix text NOT NULL,
+    encryption_iv text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    last_used timestamp without time zone,
+    last_validated timestamp without time zone,
+    CONSTRAINT provider_key_provider_check CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'google'::text, 'custom'::text]))),
+    CONSTRAINT provider_key_status_check CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text, 'revoked'::text])))
+);
+
+
+--
 -- Name: session; Type: TABLE; Schema: spotlight; Owner: -
 --
 
@@ -460,7 +484,30 @@ CREATE TABLE spotlight.session (
     total_requests integer DEFAULT 0,
     total_input_tokens integer DEFAULT 0,
     total_output_tokens integer DEFAULT 0,
-    total_cached_tokens integer DEFAULT 0
+    total_cached_tokens integer DEFAULT 0,
+    shinzo_api_key_uuid uuid
+);
+
+
+--
+-- Name: shinzo_api_key; Type: TABLE; Schema: spotlight; Owner: -
+--
+
+CREATE TABLE spotlight.shinzo_api_key (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    user_uuid uuid NOT NULL,
+    key_name text NOT NULL,
+    api_key text NOT NULL,
+    key_prefix text NOT NULL,
+    key_type text DEFAULT 'live'::text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    last_used timestamp without time zone,
+    scopes jsonb DEFAULT '[]'::jsonb,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    CONSTRAINT shinzo_api_key_key_type_check CHECK ((key_type = ANY (ARRAY['live'::text, 'test'::text]))),
+    CONSTRAINT shinzo_api_key_status_check CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text, 'revoked'::text])))
 );
 
 
@@ -755,11 +802,43 @@ ALTER TABLE ONLY spotlight.message
 
 
 --
+-- Name: provider_key provider_key_pkey; Type: CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.provider_key
+    ADD CONSTRAINT provider_key_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: provider_key provider_key_user_uuid_provider_label_key; Type: CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.provider_key
+    ADD CONSTRAINT provider_key_user_uuid_provider_label_key UNIQUE (user_uuid, provider, label);
+
+
+--
 -- Name: session session_pkey; Type: CONSTRAINT; Schema: spotlight; Owner: -
 --
 
 ALTER TABLE ONLY spotlight.session
     ADD CONSTRAINT session_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: shinzo_api_key shinzo_api_key_api_key_key; Type: CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.shinzo_api_key
+    ADD CONSTRAINT shinzo_api_key_api_key_key UNIQUE (api_key);
+
+
+--
+-- Name: shinzo_api_key shinzo_api_key_pkey; Type: CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.shinzo_api_key
+    ADD CONSTRAINT shinzo_api_key_pkey PRIMARY KEY (uuid);
 
 
 --
@@ -1117,6 +1196,34 @@ CREATE INDEX idx_message_role ON spotlight.message USING btree (role);
 
 
 --
+-- Name: idx_provider_key_last_used; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_provider_key_last_used ON spotlight.provider_key USING btree (last_used);
+
+
+--
+-- Name: idx_provider_key_provider; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_provider_key_provider ON spotlight.provider_key USING btree (provider);
+
+
+--
+-- Name: idx_provider_key_status; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_provider_key_status ON spotlight.provider_key USING btree (status);
+
+
+--
+-- Name: idx_provider_key_user; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_provider_key_user ON spotlight.provider_key USING btree (user_uuid);
+
+
+--
 -- Name: idx_session_api_key; Type: INDEX; Schema: spotlight; Owner: -
 --
 
@@ -1142,6 +1249,34 @@ CREATE INDEX idx_session_start_time ON spotlight.session USING btree (start_time
 --
 
 CREATE INDEX idx_session_user ON spotlight.session USING btree (user_uuid);
+
+
+--
+-- Name: idx_shinzo_api_key_last_used; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_shinzo_api_key_last_used ON spotlight.shinzo_api_key USING btree (last_used);
+
+
+--
+-- Name: idx_shinzo_api_key_status; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_shinzo_api_key_status ON spotlight.shinzo_api_key USING btree (status);
+
+
+--
+-- Name: idx_shinzo_api_key_type; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_shinzo_api_key_type ON spotlight.shinzo_api_key USING btree (key_type);
+
+
+--
+-- Name: idx_shinzo_api_key_user; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_shinzo_api_key_user ON spotlight.shinzo_api_key USING btree (user_uuid);
 
 
 --
@@ -1341,10 +1476,24 @@ CREATE TRIGGER updated_at_message BEFORE UPDATE ON spotlight.message FOR EACH RO
 
 
 --
+-- Name: provider_key updated_at_provider_key; Type: TRIGGER; Schema: spotlight; Owner: -
+--
+
+CREATE TRIGGER updated_at_provider_key BEFORE UPDATE ON spotlight.provider_key FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
 -- Name: session updated_at_session; Type: TRIGGER; Schema: spotlight; Owner: -
 --
 
 CREATE TRIGGER updated_at_session BEFORE UPDATE ON spotlight.session FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
+-- Name: shinzo_api_key updated_at_shinzo_api_key; Type: TRIGGER; Schema: spotlight; Owner: -
+--
+
+CREATE TRIGGER updated_at_shinzo_api_key BEFORE UPDATE ON spotlight.shinzo_api_key FOR EACH ROW EXECUTE FUNCTION public.updated_at();
 
 
 --
@@ -1525,7 +1674,7 @@ ALTER TABLE ONLY spotlight.api_key
 --
 
 ALTER TABLE ONLY spotlight.interaction
-    ADD CONSTRAINT interaction_api_key_uuid_fkey FOREIGN KEY (api_key_uuid) REFERENCES spotlight.api_key(uuid);
+    ADD CONSTRAINT interaction_api_key_uuid_fkey FOREIGN KEY (api_key_uuid) REFERENCES spotlight.provider_key(uuid);
 
 
 --
@@ -1534,6 +1683,14 @@ ALTER TABLE ONLY spotlight.interaction
 
 ALTER TABLE ONLY spotlight.interaction
     ADD CONSTRAINT interaction_session_uuid_fkey FOREIGN KEY (session_uuid) REFERENCES spotlight.session(uuid);
+
+
+--
+-- Name: interaction interaction_shinzo_api_key_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.interaction
+    ADD CONSTRAINT interaction_shinzo_api_key_uuid_fkey FOREIGN KEY (shinzo_api_key_uuid) REFERENCES spotlight.shinzo_api_key(uuid);
 
 
 --
@@ -1553,11 +1710,27 @@ ALTER TABLE ONLY spotlight.message
 
 
 --
+-- Name: provider_key provider_key_user_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.provider_key
+    ADD CONSTRAINT provider_key_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
+
+
+--
 -- Name: session session_api_key_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
 --
 
 ALTER TABLE ONLY spotlight.session
-    ADD CONSTRAINT session_api_key_uuid_fkey FOREIGN KEY (api_key_uuid) REFERENCES spotlight.api_key(uuid);
+    ADD CONSTRAINT session_api_key_uuid_fkey FOREIGN KEY (api_key_uuid) REFERENCES spotlight.provider_key(uuid);
+
+
+--
+-- Name: session session_shinzo_api_key_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.session
+    ADD CONSTRAINT session_shinzo_api_key_uuid_fkey FOREIGN KEY (shinzo_api_key_uuid) REFERENCES spotlight.shinzo_api_key(uuid);
 
 
 --
@@ -1566,6 +1739,14 @@ ALTER TABLE ONLY spotlight.session
 
 ALTER TABLE ONLY spotlight.session
     ADD CONSTRAINT session_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
+
+
+--
+-- Name: shinzo_api_key shinzo_api_key_user_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.shinzo_api_key
+    ADD CONSTRAINT shinzo_api_key_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
 
 
 --
@@ -1604,7 +1785,7 @@ ALTER TABLE ONLY spotlight.user_analytics
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dkOnjqMNVGW9sQb7c8PeXiVd8Tf41ht2MtFYHRjQxthYXI37p22JjMTkcM5IK89
+\unrestrict 23tUHISVuQFzk4FMyCfLCWKjrPdzrGcq6uWrOeNSx6k4f9Uhrl8dIXO5fJWac76
 
 
 --
@@ -1618,4 +1799,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20250930000000'),
     ('20251001000000'),
     ('20251002000000'),
-    ('20251120000000');
+    ('20251120000000'),
+    ('20251120010000'),
+    ('20251120020000');
