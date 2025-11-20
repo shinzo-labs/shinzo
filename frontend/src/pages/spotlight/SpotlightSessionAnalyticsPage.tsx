@@ -51,7 +51,7 @@ interface Interaction {
   }>
 }
 
-type SortColumn = 'start_time' | 'total_requests' | 'total_input_tokens' | 'total_output_tokens' | 'total_cached_tokens' | 'tool_uses'
+type SortColumn = 'start_time' | 'total_requests' | 'total_input_tokens' | 'total_output_tokens' | 'total_cached_tokens' | 'tool_uses' | 'tool_results'
 type SortDirection = 'asc' | 'desc'
 
 export const SpotlightSessionAnalyticsPage: React.FC = () => {
@@ -123,6 +123,13 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
           aVal = 0
           bVal = 0
           break
+        case 'tool_results':
+          // For session-level sorting, we need to calculate tool results from sessionDetail
+          // Since we don't have access to sessionDetail here, we'll use 0 for now
+          // This will be handled differently in the UI
+          aVal = 0
+          bVal = 0
+          break
         default:
           return 0
       }
@@ -183,17 +190,46 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
     return isEstimated ? `~${count.toLocaleString()}` : count.toLocaleString()
   }
 
-  const getSessionToolUses = (sessionDetail: SessionDetail): number => {
-    if (!sessionDetail?.interactions) return 0
-    return sessionDetail.interactions
-      .filter(interaction => interaction.status === 'success')
-      .reduce((total, interaction) => total + (interaction.tool_usages?.length || 0), 0)
+  const countToolsInMessages = (messages: any[], toolType: 'tool_use' | 'tool_result'): number => {
+    if (!Array.isArray(messages)) return 0
+    
+    return messages.reduce((total, msg) => {
+      if (Array.isArray(msg.content)) {
+        return total + msg.content.filter((block: any) => block.type === toolType).length
+      }
+      return total
+    }, 0)
   }
 
-  const getInteractionToolUses = (interaction: Interaction): number => {
-    if (interaction.status !== 'success') return 0
-    return interaction.tool_usages?.length || 0
-  }
+  const getToolCount = (
+    source: any,
+    type: 'tool_use' | 'tool_result'
+  ) =>
+    countToolsInMessages(source?.request_data?.messages || [], type) +
+    countToolsInMessages(
+      source?.response_data?.content ? [{ content: source.response_data.content }] : [],
+      type
+    )
+
+  const getSessionToolUses = (sessionDetail: SessionDetail): number =>
+    sessionDetail?.interactions
+      ? sessionDetail.interactions
+          .filter(i => i.status === 'success')
+          .reduce((sum, i) => sum + getToolCount(i, 'tool_use'), 0)
+      : 0
+
+  const getSessionToolResults = (sessionDetail: SessionDetail): number =>
+    sessionDetail?.interactions
+      ? sessionDetail.interactions
+          .filter(i => i.status === 'success')
+          .reduce((sum, i) => sum + getToolCount(i, 'tool_result'), 0)
+      : 0
+
+  const getInteractionToolUses = (interaction: Interaction): number =>
+    interaction.status === 'success' ? getToolCount(interaction, 'tool_use') : 0
+
+  const getInteractionToolResults = (interaction: Interaction): number =>
+    interaction.status === 'success' ? getToolCount(interaction, 'tool_result') : 0
 
   const formatMessages = (messages: any[]) => {
     if (!Array.isArray(messages)) return 'N/A'
@@ -281,6 +317,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                         <SortableHeader column="total_output_tokens">Output Tokens</SortableHeader>
                         <SortableHeader column="total_cached_tokens">Cached Tokens</SortableHeader>
                         <Table.ColumnHeaderCell>Tool Uses</Table.ColumnHeaderCell>
+                        <Table.ColumnHeaderCell>Tool Results</Table.ColumnHeaderCell>
                         <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
                       </Table.Row>
                     </Table.Header>
@@ -299,6 +336,9 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                           <Table.Cell>{session.total_input_tokens.toLocaleString()}</Table.Cell>
                           <Table.Cell>{session.total_output_tokens.toLocaleString()}</Table.Cell>
                           <Table.Cell>{session.total_cached_tokens.toLocaleString()}</Table.Cell>
+                          <Table.Cell>
+                            <Text size="2" color="gray">-</Text>
+                          </Table.Cell>
                           <Table.Cell>
                             <Text size="2" color="gray">-</Text>
                           </Table.Cell>
@@ -359,6 +399,10 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                     <Text size="2" color="gray">Tool Uses</Text>
                     <Text size="2" weight="bold">{getSessionToolUses(sessionDetail)}</Text>
                   </Flex>
+                  <Flex justify="between">
+                    <Text size="2" color="gray">Tool Results</Text>
+                    <Text size="2" weight="bold">{getSessionToolResults(sessionDetail)}</Text>
+                  </Flex>
                 </Flex>
                 <Text size="1" color="gray" mt="2" style={{ fontStyle: 'italic' }}>
                   * Estimated token counts from error responses are not included in these totals
@@ -377,6 +421,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                     <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Cached Tokens</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Tool Uses</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Tool Results</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
                   </Table.Row>
                 </Table.Header>
@@ -401,6 +446,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                         <Table.Cell>{formatTokenDisplay(interaction.output_tokens, interaction.response_data?.content || '')}</Table.Cell>
                         <Table.Cell>{formatTokenDisplay(interaction.cache_read_input_tokens)}</Table.Cell>
                         <Table.Cell>{getInteractionToolUses(interaction)}</Table.Cell>
+                        <Table.Cell>{getInteractionToolResults(interaction)}</Table.Cell>
                         <Table.Cell>
                           <Badge color={interaction.status === 'success' ? 'green' : 'red'}>
                             {interaction.status}
@@ -411,7 +457,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                       {/* Expanded Row */}
                       {expandedInteractionUuid === interaction.uuid && (
                         <Table.Row>
-                          <Table.Cell colSpan={8} style={{ maxWidth: '0', width: '100%' }}>
+                          <Table.Cell colSpan={9} style={{ maxWidth: '0', width: '100%' }}>
                             <Card style={{ background: 'var(--gray-2)', maxWidth: '100%', overflow: 'hidden' }}>
                               <Flex direction="column" gap="3" p="3">
                                 {/* Request Data */}
@@ -493,7 +539,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                                     </Flex>
                                     <Flex justify="between">
                                       <Text size="2" color="gray">Latency:</Text>
-                                      <Text size="2">{interaction.latency_ms}ms</Text>
+                                      <Text size="2">{interaction.latency_ms} ms</Text>
                                     </Flex>
                                   </Flex>
                                 </Box>

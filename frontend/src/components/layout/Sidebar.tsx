@@ -49,11 +49,6 @@ const spotlightNavigation = [
     icon: Icons.BarChartIcon,
   },
   {
-    name: 'Tool Analytics',
-    href: '/spotlight/tool-analytics',
-    icon: Icons.ComponentInstanceIcon,
-  },
-  {
     name: 'Session Analytics',
     href: '/spotlight/session-analytics',
     icon: Icons.ActivityLogIcon,

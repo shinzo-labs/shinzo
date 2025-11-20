@@ -244,7 +244,7 @@ export const TracesPage: React.FC = () => {
                         <Text size="2">{trace.operation_name || '-'}</Text>
                       </Table.Cell>
                       <Table.Cell>
-                        <Text size="2">{trace.duration_ms ? `${trace.duration_ms}ms` : '-'}</Text>
+                        <Text size="2">{trace.duration_ms ? `${trace.duration_ms} ms` : '-'}</Text>
                       </Table.Cell>
                       <Table.Cell>
                         <Badge

@@ -68,7 +68,6 @@ import {
   handleModelProxy,
   // Analytics handlers
   handleFetchTokenAnalytics,
-  handleFetchToolAnalytics,
   handleFetchSessionAnalytics,
   handleFetchSessionDetail,
   fetchAnalyticsSchema
@@ -706,27 +705,6 @@ app.get('/spotlight/analytics/tokens', async (request: AuthenticatedRequest, rep
   }
 })
 
-app.get('/spotlight/analytics/tools', async (request: AuthenticatedRequest, reply: FastifyReply) => {
-  const authenticated = await authenticateJWT(request, reply)
-  if (!authenticated) return
-
-  try {
-    const validatedQuery = await fetchAnalyticsSchema.validate(request.query, {
-      abortEarly: false,
-      stripUnknown: true,
-    })
-
-    const result = await handleFetchToolAnalytics(request.user!.uuid, validatedQuery)
-    reply.status(result.status || 200).send(result.response)
-  } catch (error: any) {
-    logger.error({ message: 'Fetch tool analytics error', error })
-    if (error.name === 'ValidationError') {
-      reply.status(400).send({ error: error.message })
-    } else {
-      reply.status(500).send({ error: 'Internal server error' })
-    }
-  }
-})
 
 app.get('/spotlight/analytics/sessions', async (request: AuthenticatedRequest, reply: FastifyReply) => {
   const authenticated = await authenticateJWT(request, reply)

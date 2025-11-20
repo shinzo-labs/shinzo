@@ -623,8 +623,8 @@ export const handleModelProxy = async (
          WHERE uuid = $10`,
         { bind: [
           responseTimestamp,
-          providerResponse.data.id,
-          providerResponse.data.stop_reason,
+          providerResponse.data.id || null,
+          providerResponse.data.stop_reason || null,
           latencyMs,
           inputTokens,
           outputTokens,
@@ -773,50 +773,6 @@ export const handleFetchTokenAnalytics = async (
   }
 }
 
-export const handleFetchToolAnalytics = async (
-  userUuid: string,
-  filters: yup.InferType<typeof fetchAnalyticsSchema> = {}
-) => {
-  try {
-    const tools = await Tool.findAll({
-      where: { user_uuid: userUuid },
-      include: [
-        {
-          model: ToolUsage,
-          as: 'usages',
-          required: false,
-        }
-      ],
-      order: [['total_calls', 'DESC']]
-    })
-
-    const toolStats = tools.map(tool => ({
-      tool_name: tool.tool_name,
-      description: tool.description,
-      total_calls: tool.total_calls,
-      total_input_tokens: tool.total_input_tokens,
-      total_output_tokens: tool.total_output_tokens,
-      first_seen: tool.first_seen,
-      last_seen: tool.last_seen,
-    }))
-
-    return {
-      response: {
-        tools: toolStats,
-        total_unique_tools: tools.length,
-        total_tool_calls: tools.reduce((sum, t) => sum + t.total_calls, 0),
-      },
-      status: 200
-    }
-  } catch (error) {
-    logger.error({ message: 'Error fetching tool analytics', error, userUuid })
-    return {
-      response: 'Error fetching tool analytics',
-      error: true,
-      status: 500
-    }
-  }
-}
 
 export const handleFetchSessionAnalytics = async (
   userUuid: string,

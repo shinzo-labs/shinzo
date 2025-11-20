@@ -198,7 +198,7 @@ export const DashboardPage: React.FC = () => {
     },
     {
       title: 'Avg Response Time',
-      value: `${stats.avgResponseTime.toFixed(2)}ms`,
+      value: `${stats.avgResponseTime.toFixed(2)} ms`,
       icon: Icons.ClockIcon,
     },
   ], [stats.totalTraces, stats.activeServices, stats.errorRate, stats.avgResponseTime])
