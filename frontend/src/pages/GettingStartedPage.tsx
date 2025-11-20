@@ -13,7 +13,7 @@ export const GettingStartedPage: React.FC = () => {
   const { token } = useAuth()
   const [ingestToken, setIngestToken] = useState<string>('')
   const [loading, setLoading] = useState(true)
-  const [copied, setCopied] = useState(false)
+  const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
   const [hasTelemetry, setHasTelemetry] = useState(false)
   const [sdkType, setSdkType] = useState<SdkType>('typescript')
 
@@ -65,10 +65,12 @@ export const GettingStartedPage: React.FC = () => {
     return () => clearInterval(interval)
   }, [token])
 
-  const copyToClipboard = (text: string) => {
+  const copyToClipboard = (text: string, buttonId: string) => {
     navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopiedStates(prev => ({ ...prev, [buttonId]: true }))
+    setTimeout(() => {
+      setCopiedStates(prev => ({ ...prev, [buttonId]: false }))
+    }, 2000)
   }
 
   const typescriptSnippet = `import { instrumentServer } from "@shinzolabs/instrumentation-mcp"
@@ -214,10 +216,26 @@ async def shutdown():
           </Box>
         </Flex>
 
-        {/* SDK Type Selector */}
+        {/* Step 1: Choose Your SDK */}
         <Card>
           <Flex direction="column" gap="3">
-            <Heading size="4">Choose Your SDK</Heading>
+            <Flex align="center" gap="3">
+              <Flex
+                align="center"
+                justify="center"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  backgroundColor: 'var(--blue-3)',
+                  borderRadius: '50%',
+                  color: 'var(--blue-9)',
+                  fontWeight: 'bold'
+                }}
+              >
+                1
+              </Flex>
+              <Heading size="4">Choose Your SDK</Heading>
+            </Flex>
             <Text color="gray" size="2">
               Select the programming language and framework for your MCP server
             </Text>
@@ -225,41 +243,76 @@ async def shutdown():
               <Tabs.List>
                 <Tabs.Trigger value="typescript">TypeScript</Tabs.Trigger>
                 <Tabs.Trigger value="python-fastmcp">Python (FastMCP)</Tabs.Trigger>
-                <Tabs.Trigger value="python-mcp">Python (MCP SDK)</Tabs.Trigger>
+                <Tabs.Trigger value="python-mcp">Python (Core MCP SDK)</Tabs.Trigger>
               </Tabs.List>
             </Tabs.Root>
 
+            {sdkType === 'typescript' && (
+              <>
+                <Text size="2">
+                  The TypeScript SDK provides seamless integration with MCP servers built using the official MCP SDK.
+                  Perfect for Node.js and TypeScript projects.
+                </Text>
+                <Flex gap="2" align="center">
+                  <Code style={{ flex: 1, padding: '12px' }}>
+                    npm install @shinzolabs/instrumentation-mcp
+                  </Code>
+                  <Button
+                    variant="soft"
+                    onClick={() => copyToClipboard('npm install @shinzolabs/instrumentation-mcp', 'ts-install-step1')}
+                  >
+                    <Icons.CopyIcon />
+                    {copiedStates['ts-install-step1'] ? 'Copied!' : 'Copy'}
+                  </Button>
+                </Flex>
+              </>
+            )}
+
             {sdkType === 'python-fastmcp' && (
-              <Callout.Root color="blue">
-                <Callout.Icon>
-                  <Icons.InfoCircledIcon />
-                </Callout.Icon>
-                <Callout.Text>
-                  <Text size="2">
-                    <strong>FastMCP</strong> provides a simpler, more modern Python API with decorators like <Code>@mcp.tool()</Code>.
+              <>
+                <Text size="2">
+                    The FastMCP SDK provides a simple, modern Python API with decorators like <Code>@mcp.tool()</Code>.
                     Recommended for new Python projects.
                   </Text>
-                </Callout.Text>
-              </Callout.Root>
+                  <Flex gap="2" align="center">
+                      <Code style={{ flex: 1, padding: '12px' }}>
+                        pip install fastmcp 
+                      </Code>
+                      <Button
+                        variant="soft"
+                        onClick={() => copyToClipboard('pip install fastmcp', 'fastmcp-install-step1')}
+                      >
+                        <Icons.CopyIcon />
+                        {copiedStates['fastmcp-install-step1'] ? 'Copied!' : 'Copy'}
+                      </Button>
+                    </Flex>
+                </>
             )}
 
             {sdkType === 'python-mcp' && (
-              <Callout.Root color="blue">
-                <Callout.Icon>
-                  <Icons.InfoCircledIcon />
-                </Callout.Icon>
-                <Callout.Text>
-                  <Text size="2">
-                    <strong>Traditional MCP SDK</strong> follows the standard MCP specification with async patterns.
-                    Use this if you need more configuration options or are working with existing MCP SDK code.
-                  </Text>
-                </Callout.Text>
-              </Callout.Root>
+              <>
+                <Text size="2">
+                  The Core MCP SDK follows the standard MCP specification with async patterns.
+                  Use this if you need more configuration options or are working with existing MCP SDK code.
+                </Text>
+                <Flex gap="2" align="center">
+                  <Code style={{ flex: 1, padding: '12px' }}>
+                    pip install mcp
+                  </Code>
+                  <Button
+                    variant="soft"
+                    onClick={() => copyToClipboard('pip install mcp', 'mcp-install-step1')}
+                  >
+                    <Icons.CopyIcon />
+                    {copiedStates['mcp-install-step1'] ? 'Copied!' : 'Copy'}
+                  </Button>
+                </Flex>
+              </>
             )}
           </Flex>
         </Card>
 
-        {/* Step 1: Install SDK */}
+        {/* Step 2: Install SDK */}
         <Card>
           <Flex direction="column" gap="4">
             <Flex align="center" gap="3">
@@ -275,7 +328,7 @@ async def shutdown():
                   fontWeight: 'bold'
                 }}
               >
-                1
+                2
               </Flex>
               <Heading size="4">Install the SDK</Heading>
             </Flex>
@@ -302,10 +355,10 @@ async def shutdown():
                       </Code>
                       <Button
                         variant="soft"
-                        onClick={() => copyToClipboard('npm install @shinzolabs/instrumentation-mcp')}
+                        onClick={() => copyToClipboard('npm install @shinzolabs/instrumentation-mcp', 'npm-install')}
                       >
                         <Icons.CopyIcon />
-                        {copied ? 'Copied!' : 'Copy'}
+                        {copiedStates['npm-install'] ? 'Copied!' : 'Copy'}
                       </Button>
                     </Flex>
                   </Tabs.Content>
@@ -317,10 +370,10 @@ async def shutdown():
                       </Code>
                       <Button
                         variant="soft"
-                        onClick={() => copyToClipboard('pnpm add @shinzolabs/instrumentation-mcp')}
+                        onClick={() => copyToClipboard('pnpm add @shinzolabs/instrumentation-mcp', 'pnpm-install')}
                       >
                         <Icons.CopyIcon />
-                        {copied ? 'Copied!' : 'Copy'}
+                        {copiedStates['pnpm-install'] ? 'Copied!' : 'Copy'}
                       </Button>
                     </Flex>
                   </Tabs.Content>
@@ -332,10 +385,10 @@ async def shutdown():
                       </Code>
                       <Button
                         variant="soft"
-                        onClick={() => copyToClipboard('yarn add @shinzolabs/instrumentation-mcp')}
+                        onClick={() => copyToClipboard('yarn add @shinzolabs/instrumentation-mcp', 'yarn-install')}
                       >
                         <Icons.CopyIcon />
-                        {copied ? 'Copied!' : 'Copy'}
+                        {copiedStates['yarn-install'] ? 'Copied!' : 'Copy'}
                       </Button>
                     </Flex>
                   </Tabs.Content>
@@ -348,17 +401,17 @@ async def shutdown():
                 </Code>
                 <Button
                   variant="soft"
-                  onClick={() => copyToClipboard('pip install shinzo')}
+                  onClick={() => copyToClipboard('pip install shinzo', 'python-install')}
                 >
                   <Icons.CopyIcon />
-                  {copied ? 'Copied!' : 'Copy'}
+                  {copiedStates['python-install'] ? 'Copied!' : 'Copy'}
                 </Button>
               </Flex>
             )}
           </Flex>
         </Card>
 
-        {/* Step 2: Add to your code */}
+        {/* Step 3: Add to your code */}
         <Card>
           <Flex direction="column" gap="4">
             <Flex align="center" gap="3">
@@ -374,7 +427,7 @@ async def shutdown():
                   fontWeight: 'bold'
                 }}
               >
-                2
+                3
               </Flex>
               <Heading size="4">Add Telemetry to Your Server</Heading>
             </Flex>
@@ -405,10 +458,10 @@ async def shutdown():
                   top: '12px',
                   right: '12px'
                 }}
-                onClick={() => copyToClipboard(getCurrentSnippet())}
+                onClick={() => copyToClipboard(getCurrentSnippet(), 'code-snippet')}
               >
                 <Icons.CopyIcon />
-                {copied ? 'Copied!' : 'Copy'}
+                {copiedStates['code-snippet'] ? 'Copied!' : 'Copy'}
               </Button>
             </Box>
 
@@ -425,7 +478,7 @@ async def shutdown():
           </Flex>
         </Card>
 
-        {/* Step 3: Run and verify */}
+        {/* Step 4: Run and verify */}
         <Card>
           <Flex direction="column" gap="4">
             <Flex align="center" gap="3">
@@ -441,7 +494,7 @@ async def shutdown():
                   fontWeight: 'bold'
                 }}
               >
-                3
+                4
               </Flex>
               <Heading size="4">Run Your Server & Verify</Heading>
             </Flex>
@@ -490,7 +543,7 @@ async def shutdown():
                   fontWeight: 'bold'
                 }}
               >
-                {hasTelemetry ? <Icons.CheckIcon width="20" height="20" /> : '4'}
+                {hasTelemetry ? <Icons.CheckIcon width="20" height="20" /> : '5'}
               </Flex>
               <Heading size="4">See Live Telemetry via the Dashboard</Heading>
             </Flex>
