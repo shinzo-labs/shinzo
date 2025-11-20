@@ -23,6 +23,7 @@ export interface Trace {
   duration_ms: number | null
 }
 
+
 export interface TimeRange {
   start: Date
   end: Date

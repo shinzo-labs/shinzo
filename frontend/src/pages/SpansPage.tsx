@@ -223,7 +223,7 @@ export const SpansPage: React.FC = () => {
                         <Text size="2">{span.operation_name}</Text>
                       </Table.Cell>
                       <Table.Cell>
-                        <Text size="2">{span.duration_ms ? `${span.duration_ms}ms` : '-'}</Text>
+                        <Text size="2">{span.duration_ms ? `${span.duration_ms} ms` : '-'}</Text>
                       </Table.Cell>
                       <Table.Cell>
                         <Badge

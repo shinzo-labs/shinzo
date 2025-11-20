@@ -47,6 +47,32 @@ import {
   getPreferenceSchema
 } from './handlers/userPreferences'
 
+import {
+  // Shinzo API Key handlers
+  handleCreateShinzoApiKey,
+  handleFetchShinzoApiKeys,
+  handleUpdateShinzoApiKey,
+  handleDeleteShinzoApiKey,
+  createShinzoApiKeySchema,
+  updateShinzoApiKeySchema,
+  // Provider Key handlers
+  handleCreateProviderKey,
+  handleFetchProviderKeys,
+  handleUpdateProviderKey,
+  handleDeleteProviderKey,
+  handleTestProviderKey,
+  createProviderKeySchema,
+  updateProviderKeySchema,
+  testProviderKeySchema,
+  // Model Proxy
+  handleModelProxy,
+  // Analytics handlers
+  handleFetchTokenAnalytics,
+  handleFetchSessionAnalytics,
+  handleFetchSessionDetail,
+  fetchAnalyticsSchema
+} from './handlers/spotlight'
+
 // Create Fastify instance
 const app = fastify({
   logger: pinoConfig('backend'),
@@ -442,6 +468,276 @@ app.post('/telemetry/ingest_http/traces', async (request: FastifyRequest, reply:
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Ingest HTTP traces error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// ============================================================================
+// Spotlight - Shinzo API Key Management
+// ============================================================================
+
+app.post('/spotlight/shinzo_keys', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedBody = await createShinzoApiKeySchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleCreateShinzoApiKey(request.user!.uuid, validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Create Shinzo API key error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/spotlight/shinzo_keys', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleFetchShinzoApiKeys(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch Shinzo API keys error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.put('/spotlight/shinzo_keys/:keyUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { keyUuid } = request.params as { keyUuid: string }
+    const validatedBody = await updateShinzoApiKeySchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleUpdateShinzoApiKey(request.user!.uuid, keyUuid, validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Update Shinzo API key error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.delete('/spotlight/shinzo_keys/:keyUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { keyUuid } = request.params as { keyUuid: string }
+    const result = await handleDeleteShinzoApiKey(request.user!.uuid, keyUuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Delete Shinzo API key error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// ============================================================================
+// Spotlight - Provider Key Management
+// ============================================================================
+
+app.post('/spotlight/provider_keys/test', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const validatedBody = await testProviderKeySchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleTestProviderKey(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Test provider key error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.post('/spotlight/provider_keys', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedBody = await createProviderKeySchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleCreateProviderKey(request.user!.uuid, validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Create provider key error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/spotlight/provider_keys', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleFetchProviderKeys(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch provider keys error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.put('/spotlight/provider_keys/:keyUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { keyUuid } = request.params as { keyUuid: string }
+    const validatedBody = await updateProviderKeySchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleUpdateProviderKey(request.user!.uuid, keyUuid, validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Update provider key error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.delete('/spotlight/provider_keys/:keyUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { keyUuid } = request.params as { keyUuid: string }
+    const result = await handleDeleteProviderKey(request.user!.uuid, keyUuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Delete provider key error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// ============================================================================
+// Spotlight - Model Proxy (Updated Architecture)
+// ============================================================================
+
+app.post('/spotlight/:provider/v1/messages', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const { provider } = request.params as { provider: string }
+    const shinzoApiKey = request.headers.authorization?.replace('Bearer ', '')
+
+    if (!shinzoApiKey) {
+      reply.status(401).send({
+        error: {
+          type: 'authentication_error',
+          message: 'Missing Authorization header with Shinzo API key'
+        }
+      })
+      return
+    }
+
+    // Validate provider
+    const validProviders = ['anthropic', 'openai', 'google']
+    if (!validProviders.includes(provider)) {
+      reply.status(400).send({
+        error: {
+          type: 'invalid_request',
+          message: `Invalid provider: ${provider}. Supported providers: ${validProviders.join(', ')}`
+        }
+      })
+      return
+    }
+
+    const result = await handleModelProxy(shinzoApiKey, provider, request.body as any)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Model proxy error', error })
+    reply.status(500).send({ error: { type: 'internal_error', message: 'Internal server error' } })
+  }
+})
+
+// Spotlight Analytics endpoints
+app.get('/spotlight/analytics/tokens', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedQuery = await fetchAnalyticsSchema.validate(request.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleFetchTokenAnalytics(request.user!.uuid, validatedQuery)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch token analytics error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+
+app.get('/spotlight/analytics/sessions', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedQuery = await fetchAnalyticsSchema.validate(request.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleFetchSessionAnalytics(request.user!.uuid, validatedQuery)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch session analytics error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/spotlight/analytics/sessions/:sessionUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { sessionUuid } = request.params as { sessionUuid: string }
+    const result = await handleFetchSessionDetail(request.user!.uuid, sessionUuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch session detail error', error })
     reply.status(500).send({ error: 'Internal server error' })
   }
 })

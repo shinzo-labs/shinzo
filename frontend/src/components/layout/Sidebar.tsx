@@ -4,7 +4,7 @@ import * as Icons from '@radix-ui/react-icons'
 import { Flex, Text, Badge, Avatar } from '@radix-ui/themes'
 import { useHasTelemetry } from '../../hooks/useHasTelemetry'
 
-const navigation = [
+const telemetryNavigation = [
   {
     name: 'Dashboard',
     href: '/dashboard',
@@ -42,14 +42,32 @@ const navigation = [
   },
 ]
 
+const spotlightNavigation = [
+  {
+    name: 'Token Analytics',
+    href: '/spotlight/token-analytics',
+    icon: Icons.BarChartIcon,
+  },
+  {
+    name: 'Session Analytics',
+    href: '/spotlight/session-analytics',
+    icon: Icons.ActivityLogIcon,
+  },
+  {
+    name: 'API Keys',
+    href: '/spotlight/api-keys',
+    icon: Icons.LockClosedIcon,
+  },
+]
+
 export const Sidebar: React.FC = () => {
   const location = useLocation()
   const { hasTelemetry, loading } = useHasTelemetry()
 
   // Filter navigation items based on whether user has telemetry data
-  const visibleNavigation = hasTelemetry
-    ? navigation.filter(item => item.href !== '/getting-started')
-    : navigation.filter(item => item.href === '/getting-started')
+  const visibleTelemetryNavigation = hasTelemetry
+    ? telemetryNavigation.filter(item => item.href !== '/getting-started')
+    : telemetryNavigation.filter(item => item.href === '/getting-started')
 
   return (
     <Flex
@@ -78,8 +96,14 @@ export const Sidebar: React.FC = () => {
       </Flex>
 
       {/* Navigation */}
-      <Flex direction="column" style={{ flex: 1, padding: '16px', gap: '4px' }}>
-        {visibleNavigation.map((item) => {
+      <Flex direction="column" style={{ flex: 1, padding: '16px', gap: '4px', overflowY: 'auto' }}>
+          <div style={{ margin: '16px 0 8px 0', paddingLeft: '12px' }}>
+          <Text size="1" weight="bold" color="gray" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            MCP Telemetry
+          </Text>
+        </div>
+        <>
+        {visibleTelemetryNavigation.map((item) => {
           const isActive = location.pathname === item.href
           const Icon = item.icon
 
@@ -116,6 +140,55 @@ export const Sidebar: React.FC = () => {
             </Link>
           )
         })}
+        </>
+
+        {/* Spotlight Section */}
+        {hasTelemetry && (
+          <>
+            <div style={{ margin: '16px 0 8px 0', paddingLeft: '12px' }}>
+              <Text size="1" weight="bold" color="gray" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Spotlight
+              </Text>
+            </div>
+            {spotlightNavigation.map((item) => {
+              const isActive = location.pathname === item.href
+              const Icon = item.icon
+
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  style={{
+                    textDecoration: 'none',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    backgroundColor: isActive ? 'var(--accent-3)' : 'transparent',
+                    color: isActive ? 'var(--accent-11)' : 'var(--gray-11)',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'var(--gray-3)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }
+                  }}
+                >
+                  <Icon width="18" height="18" />
+                  <Text size="2" weight="medium" style={{ flex: 1 }}>
+                    {item.name}
+                  </Text>
+                </Link>
+              )
+            })}
+          </>
+        )}
       </Flex>
     </Flex>
   )

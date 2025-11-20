@@ -11,6 +11,7 @@ import { subHours, subDays } from 'date-fns'
 import { TimeRangePicker, TimeRange } from '../components/charts/TimeRangePicker'
 import { TraceTimeSeriesChart } from '../components/charts/TraceTimeSeriesChart'
 import { TracePieChart } from '../components/charts/TracePieChart'
+import { TraceLatencyHistogram } from '../components/charts/TraceLatencyHistogram'
 import { WelcomeBanner } from '../components/WelcomeBanner'
 import {
   processTracesForTimeSeriesByOperation,
@@ -128,6 +129,24 @@ export const DashboardPage: React.FC = () => {
     }
   )
 
+  // Fetch spans for the selected time range for latency histogram
+  const { data: spans = [] } = useQuery(
+    ['dashboard-spans', timeRange.label, refreshTrigger],
+    async () => {
+      const currentRange = getCurrentTimeRange()
+      return telemetryService.fetchSpans(token!, {
+        start_time: currentRange.start.toISOString(),
+        end_time: currentRange.end.toISOString(),
+      })
+    },
+    {
+      enabled: !!token,
+      keepPreviousData: true,
+      refetchOnWindowFocus: false,
+      staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
+    }
+  )
+
   // Fetch traces for the selected time range to calculate stats
   const { data: statsTraces = [] } = useQuery(
     ['dashboard-stats-traces', timeRange.label, refreshTrigger],
@@ -182,12 +201,12 @@ export const DashboardPage: React.FC = () => {
 
   const statCards = useMemo(() => [
     {
-      title: 'Total Traces',
+      title: 'Tool Calls',
       value: stats.totalTraces.toLocaleString(),
       icon: Icons.ActivityLogIcon,
     },
     {
-      title: 'Active Services',
+      title: 'Active MCP Servers',
       value: stats.activeServices.toString(),
       icon: Icons.ComponentInstanceIcon,
     },
@@ -197,8 +216,8 @@ export const DashboardPage: React.FC = () => {
       icon: Icons.ExclamationTriangleIcon,
     },
     {
-      title: 'Avg Response Time',
-      value: `${stats.avgResponseTime.toFixed(2)}ms`,
+      title: 'Avg. Response Time',
+      value: `${stats.avgResponseTime.toFixed(2)} ms`,
       icon: Icons.ClockIcon,
     },
   ], [stats.totalTraces, stats.activeServices, stats.errorRate, stats.avgResponseTime])
@@ -269,13 +288,13 @@ export const DashboardPage: React.FC = () => {
           <Grid columns={{ initial: '1', lg: '2' }} gap="4">
             <TraceTimeSeriesChart
               key="operation-timeseries"
-              title="Trace Count by Operation"
+              title="Tool Calls by Operation"
               data={operationTimeSeriesData}
               height={300}
             />
             <TraceTimeSeriesChart
               key="session-timeseries"
-              title="Trace Count by Session ID"
+              title="Tool Calls by Session ID"
               data={sessionTimeSeriesData}
               height={300}
             />
@@ -285,7 +304,7 @@ export const DashboardPage: React.FC = () => {
           <Grid columns={{ initial: '1', lg: '2' }} gap="4">
             <TracePieChart
               key="operation-pie"
-              title="Traces by Operation"
+              title="Tool Calls by Operation"
               data={operationPieData}
               height={300}
               groupBy="tool"
@@ -293,21 +312,29 @@ export const DashboardPage: React.FC = () => {
             />
             <TracePieChart
               key="session-pie"
-              title="Traces by Session ID"
+              title="Tool Calls by Session ID"
               data={sessionPieData}
               height={300}
               groupBy="session"
               traces={traces}
             />
           </Grid>
+
+          {/* Latency Histogram */}
+          <TraceLatencyHistogram
+            key="latency-histogram"
+            title="Tool Call Latency Distribution"
+            data={spans as any}
+            height={300}
+          />
         </Flex>
 
         {/* Service overview */}
         <Card style={{ padding: '24px' }}>
           <Flex direction="column" gap="6">
             <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '20px' }}>
-              <Heading size="4" style={{ marginBottom: '8px' }}>Services</Heading>
-              <Text size="2" color="gray">Active services and their status</Text>
+              <Heading size="4" style={{ marginBottom: '8px' }}>MCP Servers</Heading>
+              <Text size="2" color="gray">Active MCP servers and their status</Text>
             </Box>
             <Box>
               {resourcesLoading ? (
@@ -342,7 +369,7 @@ export const DashboardPage: React.FC = () => {
                   <Icons.ComponentInstanceIcon width="48" height="48" color="var(--gray-8)" />
                   <Text size="2" color="gray" style={{ marginTop: '8px' }}>No services found</Text>
                   <Text size="1" color="gray">
-                    Services will appear here once telemetry data is ingested
+                    MCP servers will appear here once telemetry data is ingested
                   </Text>
                 </Flex>
               )}

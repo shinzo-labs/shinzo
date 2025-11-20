@@ -17,7 +17,13 @@ import {
   SpanLinkAttribute,
   Metric,
   MetricAttribute,
-  HistogramBucket
+  HistogramBucket,
+  ApiKey,
+  Session,
+  Interaction,
+  Tool,
+  ToolUsage,
+  UserAnalytics
 } from './models'
 
 export const sequelize = new Sequelize(DATABASE_URL, {
@@ -55,6 +61,12 @@ SpanLinkAttribute.initialize(sequelize)
 Metric.initialize(sequelize)
 MetricAttribute.initialize(sequelize)
 HistogramBucket.initialize(sequelize)
+ApiKey.initialize(sequelize)
+Session.initialize(sequelize)
+Interaction.initialize(sequelize)
+Tool.initialize(sequelize)
+ToolUsage.initialize(sequelize)
+UserAnalytics.initialize(sequelize)
 
 // Set up associations
 User.hasMany(Resource, { foreignKey: 'user_uuid', as: 'resources' })
@@ -108,5 +120,33 @@ Metric.hasMany(HistogramBucket, { foreignKey: 'metric_uuid', as: 'histogram_buck
 MetricAttribute.belongsTo(Metric, { foreignKey: 'metric_uuid', as: 'metric' })
 
 HistogramBucket.belongsTo(Metric, { foreignKey: 'metric_uuid', as: 'metric' })
+
+// Spotlight associations
+User.hasMany(ApiKey, { foreignKey: 'user_uuid', as: 'apiKeys' })
+User.hasMany(Session, { foreignKey: 'user_uuid', as: 'sessions' })
+User.hasMany(Interaction, { foreignKey: 'user_uuid', as: 'interactions' })
+User.hasMany(Tool, { foreignKey: 'user_uuid', as: 'tools' })
+User.hasMany(UserAnalytics, { foreignKey: 'user_uuid', as: 'userAnalytics' })
+
+ApiKey.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
+ApiKey.hasMany(Session, { foreignKey: 'api_key_uuid', as: 'sessions' })
+ApiKey.hasMany(Interaction, { foreignKey: 'api_key_uuid', as: 'interactions' })
+
+Session.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
+Session.belongsTo(ApiKey, { foreignKey: 'api_key_uuid', as: 'apiKey' })
+Session.hasMany(Interaction, { foreignKey: 'session_uuid', as: 'interactions' })
+
+Interaction.belongsTo(Session, { foreignKey: 'session_uuid', as: 'session' })
+Interaction.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
+Interaction.belongsTo(ApiKey, { foreignKey: 'api_key_uuid', as: 'apiKey' })
+Interaction.hasMany(ToolUsage, { foreignKey: 'interaction_uuid', as: 'toolUsages' })
+
+Tool.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
+Tool.hasMany(ToolUsage, { foreignKey: 'tool_uuid', as: 'usages' })
+
+ToolUsage.belongsTo(Interaction, { foreignKey: 'interaction_uuid', as: 'interaction' })
+ToolUsage.belongsTo(Tool, { foreignKey: 'tool_uuid', as: 'tool' })
+
+UserAnalytics.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
 
 export const dbClient = sequelize
