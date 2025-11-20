@@ -4,7 +4,7 @@ import * as Icons from '@radix-ui/react-icons'
 import { Flex, Text, Badge, Avatar } from '@radix-ui/themes'
 import { useHasTelemetry } from '../../hooks/useHasTelemetry'
 
-const navigation = [
+const telemetryNavigation = [
   {
     name: 'Dashboard',
     href: '/dashboard',
@@ -65,9 +65,9 @@ export const Sidebar: React.FC = () => {
   const { hasTelemetry, loading } = useHasTelemetry()
 
   // Filter navigation items based on whether user has telemetry data
-  const visibleNavigation = hasTelemetry
-    ? navigation.filter(item => item.href !== '/getting-started')
-    : navigation.filter(item => item.href === '/getting-started')
+  const visibleTelemetryNavigation = hasTelemetry
+    ? telemetryNavigation.filter(item => item.href !== '/getting-started')
+    : telemetryNavigation.filter(item => item.href === '/getting-started')
 
   return (
     <Flex
@@ -97,7 +97,13 @@ export const Sidebar: React.FC = () => {
 
       {/* Navigation */}
       <Flex direction="column" style={{ flex: 1, padding: '16px', gap: '4px', overflowY: 'auto' }}>
-        {visibleNavigation.map((item) => {
+          <div style={{ margin: '16px 0 8px 0', paddingLeft: '12px' }}>
+          <Text size="1" weight="bold" color="gray" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            MCP Telemetry
+          </Text>
+        </div>
+        <>
+        {visibleTelemetryNavigation.map((item) => {
           const isActive = location.pathname === item.href
           const Icon = item.icon
 
@@ -134,6 +140,7 @@ export const Sidebar: React.FC = () => {
             </Link>
           )
         })}
+        </>
 
         {/* Spotlight Section */}
         {hasTelemetry && (
