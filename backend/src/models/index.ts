@@ -14,6 +14,12 @@ import { SpanLinkAttribute } from './open_telemetry/SpanLinkAttribute'
 import { Metric } from './open_telemetry/Metric'
 import { MetricAttribute } from './open_telemetry/MetricAttribute'
 import { HistogramBucket } from './open_telemetry/HistogramBucket'
+import { ApiKey } from './spotlight/ApiKey'
+import { Session } from './spotlight/Session'
+import { Interaction } from './spotlight/Interaction'
+import { Tool } from './spotlight/Tool'
+import { ToolUsage } from './spotlight/ToolUsage'
+import { UserAnalytics } from './spotlight/UserAnalytics'
 
 export {
   User,
@@ -32,4 +38,10 @@ export {
   Metric,
   MetricAttribute,
   HistogramBucket,
+  ApiKey,
+  Session,
+  Interaction,
+  Tool,
+  ToolUsage,
+  UserAnalytics,
 }

@@ -22,6 +22,13 @@ import { MetricsPage } from './pages/MetricsPage'
 import { ResourcesPage } from './pages/ResourcesPage'
 import { SettingsPage } from './pages/SettingsPage'
 
+// Spotlight pages
+import { SpotlightApiKeysPage } from './pages/spotlight/SpotlightApiKeysPage'
+import { SpotlightTokenAnalyticsPage } from './pages/spotlight/SpotlightTokenAnalyticsPage'
+import { SpotlightToolAnalyticsPage } from './pages/spotlight/SpotlightToolAnalyticsPage'
+import { SpotlightSessionAnalyticsPage } from './pages/spotlight/SpotlightSessionAnalyticsPage'
+import { SpotlightUserAnalyticsPage } from './pages/spotlight/SpotlightUserAnalyticsPage'
+
 import './App.css'
 
 const queryClient = new QueryClient({
@@ -94,6 +101,43 @@ function App() {
                   <ProtectedRoute>
                     <OnboardingRoute>
                       <SettingsPage />
+                    </OnboardingRoute>
+                  </ProtectedRoute>
+                } />
+
+                {/* Spotlight routes */}
+                <Route path="/spotlight/api-keys" element={
+                  <ProtectedRoute>
+                    <OnboardingRoute>
+                      <SpotlightApiKeysPage />
+                    </OnboardingRoute>
+                  </ProtectedRoute>
+                } />
+                <Route path="/spotlight/token-analytics" element={
+                  <ProtectedRoute>
+                    <OnboardingRoute>
+                      <SpotlightTokenAnalyticsPage />
+                    </OnboardingRoute>
+                  </ProtectedRoute>
+                } />
+                <Route path="/spotlight/tool-analytics" element={
+                  <ProtectedRoute>
+                    <OnboardingRoute>
+                      <SpotlightToolAnalyticsPage />
+                    </OnboardingRoute>
+                  </ProtectedRoute>
+                } />
+                <Route path="/spotlight/session-analytics" element={
+                  <ProtectedRoute>
+                    <OnboardingRoute>
+                      <SpotlightSessionAnalyticsPage />
+                    </OnboardingRoute>
+                  </ProtectedRoute>
+                } />
+                <Route path="/spotlight/user-analytics" element={
+                  <ProtectedRoute>
+                    <OnboardingRoute>
+                      <SpotlightUserAnalyticsPage />
                     </OnboardingRoute>
                   </ProtectedRoute>
                 } />
