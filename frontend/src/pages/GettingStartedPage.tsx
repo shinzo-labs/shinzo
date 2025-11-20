@@ -7,12 +7,15 @@ import { ingestTokenService, telemetryService } from '../backendService'
 import { subHours } from 'date-fns'
 import { BACKEND_URL } from '../config'
 
+type SdkType = 'typescript' | 'python-mcp' | 'python-fastmcp'
+
 export const GettingStartedPage: React.FC = () => {
   const { token } = useAuth()
   const [ingestToken, setIngestToken] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [hasTelemetry, setHasTelemetry] = useState(false)
+  const [sdkType, setSdkType] = useState<SdkType>('typescript')
 
   useEffect(() => {
     const fetchIngestToken = async () => {
@@ -89,8 +92,78 @@ instrumentServer(server, {
 
 // Continue with server tool setup...
 // server.tool(...)
-// 
+//
 // NOTE: The telemetry only works with server.tool(...) registration at the moment. Other registration methods are coming soon!`
+
+  const pythonFastMcpSnippet = `from mcp.server.fastmcp import FastMCP
+from shinzo import instrument_server
+
+# Create FastMCP server
+mcp = FastMCP(name="my-mcp-server")
+
+# Instrument it with Shinzo
+observability = instrument_server(
+    mcp,
+    config={
+        "server_name": "my-mcp-server",
+        "server_version": "1.0.0",
+        "exporter_endpoint": "${BACKEND_URL}/telemetry/ingest_http",
+        "exporter_auth": {
+            "type": "bearer",
+            "token": "${ingestToken || 'your-token-here'}"  # you can create additional tokens in the Settings page
+        }
+    }
+)
+
+# Define your tools
+@mcp.tool()
+def get_weather(city: str) -> str:
+    """Get weather for a city."""
+    return f"Weather for {city}: Sunny"
+
+# Run the server
+if __name__ == "__main__":
+    mcp.run()`
+
+  const pythonMcpSnippet = `from mcp.server import Server
+from shinzo import instrument_server
+
+# Create your MCP server
+server = Server("my-mcp-server")
+
+# Instrument it with Shinzo
+observability = instrument_server(
+    server,
+    config={
+        "server_name": "my-mcp-server",
+        "server_version": "1.0.0",
+        "exporter_endpoint": "${BACKEND_URL}/telemetry/ingest_http",
+        "exporter_auth": {
+            "type": "bearer",
+            "token": "${ingestToken || 'your-token-here'}"  # you can create additional tokens in the Settings page
+        }
+    }
+)
+
+# Define your tools
+@server.call_tool()
+async def get_weather(city: str) -> str:
+    return f"Weather for {city}: Sunny"
+
+# Clean shutdown
+async def shutdown():
+    await observability.shutdown()`
+
+  const getCurrentSnippet = () => {
+    switch (sdkType) {
+      case 'python-fastmcp':
+        return pythonFastMcpSnippet
+      case 'python-mcp':
+        return pythonMcpSnippet
+      default:
+        return typescriptSnippet
+    }
+  }
 
   return (
     <AppLayout>
@@ -141,6 +214,51 @@ instrumentServer(server, {
           </Box>
         </Flex>
 
+        {/* SDK Type Selector */}
+        <Card>
+          <Flex direction="column" gap="3">
+            <Heading size="4">Choose Your SDK</Heading>
+            <Text color="gray" size="2">
+              Select the programming language and framework for your MCP server
+            </Text>
+            <Tabs.Root value={sdkType} onValueChange={(value) => setSdkType(value as SdkType)}>
+              <Tabs.List>
+                <Tabs.Trigger value="typescript">TypeScript</Tabs.Trigger>
+                <Tabs.Trigger value="python-fastmcp">Python (FastMCP)</Tabs.Trigger>
+                <Tabs.Trigger value="python-mcp">Python (MCP SDK)</Tabs.Trigger>
+              </Tabs.List>
+            </Tabs.Root>
+
+            {sdkType === 'python-fastmcp' && (
+              <Callout.Root color="blue">
+                <Callout.Icon>
+                  <Icons.InfoCircledIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  <Text size="2">
+                    <strong>FastMCP</strong> provides a simpler, more modern Python API with decorators like <Code>@mcp.tool()</Code>.
+                    Recommended for new Python projects.
+                  </Text>
+                </Callout.Text>
+              </Callout.Root>
+            )}
+
+            {sdkType === 'python-mcp' && (
+              <Callout.Root color="blue">
+                <Callout.Icon>
+                  <Icons.InfoCircledIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  <Text size="2">
+                    <strong>Traditional MCP SDK</strong> follows the standard MCP specification with async patterns.
+                    Use this if you need more configuration options or are working with existing MCP SDK code.
+                  </Text>
+                </Callout.Text>
+              </Callout.Root>
+            )}
+          </Flex>
+        </Card>
+
         {/* Step 1: Install SDK */}
         <Card>
           <Flex direction="column" gap="4">
@@ -163,63 +281,80 @@ instrumentServer(server, {
             </Flex>
 
             <Text color="gray">
-              Add the Shinzo instrumentation SDK to your TypeScript MCP server:
+              {sdkType === 'typescript'
+                ? 'Add the Shinzo instrumentation SDK to your TypeScript MCP server:'
+                : 'Install the Shinzo Python SDK using pip:'}
             </Text>
 
-            <Tabs.Root defaultValue="npm">
-              <Tabs.List>
-                <Tabs.Trigger value="npm">npm</Tabs.Trigger>
-                <Tabs.Trigger value="pnpm">pnpm</Tabs.Trigger>
-                <Tabs.Trigger value="yarn">yarn</Tabs.Trigger>
-              </Tabs.List>
+            {sdkType === 'typescript' ? (
+              <Tabs.Root defaultValue="npm">
+                <Tabs.List>
+                  <Tabs.Trigger value="npm">npm</Tabs.Trigger>
+                  <Tabs.Trigger value="pnpm">pnpm</Tabs.Trigger>
+                  <Tabs.Trigger value="yarn">yarn</Tabs.Trigger>
+                </Tabs.List>
 
-              <Box style={{ marginTop: '16px' }}>
-                <Tabs.Content value="npm">
-                  <Flex gap="2" align="center">
-                    <Code style={{ flex: 1, padding: '12px' }}>
-                      npm install @shinzolabs/instrumentation-mcp
-                    </Code>
-                    <Button
-                      variant="soft"
-                      onClick={() => copyToClipboard('npm install @shinzolabs/instrumentation-mcp')}
-                    >
-                      <Icons.CopyIcon />
-                      {copied ? 'Copied!' : 'Copy'}
-                    </Button>
-                  </Flex>
-                </Tabs.Content>
+                <Box style={{ marginTop: '16px' }}>
+                  <Tabs.Content value="npm">
+                    <Flex gap="2" align="center">
+                      <Code style={{ flex: 1, padding: '12px' }}>
+                        npm install @shinzolabs/instrumentation-mcp
+                      </Code>
+                      <Button
+                        variant="soft"
+                        onClick={() => copyToClipboard('npm install @shinzolabs/instrumentation-mcp')}
+                      >
+                        <Icons.CopyIcon />
+                        {copied ? 'Copied!' : 'Copy'}
+                      </Button>
+                    </Flex>
+                  </Tabs.Content>
 
-                <Tabs.Content value="pnpm">
-                  <Flex gap="2" align="center">
-                    <Code style={{ flex: 1, padding: '12px' }}>
-                      pnpm add @shinzolabs/instrumentation-mcp
-                    </Code>
-                    <Button
-                      variant="soft"
-                      onClick={() => copyToClipboard('pnpm add @shinzolabs/instrumentation-mcp')}
-                    >
-                      <Icons.CopyIcon />
-                      {copied ? 'Copied!' : 'Copy'}
-                    </Button>
-                  </Flex>
-                </Tabs.Content>
+                  <Tabs.Content value="pnpm">
+                    <Flex gap="2" align="center">
+                      <Code style={{ flex: 1, padding: '12px' }}>
+                        pnpm add @shinzolabs/instrumentation-mcp
+                      </Code>
+                      <Button
+                        variant="soft"
+                        onClick={() => copyToClipboard('pnpm add @shinzolabs/instrumentation-mcp')}
+                      >
+                        <Icons.CopyIcon />
+                        {copied ? 'Copied!' : 'Copy'}
+                      </Button>
+                    </Flex>
+                  </Tabs.Content>
 
-                <Tabs.Content value="yarn">
-                  <Flex gap="2" align="center">
-                    <Code style={{ flex: 1, padding: '12px' }}>
-                      yarn add @shinzolabs/instrumentation-mcp
-                    </Code>
-                    <Button
-                      variant="soft"
-                      onClick={() => copyToClipboard('yarn add @shinzolabs/instrumentation-mcp')}
-                    >
-                      <Icons.CopyIcon />
-                      {copied ? 'Copied!' : 'Copy'}
-                    </Button>
-                  </Flex>
-                </Tabs.Content>
-              </Box>
-            </Tabs.Root>
+                  <Tabs.Content value="yarn">
+                    <Flex gap="2" align="center">
+                      <Code style={{ flex: 1, padding: '12px' }}>
+                        yarn add @shinzolabs/instrumentation-mcp
+                      </Code>
+                      <Button
+                        variant="soft"
+                        onClick={() => copyToClipboard('yarn add @shinzolabs/instrumentation-mcp')}
+                      >
+                        <Icons.CopyIcon />
+                        {copied ? 'Copied!' : 'Copy'}
+                      </Button>
+                    </Flex>
+                  </Tabs.Content>
+                </Box>
+              </Tabs.Root>
+            ) : (
+              <Flex gap="2" align="center">
+                <Code style={{ flex: 1, padding: '12px' }}>
+                  pip install shinzo
+                </Code>
+                <Button
+                  variant="soft"
+                  onClick={() => copyToClipboard('pip install shinzo')}
+                >
+                  <Icons.CopyIcon />
+                  {copied ? 'Copied!' : 'Copy'}
+                </Button>
+              </Flex>
+            )}
           </Flex>
         </Card>
 
@@ -261,7 +396,7 @@ instrumentServer(server, {
                   lineHeight: '1.6'
                 }}
               >
-                {typescriptSnippet}
+                {getCurrentSnippet()}
               </Code>
               <Button
                 variant="soft"
@@ -270,7 +405,7 @@ instrumentServer(server, {
                   top: '12px',
                   right: '12px'
                 }}
-                onClick={() => copyToClipboard(typescriptSnippet)}
+                onClick={() => copyToClipboard(getCurrentSnippet())}
               >
                 <Icons.CopyIcon />
                 {copied ? 'Copied!' : 'Copy'}
