@@ -1,0 +1,48 @@
+{
+  "name": "shinzo",
+  "version": "0.0.0",
+  "description": "Complete observability platform for AI Agents and MCP servers",
+  "type": "commonjs",
+  "private": true,
+  "engines": {
+    "node": ">=22.16",
+    "pnpm": ">=10.2.1"
+  },
+  "packageManager": "pnpm@10.12.1",
+  "pnpm": {
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "*": "*"
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "analytics",
+    "opentelemetry",
+    "observability",
+    "telemetry",
+    "tracing",
+    "monitoring",
+    "instrumentation",
+    "modular",
+    "composable",
+    "stack",
+    "agent",
+    "ai"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shinzo-labs/shinzo.git"
+  },
+  "homepage": "https://github.com/shinzo-labs/shinzo",
+  "bugs": {
+    "url": "https://github.com/shinzo-labs/shinzo/issues"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@changesets/cli": "^2.27.9"
+  }
+}
