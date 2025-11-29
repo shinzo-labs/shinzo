@@ -1,18 +1,26 @@
-node_modules
-
-*.env*
-!.env.example
-
-.DS_Store
-
+# IDEs
+.claude
 .vscode
 .idea
 .cursor*
 
-dist/
-build
+# Env files
+*.env
+*.env.*
+!.env.example
+
+# TypeScript
 *.tsbuildinfo
 
-dev/
+# Node modules
+node_modules
 
-CLAUDE.md
+# Build output
+dist/
+build
+
+# Test coverage
+coverage/
+
+# MacOS
+.DS_Store
