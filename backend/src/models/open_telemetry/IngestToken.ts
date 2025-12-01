@@ -36,9 +36,7 @@ export class IngestToken extends CommonModel {
         modelName: 'IngestToken',
         tableName: 'ingest_token',
         schema: 'open_telemetry',
-        timestamps: true,
-        createdAt: 'created_at',
-        updatedAt: 'updated_at',
+        timestamps: false,
       }
     )
   }
