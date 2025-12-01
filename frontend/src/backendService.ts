@@ -196,7 +196,8 @@ export const ingestTokenService = {
   async revoke(token: string, tokenUuid: string): Promise<void> {
     const response = await fetch(`${API_BASE_URL}/auth/revoke_ingest_token/${tokenUuid}`, {
       method: 'POST',
-      headers: getAuthHeaders(token)
+      headers: getAuthHeaders(token),
+      body: JSON.stringify({})
     })
     return handleResponse(response)
   }

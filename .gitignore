@@ -24,3 +24,6 @@ coverage/
 
 # MacOS
 .DS_Store
+
+# Local development
+dev/
