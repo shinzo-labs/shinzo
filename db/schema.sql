@@ -1,11 +1,12 @@
-\restrict 23tUHISVuQFzk4FMyCfLCWKjrPdzrGcq6uWrOeNSx6k4f9Uhrl8dIXO5fJWac76
+\restrict X0TTsI9DacRwLJ18jlFD7tOp6bwr0PbwLn4XIQqaKwjBoQPurWHjnL9fla3N4Pg
 
 -- Dumped from database version 15.14 (Homebrew)
--- Dumped by pg_dump version 15.14 (Homebrew)
+-- Dumped by pg_dump version 17.6
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -402,7 +403,7 @@ CREATE TABLE spotlight.interaction (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     session_uuid uuid NOT NULL,
     user_uuid uuid NOT NULL,
-    api_key_uuid uuid NOT NULL,
+    api_key_uuid uuid,
     request_timestamp timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     model text NOT NULL,
     provider text NOT NULL,
@@ -423,8 +424,24 @@ CREATE TABLE spotlight.interaction (
     error_type text,
     status text DEFAULT 'pending'::text NOT NULL,
     shinzo_api_key_uuid uuid,
+    auth_type text,
+    CONSTRAINT interaction_auth_type_check CHECK ((auth_type = ANY (ARRAY['api_key'::text, 'subscription'::text, 'unknown'::text]))),
     CONSTRAINT interaction_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'success'::text, 'error'::text])))
 );
+
+
+--
+-- Name: COLUMN interaction.api_key_uuid; Type: COMMENT; Schema: spotlight; Owner: -
+--
+
+COMMENT ON COLUMN spotlight.interaction.api_key_uuid IS 'Foreign key to provider_key table. Null when using x-shinzo-api-key header with direct provider key auth.';
+
+
+--
+-- Name: COLUMN interaction.auth_type; Type: COMMENT; Schema: spotlight; Owner: -
+--
+
+COMMENT ON COLUMN spotlight.interaction.auth_type IS 'Type of authentication used: api_key (sk-ant-api03-...), subscription (sk-ant-oat0-...), or unknown';
 
 
 --
@@ -477,7 +494,7 @@ CREATE TABLE spotlight.session (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     user_uuid uuid NOT NULL,
-    api_key_uuid uuid NOT NULL,
+    api_key_uuid uuid,
     session_id text NOT NULL,
     start_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     end_time timestamp without time zone,
@@ -487,6 +504,13 @@ CREATE TABLE spotlight.session (
     total_cached_tokens integer DEFAULT 0,
     shinzo_api_key_uuid uuid
 );
+
+
+--
+-- Name: COLUMN session.api_key_uuid; Type: COMMENT; Schema: spotlight; Owner: -
+--
+
+COMMENT ON COLUMN spotlight.session.api_key_uuid IS 'Foreign key to provider_key table. Null when using x-shinzo-api-key header with direct provider key auth.';
 
 
 --
@@ -1140,6 +1164,13 @@ CREATE INDEX idx_interaction_api_key ON spotlight.interaction USING btree (api_k
 
 
 --
+-- Name: idx_interaction_auth_type; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_interaction_auth_type ON spotlight.interaction USING btree (auth_type);
+
+
+--
 -- Name: idx_interaction_model; Type: INDEX; Schema: spotlight; Owner: -
 --
 
@@ -1785,7 +1816,7 @@ ALTER TABLE ONLY spotlight.user_analytics
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 23tUHISVuQFzk4FMyCfLCWKjrPdzrGcq6uWrOeNSx6k4f9Uhrl8dIXO5fJWac76
+\unrestrict X0TTsI9DacRwLJ18jlFD7tOp6bwr0PbwLn4XIQqaKwjBoQPurWHjnL9fla3N4Pg
 
 
 --
@@ -1801,4 +1832,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20251002000000'),
     ('20251120000000'),
     ('20251120010000'),
-    ('20251120020000');
+    ('20251120020000'),
+    ('20251204000000'),
+    ('20251204000001');

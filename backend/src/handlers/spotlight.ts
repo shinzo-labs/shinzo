@@ -468,21 +468,53 @@ export const handleDeleteProviderKey = async (userUuid: string, keyUuid: string)
 }
 
 // ============================================================================
-// Model Proxy Handler (Updated for new architecture)
+// Helper function to detect auth type from provider key
+// ============================================================================
+
+function detectAuthType(providerApiKey: string): 'api_key' | 'subscription' | 'unknown' {
+  if (providerApiKey.startsWith('sk-ant-api03-')) {
+    return 'api_key'
+  } else if (providerApiKey.startsWith('sk-ant-oat0-')) {
+    return 'subscription'
+  }
+  // Add more patterns as they are discovered
+  return 'unknown'
+}
+
+// ============================================================================
+// Model Proxy Handler (Updated for dual-mode auth support)
 // ============================================================================
 
 export const handleModelProxy = async (
-  shinzoApiKey: string,
+  shinzoApiKey: string | null,
+  xShinzoApiKey: string | null,
   provider: string,
   requestBody: any
 ) => {
   try {
+    // Determine which auth mode we're using
+    const usingSeparateHeader = !!xShinzoApiKey
+    const shinzoKeyToValidate = xShinzoApiKey || shinzoApiKey
+
+    if (!shinzoKeyToValidate) {
+      return {
+        response: {
+          error: {
+            type: 'authentication_error',
+            message: 'Missing Shinzo API key. Provide either x-shinzo-api-key header or Authorization header.'
+          }
+        },
+        error: true,
+        status: 401
+      }
+    }
+
     // 1. Validate Shinzo API key
     const [shinzoKeyResults] = await sequelize.query(
       `SELECT uuid, user_uuid, key_name, status
        FROM spotlight.shinzo_api_key
        WHERE api_key = $1 AND status = 'active'`,
-      { bind: [shinzoApiKey] })
+      { bind: [shinzoKeyToValidate] })
 
     if (!shinzoKeyResults?.length) {
       return {
@@ -500,46 +532,65 @@ export const handleModelProxy = async (
       `UPDATE spotlight.shinzo_api_key SET last_used = CURRENT_TIMESTAMP WHERE uuid = $1`,
       { bind: [shinzoKey.uuid] })
 
-    // 2. Look up active provider key for this user and provider
-    const [providerKeyResults] = await sequelize.query(
-      `SELECT uuid, encrypted_key, encryption_iv, provider_base_url, provider
-       FROM spotlight.provider_key
-       WHERE user_uuid = $1 AND provider = $2 AND status = 'active'
-       LIMIT 1`,
-      { bind: [userUuid, provider] })
-
-    if (!providerKeyResults?.length) {
-      return {
-        response: {
-          error: {
-            type: 'no_provider_key',
-            message: `No active ${provider} provider key found. Please add one in your dashboard.`
-          }
-        },
-        error: true,
-        status: 400
-      }
-    }
-
-    const providerKeyRow = providerKeyResults[0] as any
-
-    // 3. Decrypt provider key
     let providerApiKey: string
-    try {
-      providerApiKey = decryptProviderKey(providerKeyRow.encrypted_key, providerKeyRow.encryption_iv)
-    } catch (decryptError) {
-      logger.error({ message: 'Failed to decrypt provider key', error: decryptError, userUuid })
-      return {
-        response: { error: { type: 'decryption_error', message: 'Failed to decrypt provider key' } },
-        error: true,
-        status: 500
-      }
-    }
+    let providerKeyRow: any = null
+    let authType: 'api_key' | 'subscription' | 'unknown'
 
-    // Update last_used for provider key
-    await sequelize.query(
-      `UPDATE spotlight.provider_key SET last_used = CURRENT_TIMESTAMP WHERE uuid = $1`,
-      { bind: [providerKeyRow.uuid] })
+    if (usingSeparateHeader) {
+      // MODE 1: x-shinzo-api-key header present
+      // Use the Authorization header directly as the provider API key
+      providerApiKey = shinzoApiKey! // This is the actual provider key from Authorization header
+      authType = detectAuthType(providerApiKey)
+
+      logger.info({
+        message: 'Using direct provider key from Authorization header',
+        provider,
+        userUuid,
+        authType
+      })
+    } else {
+      // MODE 2: Traditional mode - look up stored provider key
+      // 2. Look up active provider key for this user and provider
+      const [providerKeyResults] = await sequelize.query(
+        `SELECT uuid, encrypted_key, encryption_iv, provider_base_url, provider
+         FROM spotlight.provider_key
+         WHERE user_uuid = $1 AND provider = $2 AND status = 'active'
+         LIMIT 1`,
+        { bind: [userUuid, provider] })
+
+      if (!providerKeyResults?.length) {
+        return {
+          response: {
+            error: {
+              type: 'no_provider_key',
+              message: `No active ${provider} provider key found. Please add one in your dashboard.`
+            }
+          },
+          error: true,
+          status: 400
+        }
+      }
+
+      providerKeyRow = providerKeyResults[0] as any
+
+      // 3. Decrypt provider key
+      try {
+        providerApiKey = decryptProviderKey(providerKeyRow.encrypted_key, providerKeyRow.encryption_iv)
+        authType = detectAuthType(providerApiKey)
+      } catch (decryptError) {
+        logger.error({ message: 'Failed to decrypt provider key', error: decryptError, userUuid })
+        return {
+          response: { error: { type: 'decryption_error', message: 'Failed to decrypt provider key' } },
+          error: true,
+          status: 500
+        }
+      }
+
+      // Update last_used for provider key
+      await sequelize.query(
+        `UPDATE spotlight.provider_key SET last_used = CURRENT_TIMESTAMP WHERE uuid = $1`,
+        { bind: [providerKeyRow.uuid] })
+    }
 
     const requestTimestamp = new Date()
     const sessionId = requestBody.metadata?.user_id || 'default-session'
@@ -558,7 +609,7 @@ export const handleModelProxy = async (
         `INSERT INTO spotlight.session (user_uuid, api_key_uuid, shinzo_api_key_uuid, session_id, start_time)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING uuid, total_requests, total_input_tokens, total_output_tokens, total_cached_tokens`,
-        { bind: [userUuid, providerKeyRow.uuid, shinzoKey.uuid, sessionId, requestTimestamp] })
+        { bind: [userUuid, providerKeyRow?.uuid || null, shinzoKey.uuid, sessionId, requestTimestamp] })
       session = newSessionResults[0] as any
     } else {
       session = sessionResults[0] as any
@@ -568,13 +619,13 @@ export const handleModelProxy = async (
     const [interactionResults] = await sequelize.query(
       `INSERT INTO spotlight.interaction
        (session_uuid, user_uuid, api_key_uuid, shinzo_api_key_uuid, request_timestamp, model, provider,
-        max_tokens, temperature, system_prompt, request_data, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending')
+        max_tokens, temperature, system_prompt, request_data, status, auth_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12)
        RETURNING uuid`,
       { bind: [
         session.uuid,
         userUuid,
-        providerKeyRow.uuid,
+        providerKeyRow?.uuid || null,
         shinzoKey.uuid,
         requestTimestamp,
         requestBody.model || 'unknown',
@@ -582,7 +633,8 @@ export const handleModelProxy = async (
         requestBody.max_tokens || null,
         requestBody.temperature || null,
         requestBody.system || null,
-        JSON.stringify(requestBody)
+        JSON.stringify(requestBody),
+        authType
       ] })
 
     const interaction = interactionResults[0] as any
@@ -590,9 +642,10 @@ export const handleModelProxy = async (
     // 4. Forward request to provider
     try {
       const endpoint = provider === 'anthropic' ? '/v1/messages' : '/v1/chat/completions'
-      const url = `${providerKeyRow.provider_base_url}${endpoint}`
+      const baseUrl = providerKeyRow?.provider_base_url || getProviderBaseUrl(provider)
+      const url = `${baseUrl}${endpoint}`
 
-      logger.info({ message: 'Proxying request to provider', provider, url, userUuid })
+      logger.info({ message: 'Proxying request to provider', provider, url, userUuid, authType })
 
       const providerResponse = await axios.post(url, requestBody, {
         headers: {

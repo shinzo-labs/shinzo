@@ -650,9 +650,28 @@ app.delete('/spotlight/provider_keys/:keyUuid', async (request: AuthenticatedReq
 app.post('/spotlight/:provider/v1/messages', async (request: FastifyRequest, reply: FastifyReply) => {
   try {
     const { provider } = request.params as { provider: string }
-    const shinzoApiKey = request.headers.authorization?.replace('Bearer ', '')
 
-    if (!shinzoApiKey) {
+    // Check for x-shinzo-api-key header (new mode)
+    const xShinzoApiKey = request.headers['x-shinzo-api-key'] as string | undefined
+
+    // Extract Authorization header
+    const authHeader = request.headers.authorization?.replace('Bearer ', '')
+
+    // Determine authentication mode
+    if (xShinzoApiKey) {
+      // MODE 1: x-shinzo-api-key header present
+      // Authorization header contains the actual provider API key
+      if (!authHeader) {
+        reply.status(401).send({
+          error: {
+            type: 'authentication_error',
+            message: 'Missing Authorization header with provider API key'
+          }
+        })
+        return
+      }
+    } else if (!authHeader) {
+      // MODE 2: Traditional mode - Authorization must contain Shinzo API key
       reply.status(401).send({
         error: {
           type: 'authentication_error',
@@ -674,7 +693,12 @@ app.post('/spotlight/:provider/v1/messages', async (request: FastifyRequest, rep
       return
     }
 
-    const result = await handleModelProxy(shinzoApiKey, provider, request.body as any)
+    const result = await handleModelProxy(
+      authHeader || null,
+      xShinzoApiKey || null,
+      provider,
+      request.body as any
+    )
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Model proxy error', error })
