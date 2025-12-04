@@ -51,6 +51,10 @@ interface IngestToken {
 interface Resource {
   uuid: string
   service_name: string
+  service_version?: string
+  service_namespace?: string
+  first_seen?: string
+  last_seen?: string
   attributes: Record<string, any>
   created_at: string
 }
@@ -205,6 +209,28 @@ export const ingestTokenService = {
 
 export type { UserQuota }
 
+interface ResourceAnalytics {
+  resource: {
+    uuid: string
+    service_name: string
+    service_version?: string | null
+    service_namespace?: string | null
+    first_seen: string
+    last_seen: string
+    attributes: Record<string, any>
+  }
+  metrics: {
+    totalTraces: number
+    errorTraces: number
+    errorRate: number
+    avgDuration: number
+  }
+  traces: Trace[]
+  spans: Span[]
+}
+
+export type { ResourceAnalytics }
+
 export const telemetryService = {
   async fetchResources(token: string): Promise<Resource[]> {
     const response = await fetch(`${API_BASE_URL}/telemetry/fetch_resources`, {
@@ -247,6 +273,17 @@ export const telemetryService = {
     if (params.offset) queryParams.append('offset', params.offset.toString())
 
     const response = await fetch(`${API_BASE_URL}/telemetry/fetch_metrics?${queryParams}`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async fetchResourceAnalytics(token: string, resourceUuid: string, params: TelemetryQueryParams): Promise<ResourceAnalytics> {
+    const queryParams = new URLSearchParams()
+    queryParams.append('start_time', params.start_time)
+    queryParams.append('end_time', params.end_time)
+
+    const response = await fetch(`${API_BASE_URL}/telemetry/fetch_resource_analytics/${resourceUuid}?${queryParams}`, {
       headers: getAuthHeaders(token)
     })
     return handleResponse(response)

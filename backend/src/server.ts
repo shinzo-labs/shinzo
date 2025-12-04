@@ -25,6 +25,7 @@ import {
   handleFetchTraces,
   handleFetchSpans,
   handleFetchMetrics,
+  handleFetchResourceAnalytics,
   fetchDataSchema
 } from './handlers/telemetry'
 
@@ -390,6 +391,29 @@ app.get('/telemetry/fetch_metrics', async (request: AuthenticatedRequest, reply:
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Fetch metrics error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/telemetry/fetch_resource_analytics/:resourceUuid', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { resourceUuid } = request.params as { resourceUuid: string }
+    const validatedQuery = await fetchDataSchema.validate(request.query, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleFetchResourceAnalytics(request.user!.uuid, resourceUuid, validatedQuery)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch resource analytics error', error })
     if (error.name === 'ValidationError') {
       reply.status(400).send({ error: error.message })
     } else {

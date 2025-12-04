@@ -21,6 +21,7 @@ import { SpansPage } from './pages/SpansPage'
 import { MetricsPage } from './pages/MetricsPage'
 import { ResourcesPage } from './pages/ResourcesPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { ServerAnalyticsPage } from './pages/ServerAnalyticsPage'
 
 // Spotlight pages
 import { SpotlightApiKeysPage } from './pages/spotlight/SpotlightApiKeysPage'
@@ -123,6 +124,11 @@ function App() {
                     <OnboardingRoute>
                       <SpotlightSessionAnalyticsPage />
                     </OnboardingRoute>
+                  </ProtectedRoute>
+                } />
+                <Route path="/server-analytics" element={
+                  <ProtectedRoute>
+                    <ServerAnalyticsPage />
                   </ProtectedRoute>
                 } />
 
