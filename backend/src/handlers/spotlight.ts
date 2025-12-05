@@ -474,7 +474,8 @@ export const handleDeleteProviderKey = async (userUuid: string, keyUuid: string)
 function detectAuthType(providerApiKey: string): 'api_key' | 'subscription' | 'unknown' {
   if (providerApiKey.startsWith('sk-ant-api03-')) {
     return 'api_key'
-  } else if (providerApiKey.startsWith('sk-ant-oat0-')) {
+  } else if (providerApiKey.startsWith('sk-ant-oat')) {
+    // Matches sk-ant-oat0-, sk-ant-oat01-, etc.
     return 'subscription'
   }
   // Add more patterns as they are discovered
@@ -543,10 +544,12 @@ export const handleModelProxy = async (
       authType = detectAuthType(providerApiKey)
 
       logger.info({
-        message: 'Using direct provider key from Authorization header',
+        message: 'Using direct provider key from Authorization header (MODE 1)',
         provider,
         userUuid,
-        authType
+        authType,
+        shinzoKeyPrefix: shinzoKeyToValidate.substring(0, 12) + '...',
+        providerKeyPrefix: providerApiKey.substring(0, 12) + '...'
       })
     } else {
       // MODE 2: Traditional mode - look up stored provider key
@@ -645,15 +648,41 @@ export const handleModelProxy = async (
       const baseUrl = providerKeyRow?.provider_base_url || getProviderBaseUrl(provider)
       const url = `${baseUrl}${endpoint}`
 
-      logger.info({ message: 'Proxying request to provider', provider, url, userUuid, authType })
+      logger.info({
+        message: 'Proxying request to provider',
+        provider,
+        url,
+        userUuid,
+        authType,
+        providerKeyPrefix: providerApiKey.substring(0, 12) + '...', // Log prefix for debugging
+        usingSeparateHeader
+      })
+
+      // Build headers based on auth type
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      // For Anthropic OAuth tokens (subscription), only use Authorization header
+      // For Anthropic API keys, use x-api-key header
+      // For other providers, use Authorization header
+      if (provider === 'anthropic') {
+        if (authType === 'subscription') {
+          // OAuth tokens require Authorization header + beta flag
+          headers['Authorization'] = `Bearer ${providerApiKey}`
+          headers['anthropic-beta'] = 'oauth-2025-04-20'
+        } else {
+          // Regular API keys use x-api-key header
+          headers['x-api-key'] = providerApiKey
+        }
+        headers['anthropic-version'] = '2023-06-01'
+      } else {
+        // OpenAI and Google use Authorization header
+        headers['Authorization'] = `Bearer ${providerApiKey}`
+      }
 
       const providerResponse = await axios.post(url, requestBody, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': providerApiKey,
-          'Authorization': `Bearer ${providerApiKey}`,
-          'anthropic-version': '2023-06-01',
-        },
+        headers,
         timeout: 120000,
       })
 
@@ -706,7 +735,15 @@ export const handleModelProxy = async (
         status: providerResponse.status
       }
     } catch (providerError: any) {
-      logger.error({ message: 'Error proxying to provider', error: providerError, provider, userUuid })
+      logger.error({
+        message: 'Error proxying to provider',
+        error: providerError,
+        provider,
+        userUuid,
+        responseStatus: providerError.response?.status,
+        responseData: providerError.response?.data,
+        responseHeaders: providerError.response?.headers
+      })
 
       // Update interaction with error
       await sequelize.query(
