@@ -491,11 +491,15 @@ export const handleModelProxy = async (
   xShinzoApiKey: string | null,
   provider: string,
   endpointPath: string,
-  requestBody: any
+  requestBody: any,
+  clientHeaders: Record<string, string | string[] | undefined>
 ) => {
   try {
     // Determine which auth mode we're using
-    const usingSeparateHeader = !!xShinzoApiKey
+    // MODE 1: xShinzoApiKey + shinzoApiKey both present -> use shinzoApiKey as provider key
+    // MODE 2a: xShinzoApiKey present, shinzoApiKey empty -> lookup stored provider key
+    // MODE 2b: xShinzoApiKey empty, shinzoApiKey present -> lookup stored provider key
+    const usingSeparateHeader = !!(xShinzoApiKey && shinzoApiKey)
     const shinzoKeyToValidate = xShinzoApiKey || shinzoApiKey
 
     if (!shinzoKeyToValidate) {
@@ -511,7 +515,20 @@ export const handleModelProxy = async (
       }
     }
 
+    logger.info({
+      message: 'Handler authentication mode',
+      usingSeparateHeader,
+      hasXShinzoApiKey: !!xShinzoApiKey,
+      hasShinzoApiKey: !!shinzoApiKey
+    })
+
     // 1. Validate Shinzo API key
+    logger.info({
+      message: 'Validating Shinzo API key',
+      keyPrefix: shinzoKeyToValidate.substring(0, 12) + '...',
+      usingSeparateHeader
+    })
+
     const [shinzoKeyResults] = await sequelize.query(
       `SELECT uuid, user_uuid, key_name, status
        FROM spotlight.shinzo_api_key
@@ -519,6 +536,11 @@ export const handleModelProxy = async (
       { bind: [shinzoKeyToValidate] })
 
     if (!shinzoKeyResults?.length) {
+      logger.warn({
+        message: 'Shinzo API key validation failed',
+        keyPrefix: shinzoKeyToValidate.substring(0, 12) + '...',
+        reason: 'Key not found or inactive in database'
+      })
       return {
         response: { error: { type: 'invalid_api_key', message: 'Invalid or inactive Shinzo API key' } },
         error: true,
@@ -528,6 +550,12 @@ export const handleModelProxy = async (
 
     const shinzoKey = shinzoKeyResults[0] as any
     const userUuid = shinzoKey.user_uuid
+
+    logger.info({
+      message: 'Shinzo API key validated successfully',
+      userUuid,
+      keyName: shinzoKey.key_name
+    })
 
     // Update last_used timestamp
     await sequelize.query(
@@ -539,13 +567,13 @@ export const handleModelProxy = async (
     let authType: 'api_key' | 'subscription' | 'unknown'
 
     if (usingSeparateHeader) {
-      // MODE 1: x-shinzo-api-key header present
-      // Use the Authorization header directly as the provider API key
+      // MODE 1: BOTH x-shinzo-api-key AND Authorization headers present
+      // Use the Authorization header directly as the provider API key (don't replace or lookup)
       providerApiKey = shinzoApiKey! // This is the actual provider key from Authorization header
       authType = detectAuthType(providerApiKey)
 
       logger.info({
-        message: 'Using direct provider key from Authorization header (MODE 1)',
+        message: 'MODE 1: Using provider key from Authorization header (both headers present)',
         provider,
         userUuid,
         authType,
@@ -553,7 +581,15 @@ export const handleModelProxy = async (
         providerKeyPrefix: providerApiKey.substring(0, 12) + '...'
       })
     } else {
-      // MODE 2: Traditional mode - look up stored provider key
+      // MODE 2: Only one header present - look up stored provider key from database
+      // MODE 2a: x-shinzo-api-key present (current case based on logs)
+      // MODE 2b: Authorization header present (traditional mode)
+      logger.info({
+        message: 'MODE 2: Looking up stored provider key',
+        userUuid,
+        provider
+      })
+
       // 2. Look up active provider key for this user and provider
       const [providerKeyResults] = await sequelize.query(
         `SELECT uuid, encrypted_key, encryption_iv, provider_base_url, provider
@@ -563,6 +599,12 @@ export const handleModelProxy = async (
         { bind: [userUuid, provider] })
 
       if (!providerKeyResults?.length) {
+        logger.warn({
+          message: 'No provider key found for user',
+          userUuid,
+          provider,
+          reason: 'Key not found or inactive in database'
+        })
         return {
           response: {
             error: {
@@ -576,11 +618,22 @@ export const handleModelProxy = async (
       }
 
       providerKeyRow = providerKeyResults[0] as any
+      logger.info({
+        message: 'Provider key found',
+        userUuid,
+        provider,
+        providerKeyUuid: providerKeyRow.uuid
+      })
 
       // 3. Decrypt provider key
       try {
         providerApiKey = decryptProviderKey(providerKeyRow.encrypted_key, providerKeyRow.encryption_iv)
         authType = detectAuthType(providerApiKey)
+        logger.info({
+          message: 'Provider key decrypted successfully',
+          authType,
+          providerKeyPrefix: providerApiKey.substring(0, 12) + '...'
+        })
       } catch (decryptError) {
         logger.error({ message: 'Failed to decrypt provider key', error: decryptError, userUuid })
         return {
@@ -648,39 +701,8 @@ export const handleModelProxy = async (
       const baseUrl = providerKeyRow?.provider_base_url || getProviderBaseUrl(provider)
       const url = `${baseUrl}${endpointPath}`
 
-      // Clean up request body for Anthropic API compatibility
-      // Claude Code includes internal fields when talking to proxies that need to be filtered
-      if (provider === 'anthropic') {
-        // Valid top-level fields per Anthropic API spec
-        const validRequestFields = new Set([
-          'model', 'messages', 'max_tokens', 'metadata', 'stop_sequences',
-          'stream', 'system', 'temperature', 'thinking', 'tool_choice',
-          'tools', 'top_k', 'top_p', 'service_tier'
-        ])
-
-        // Filter out non-standard request fields (like context_management)
-        const cleanedBody: any = {}
-        for (const [key, value] of Object.entries(requestBody)) {
-          if (validRequestFields.has(key)) {
-            cleanedBody[key] = value
-          }
-        }
-        requestBody = cleanedBody
-
-        // Clean up tools array - remove fields like input_examples
-        if (requestBody.tools) {
-          const validToolFields = new Set(['name', 'description', 'input_schema', 'type', 'cache_control'])
-          requestBody.tools = requestBody.tools.map((tool: any) => {
-            const cleanedTool: any = {}
-            for (const [key, value] of Object.entries(tool)) {
-              if (validToolFields.has(key)) {
-                cleanedTool[key] = value
-              }
-            }
-            return cleanedTool
-          })
-        }
-      }
+      // Transparent proxy: Pass request body as-is to provider
+      // No filtering or cleaning - Anthropic API will handle validation
 
       logger.info({
         message: 'Proxying request to provider',
@@ -693,28 +715,52 @@ export const handleModelProxy = async (
         usingSeparateHeader
       })
 
-      // Build headers based on auth type
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+      // Build headers by forwarding all client headers (transparent proxy)
+      const headers: Record<string, string> = {}
+
+      // Copy all client headers except x-shinzo-api-key and host
+      for (const [key, value] of Object.entries(clientHeaders)) {
+        const lowerKey = key.toLowerCase()
+        if (lowerKey === 'x-shinzo-api-key' || lowerKey === 'host') {
+          continue // Skip Shinzo-specific header and host header
+        }
+        if (value !== undefined) {
+          headers[key] = Array.isArray(value) ? value.join(', ') : value
+        }
       }
 
-      // For Anthropic OAuth tokens (subscription), only use Authorization header
-      // For Anthropic API keys, use x-api-key header
-      // For other providers, use Authorization header
+      // Set the appropriate authorization header for the provider
+      // This replaces the Authorization header from the client
       if (provider === 'anthropic') {
         if (authType === 'subscription') {
           // OAuth tokens require Authorization header + beta flag
           headers['Authorization'] = `Bearer ${providerApiKey}`
-          headers['anthropic-beta'] = 'oauth-2025-04-20'
+          // Keep or add anthropic-beta header if not already present
+          if (!headers['anthropic-beta']) {
+            headers['anthropic-beta'] = 'oauth-2025-04-20'
+          }
         } else {
           // Regular API keys use x-api-key header
           headers['x-api-key'] = providerApiKey
+          delete headers['Authorization'] // Remove Authorization if using x-api-key
         }
-        headers['anthropic-version'] = '2023-06-01'
+        // Ensure anthropic-version is set
+        if (!headers['anthropic-version']) {
+          headers['anthropic-version'] = '2023-06-01'
+        }
       } else {
         // OpenAI and Google use Authorization header
         headers['Authorization'] = `Bearer ${providerApiKey}`
       }
+
+      logger.info({
+        message: 'Sending request to provider',
+        url,
+        provider,
+        authType,
+        headerKeys: Object.keys(headers),
+        bodySize: JSON.stringify(requestBody).length
+      })
 
       const providerResponse = await axios.post(url, requestBody, {
         headers,
@@ -723,6 +769,14 @@ export const handleModelProxy = async (
 
       const responseTimestamp = new Date()
       const latencyMs = responseTimestamp.getTime() - requestTimestamp.getTime()
+
+      logger.info({
+        message: 'Received response from provider',
+        provider,
+        statusCode: providerResponse.status,
+        latencyMs,
+        responseHeaders: Object.keys(providerResponse.headers)
+      })
 
       // Extract usage data
       const usage = providerResponse.data.usage || {}
@@ -767,6 +821,7 @@ export const handleModelProxy = async (
 
       return {
         response: providerResponse.data,
+        responseHeaders: providerResponse.headers,
         status: providerResponse.status
       }
     } catch (providerError: any) {
@@ -820,11 +875,15 @@ export const handleCountTokens = async (
   shinzoApiKey: string | null,
   xShinzoApiKey: string | null,
   provider: string,
-  requestBody: any
+  requestBody: any,
+  clientHeaders: Record<string, string | string[] | undefined>
 ) => {
   try {
     // Determine which auth mode we're using
-    const usingSeparateHeader = !!xShinzoApiKey
+    // MODE 1: xShinzoApiKey + shinzoApiKey both present -> use shinzoApiKey as provider key
+    // MODE 2a: xShinzoApiKey present, shinzoApiKey empty -> lookup stored provider key
+    // MODE 2b: xShinzoApiKey empty, shinzoApiKey present -> lookup stored provider key
+    const usingSeparateHeader = !!(xShinzoApiKey && shinzoApiKey)
     const shinzoKeyToValidate = xShinzoApiKey || shinzoApiKey
 
     if (!shinzoKeyToValidate) {
@@ -840,7 +899,20 @@ export const handleCountTokens = async (
       }
     }
 
+    logger.info({
+      message: 'Handler authentication mode',
+      usingSeparateHeader,
+      hasXShinzoApiKey: !!xShinzoApiKey,
+      hasShinzoApiKey: !!shinzoApiKey
+    })
+
     // 1. Validate Shinzo API key
+    logger.info({
+      message: 'Validating Shinzo API key',
+      keyPrefix: shinzoKeyToValidate.substring(0, 12) + '...',
+      usingSeparateHeader
+    })
+
     const [shinzoKeyResults] = await sequelize.query(
       `SELECT uuid, user_uuid, key_name, status
        FROM spotlight.shinzo_api_key
@@ -848,6 +920,11 @@ export const handleCountTokens = async (
       { bind: [shinzoKeyToValidate] })
 
     if (!shinzoKeyResults?.length) {
+      logger.warn({
+        message: 'Shinzo API key validation failed',
+        keyPrefix: shinzoKeyToValidate.substring(0, 12) + '...',
+        reason: 'Key not found or inactive in database'
+      })
       return {
         response: { error: { type: 'invalid_api_key', message: 'Invalid or inactive Shinzo API key' } },
         error: true,
@@ -857,6 +934,12 @@ export const handleCountTokens = async (
 
     const shinzoKey = shinzoKeyResults[0] as any
     const userUuid = shinzoKey.user_uuid
+
+    logger.info({
+      message: 'Shinzo API key validated successfully',
+      userUuid,
+      keyName: shinzoKey.key_name
+    })
 
     // Update last_used timestamp
     await sequelize.query(
@@ -868,12 +951,13 @@ export const handleCountTokens = async (
     let authType: 'api_key' | 'subscription' | 'unknown'
 
     if (usingSeparateHeader) {
-      // MODE 1: x-shinzo-api-key header present
+      // MODE 1: BOTH x-shinzo-api-key AND Authorization headers present
+      // Use the Authorization header directly as the provider API key (don't replace or lookup)
       providerApiKey = shinzoApiKey!
       authType = detectAuthType(providerApiKey)
 
       logger.info({
-        message: 'Count tokens request using direct provider key (MODE 1)',
+        message: 'MODE 1: Count tokens using provider key from Authorization header (both headers present)',
         provider,
         userUuid,
         authType,
@@ -881,7 +965,7 @@ export const handleCountTokens = async (
         providerKeyPrefix: providerApiKey.substring(0, 12) + '...'
       })
     } else {
-      // MODE 2: Traditional mode - look up stored provider key
+      // MODE 2: Only one header present - look up stored provider key from database
       const [providerKeyResults] = await sequelize.query(
         `SELECT uuid, encrypted_key, encryption_iv, provider_base_url, provider
          FROM spotlight.provider_key
@@ -968,19 +1052,36 @@ export const handleCountTokens = async (
         usingSeparateHeader
       })
 
-      // Build headers based on auth type
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+      // Build headers by forwarding all client headers (transparent proxy)
+      const headers: Record<string, string> = {}
+
+      // Copy all client headers except x-shinzo-api-key and host
+      for (const [key, value] of Object.entries(clientHeaders)) {
+        const lowerKey = key.toLowerCase()
+        if (lowerKey === 'x-shinzo-api-key' || lowerKey === 'host') {
+          continue // Skip Shinzo-specific header and host header
+        }
+        if (value !== undefined) {
+          headers[key] = Array.isArray(value) ? value.join(', ') : value
+        }
       }
 
+      // Set the appropriate authorization header for the provider
       if (provider === 'anthropic') {
         if (authType === 'subscription') {
           headers['Authorization'] = `Bearer ${providerApiKey}`
-          headers['anthropic-beta'] = 'oauth-2025-04-20'
+          // Keep or add anthropic-beta header if not already present
+          if (!headers['anthropic-beta']) {
+            headers['anthropic-beta'] = 'oauth-2025-04-20'
+          }
         } else {
           headers['x-api-key'] = providerApiKey
+          delete headers['Authorization'] // Remove Authorization if using x-api-key
         }
-        headers['anthropic-version'] = '2023-06-01'
+        // Ensure anthropic-version is set
+        if (!headers['anthropic-version']) {
+          headers['anthropic-version'] = '2023-06-01'
+        }
       } else {
         headers['Authorization'] = `Bearer ${providerApiKey}`
       }
@@ -1020,6 +1121,7 @@ export const handleCountTokens = async (
 
       return {
         response: providerResponse.data,
+        responseHeaders: providerResponse.headers,
         status: providerResponse.status
       }
     } catch (providerError: any) {
@@ -1061,6 +1163,198 @@ export const handleCountTokens = async (
       response: { error: { type: 'internal_error', message: 'Internal server error' } },
       error: true,
       status: 500
+    }
+  }
+}
+
+// ============================================================================
+// Event Logging Handler
+// ============================================================================
+
+export const handleEventLogging = async (
+  shinzoApiKey: string | null,
+  xShinzoApiKey: string | null,
+  provider: string,
+  requestBody: any,
+  clientHeaders: Record<string, string | string[] | undefined>
+) => {
+  try {
+    // Determine which auth mode we're using
+    // MODE 1: xShinzoApiKey + shinzoApiKey both present -> use shinzoApiKey as provider key
+    // MODE 2a: xShinzoApiKey present, shinzoApiKey empty -> lookup stored provider key
+    // MODE 2b: xShinzoApiKey empty, shinzoApiKey present -> lookup stored provider key
+    const usingSeparateHeader = !!(xShinzoApiKey && shinzoApiKey)
+    const shinzoKeyToValidate = xShinzoApiKey || shinzoApiKey
+
+    if (!shinzoKeyToValidate) {
+      return {
+        response: {
+          error: {
+            type: 'authentication_error',
+            message: 'Missing Shinzo API key. Provide either x-shinzo-api-key header or Authorization header.'
+          }
+        },
+        error: true,
+        status: 401
+      }
+    }
+
+    logger.info({
+      message: 'Handler authentication mode',
+      usingSeparateHeader,
+      hasXShinzoApiKey: !!xShinzoApiKey,
+      hasShinzoApiKey: !!shinzoApiKey
+    })
+
+    // 1. Validate Shinzo API key
+    logger.info({
+      message: 'Validating Shinzo API key',
+      keyPrefix: shinzoKeyToValidate.substring(0, 12) + '...',
+      usingSeparateHeader
+    })
+
+    const [shinzoKeyResults] = await sequelize.query(
+      `SELECT uuid, user_uuid, key_name, status
+       FROM spotlight.shinzo_api_key
+       WHERE api_key = $1 AND status = 'active'`,
+      { bind: [shinzoKeyToValidate] })
+
+    if (!shinzoKeyResults?.length) {
+      logger.warn({
+        message: 'Shinzo API key validation failed',
+        keyPrefix: shinzoKeyToValidate.substring(0, 12) + '...',
+        reason: 'Key not found or inactive in database'
+      })
+      return {
+        response: { error: { type: 'invalid_api_key', message: 'Invalid or inactive Shinzo API key' } },
+        error: true,
+        status: 401
+      }
+    }
+
+    const shinzoKey = shinzoKeyResults[0] as any
+    const userUuid = shinzoKey.user_uuid
+
+    logger.info({
+      message: 'Shinzo API key validated successfully',
+      userUuid,
+      keyName: shinzoKey.key_name
+    })
+
+    let providerApiKey: string
+    let authType: 'api_key' | 'subscription' | 'unknown'
+
+    if (usingSeparateHeader) {
+      // MODE 1: BOTH x-shinzo-api-key AND Authorization headers present
+      // Use the Authorization header directly as the provider API key (don't replace or lookup)
+      providerApiKey = shinzoApiKey!
+      authType = detectAuthType(providerApiKey)
+
+      logger.info({
+        message: 'MODE 1: Event logging using provider key from Authorization header (both headers present)',
+        authType,
+        providerKeyPrefix: providerApiKey.substring(0, 12) + '...'
+      })
+    } else {
+      // MODE 2: Only one header present - look up stored provider key from database
+      const [providerKeyResults] = await sequelize.query(
+        `SELECT uuid, encrypted_key, encryption_iv
+         FROM spotlight.provider_key
+         WHERE user_uuid = $1 AND provider = $2 AND status = 'active'
+         LIMIT 1`,
+        { bind: [userUuid, provider] })
+
+      if (!providerKeyResults?.length) {
+        return {
+          response: {
+            error: {
+              type: 'no_provider_key',
+              message: `No active ${provider} provider key found. Please add one in your dashboard.`
+            }
+          },
+          error: true,
+          status: 400
+        }
+      }
+
+      const providerKeyRow = providerKeyResults[0] as any
+      providerApiKey = decryptProviderKey(providerKeyRow.encrypted_key, providerKeyRow.encryption_iv)
+      authType = detectAuthType(providerApiKey)
+    }
+
+    // 2. Prepare headers for forwarding to Anthropic
+    const headers: Record<string, string> = {}
+
+    // Copy all client headers except x-shinzo-api-key
+    for (const [key, value] of Object.entries(clientHeaders)) {
+      const lowerKey = key.toLowerCase()
+      if (lowerKey === 'x-shinzo-api-key' || lowerKey === 'host') {
+        continue // Skip Shinzo-specific header and host header
+      }
+      if (value !== undefined) {
+        headers[key] = Array.isArray(value) ? value.join(', ') : value
+      }
+    }
+
+    // Set the appropriate authorization header for the provider
+    if (provider === 'anthropic') {
+      if (authType === 'subscription') {
+        headers['Authorization'] = `Bearer ${providerApiKey}`
+        // Keep or add anthropic-beta header
+        if (!headers['anthropic-beta']) {
+          headers['anthropic-beta'] = 'oauth-2025-04-20'
+        }
+      } else {
+        headers['x-api-key'] = providerApiKey
+        delete headers['Authorization'] // Remove Authorization if using x-api-key
+      }
+      // Ensure anthropic-version is set
+      if (!headers['anthropic-version']) {
+        headers['anthropic-version'] = '2023-06-01'
+      }
+    }
+
+    // 3. Forward to Anthropic's event logging endpoint
+    const baseUrl = 'https://api.anthropic.com'
+    const url = `${baseUrl}/api/event_logging/batch`
+
+    logger.info({
+      message: 'Forwarding event logging request to Anthropic',
+      provider,
+      url,
+      userUuid,
+      authType
+    })
+
+    const providerResponse = await axios.post(url, requestBody, {
+      headers,
+      timeout: 30000,
+    })
+
+    // Return the response from Anthropic
+    return {
+      response: providerResponse.data,
+      responseHeaders: providerResponse.headers,
+      status: providerResponse.status
+    }
+  } catch (providerError: any) {
+    logger.error({
+      message: 'Error forwarding event logging to Anthropic',
+      error: providerError,
+      provider,
+      responseStatus: providerError.response?.status,
+      responseData: providerError.response?.data
+    })
+
+    return {
+      response: providerError.response?.data || {
+        error: {
+          type: 'provider_error',
+          message: providerError.message,
+        }
+      },
+      error: true,
+      status: providerError.response?.status || 500
     }
   }
 }

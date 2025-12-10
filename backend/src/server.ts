@@ -657,31 +657,72 @@ app.all('/spotlight/:provider/v1/*', async (request: FastifyRequest, reply: Fast
     const fullPath = request.url.split('?')[0] // Remove query params
     const endpointPath = fullPath.substring(fullPath.indexOf('/v1/'))
 
-    // Check for x-shinzo-api-key header (new mode)
-    const xShinzoApiKey = request.headers['x-shinzo-api-key'] as string | undefined
+    // Log ALL incoming headers first for debugging
+    logger.info({
+      message: 'ALL incoming headers (raw)',
+      allHeaders: request.headers,
+      headerKeys: Object.keys(request.headers)
+    })
 
-    // Extract Authorization header
-    const authHeader = request.headers.authorization?.replace('Bearer ', '')
+    // Check for x-shinzo-api-key header (new mode) - try multiple case variations
+    // Treat empty strings as undefined
+    let xShinzoApiKey = request.headers['x-shinzo-api-key'] as string | undefined
+      || request.headers['X-Shinzo-Api-Key'] as string | undefined
+      || request.headers['X-SHINZO-API-KEY'] as string | undefined
+    if (xShinzoApiKey === '') xShinzoApiKey = undefined
+
+    // Extract provider API key from either Authorization or x-api-key header
+    // Authorization: Used for OAuth tokens (sk-ant-oat01-...)
+    // x-api-key: Used for API keys (sk-ant-api03-...)
+    let providerApiKeyHeader = request.headers.authorization?.replace('Bearer ', '')
+    if (!providerApiKeyHeader || providerApiKeyHeader === '') {
+      providerApiKeyHeader = request.headers['x-api-key'] as string | undefined
+    }
+    if (providerApiKeyHeader === '') providerApiKeyHeader = undefined
+
+    logger.info({
+      message: 'Proxy request received (parsed)',
+      provider,
+      endpointPath,
+      fullPath,
+      method: request.method,
+      hasXShinzoApiKey: !!xShinzoApiKey,
+      hasProviderApiKey: !!providerApiKeyHeader,
+      xShinzoApiKeyPrefix: xShinzoApiKey ? xShinzoApiKey.substring(0, 12) + '...' : 'none',
+      providerApiKeyPrefix: providerApiKeyHeader ? providerApiKeyHeader.substring(0, 12) + '...' : 'none',
+      providerApiKeySource: providerApiKeyHeader ? (request.headers.authorization ? 'Authorization' : 'x-api-key') : 'none',
+      headers: {
+        'anthropic-version': request.headers['anthropic-version'],
+        'anthropic-beta': request.headers['anthropic-beta'],
+        'user-agent': request.headers['user-agent'],
+        'content-type': request.headers['content-type']
+      }
+    })
 
     // Determine authentication mode
-    if (xShinzoApiKey) {
-      // MODE 1: x-shinzo-api-key header present
-      // Authorization header contains the actual provider API key
-      if (!authHeader) {
-        reply.status(401).send({
-          error: {
-            type: 'authentication_error',
-            message: 'Missing Authorization header with provider API key'
-          }
-        })
-        return
-      }
-    } else if (!authHeader) {
-      // MODE 2: Traditional mode - Authorization must contain Shinzo API key
+    if (xShinzoApiKey && providerApiKeyHeader) {
+      // MODE 1: x-shinzo-api-key + provider API key both present
+      // Use provider API key header directly (don't replace or lookup)
+      logger.info({ message: 'Using MODE 1 authentication (x-shinzo-api-key + provider API key provided)' })
+    } else if (xShinzoApiKey && !providerApiKeyHeader) {
+      // MODE 2a: x-shinzo-api-key present but NO provider API key
+      // Look up stored provider key from database
+      logger.info({ message: 'Using MODE 2a authentication (x-shinzo-api-key + lookup stored provider key)' })
+    } else if (!xShinzoApiKey && providerApiKeyHeader) {
+      // MODE 1b: Provider API key present without x-shinzo-api-key
+      // Use the provider API key directly (no Shinzo key validation)
+      logger.info({ message: 'Using MODE 1b authentication (provider API key only, no Shinzo validation)' })
+    } else {
+      // No authentication provided at all
+      logger.warn({
+        message: 'Authentication failed: No credentials provided',
+        hasXShinzoApiKey: !!xShinzoApiKey,
+        hasProviderApiKey: !!providerApiKeyHeader
+      })
       reply.status(401).send({
         error: {
           type: 'authentication_error',
-          message: 'Missing Authorization header with Shinzo API key'
+          message: 'Missing authentication. Provide x-shinzo-api-key and/or provider API key (Authorization or x-api-key header).'
         }
       })
       return
@@ -705,24 +746,116 @@ app.all('/spotlight/:provider/v1/*', async (request: FastifyRequest, reply: Fast
       // Handle count_tokens requests
       const { handleCountTokens } = await import('./handlers/spotlight')
       result = await handleCountTokens(
-        authHeader || null,
+        providerApiKeyHeader || null,
         xShinzoApiKey || null,
         provider,
-        request.body as any
+        request.body as any,
+        request.headers
       )
     } else {
       // Handle all other requests (messages, etc.)
       result = await handleModelProxy(
-        authHeader || null,
+        providerApiKeyHeader || null,
         xShinzoApiKey || null,
         provider,
         endpointPath,
-        request.body as any
+        request.body as any,
+        request.headers
       )
     }
+
+    // Forward response headers from provider (except transfer-encoding which is handled by Fastify)
+    if (result.responseHeaders) {
+      for (const [key, value] of Object.entries(result.responseHeaders)) {
+        if (value !== undefined && key.toLowerCase() !== 'transfer-encoding') {
+          reply.header(key, value)
+        }
+      }
+    }
+
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Model proxy error', error })
+    reply.status(500).send({ error: { type: 'internal_error', message: 'Internal server error' } })
+  }
+})
+
+// Event logging endpoint for Claude Code analytics
+// Note: Claude Code prefixes this with the provider base URL, so we use /spotlight/:provider/api/event_logging/batch
+app.post('/spotlight/:provider/api/event_logging/batch', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const { provider } = request.params as { provider: string }
+
+    // Log ALL incoming headers first for debugging
+    logger.info({
+      message: 'Event logging - ALL incoming headers (raw)',
+      allHeaders: request.headers,
+      headerKeys: Object.keys(request.headers)
+    })
+
+    // Extract authentication headers (same as main proxy) - try multiple case variations
+    // Treat empty strings as undefined
+    let xShinzoApiKey = request.headers['x-shinzo-api-key'] as string | undefined
+      || request.headers['X-Shinzo-Api-Key'] as string | undefined
+      || request.headers['X-SHINZO-API-KEY'] as string | undefined
+    if (xShinzoApiKey === '') xShinzoApiKey = undefined
+
+    // Extract provider API key from either Authorization or x-api-key header
+    let providerApiKeyHeader = request.headers.authorization?.replace('Bearer ', '')
+    if (!providerApiKeyHeader || providerApiKeyHeader === '') {
+      providerApiKeyHeader = request.headers['x-api-key'] as string | undefined
+    }
+    if (providerApiKeyHeader === '') providerApiKeyHeader = undefined
+
+    logger.info({
+      message: 'Event logging request received (parsed)',
+      provider,
+      hasXShinzoApiKey: !!xShinzoApiKey,
+      hasProviderApiKey: !!providerApiKeyHeader,
+      xShinzoApiKeyPrefix: xShinzoApiKey ? xShinzoApiKey.substring(0, 12) + '...' : 'none',
+      providerApiKeyPrefix: providerApiKeyHeader ? providerApiKeyHeader.substring(0, 12) + '...' : 'none',
+      providerApiKeySource: providerApiKeyHeader ? (request.headers.authorization ? 'Authorization' : 'x-api-key') : 'none',
+      eventCount: (request.body as any)?.events?.length || 0
+    })
+
+    // Validate authentication
+    if (!xShinzoApiKey && !providerApiKeyHeader) {
+      logger.warn({
+        message: 'Event logging auth failed: Missing authentication',
+        hasXShinzoApiKey: !!xShinzoApiKey,
+        hasProviderApiKey: !!providerApiKeyHeader
+      })
+      reply.status(401).send({
+        error: {
+          type: 'authentication_error',
+          message: 'Missing authentication. Provide x-shinzo-api-key and/or provider API key (Authorization or x-api-key header).'
+        }
+      })
+      return
+    }
+
+    // Import and call the event logging handler
+    const { handleEventLogging } = await import('./handlers/spotlight')
+    const result = await handleEventLogging(
+      providerApiKeyHeader || null,
+      xShinzoApiKey || null,
+      'anthropic', // Event logging is Anthropic-specific
+      request.body as any,
+      request.headers
+    )
+
+    // Forward response headers if available
+    if (result.responseHeaders) {
+      for (const [key, value] of Object.entries(result.responseHeaders)) {
+        if (value !== undefined && key.toLowerCase() !== 'transfer-encoding') {
+          reply.header(key, value)
+        }
+      }
+    }
+
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Event logging error', error })
     reply.status(500).send({ error: { type: 'internal_error', message: 'Internal server error' } })
   }
 })
