@@ -17,6 +17,7 @@ import { HistogramBucket } from './open_telemetry/HistogramBucket'
 import { ApiKey } from './spotlight/ApiKey'
 import { Session } from './spotlight/Session'
 import { Interaction } from './spotlight/Interaction'
+import { TokenCountRequest } from './spotlight/TokenCountRequest'
 import { Tool } from './spotlight/Tool'
 import { ToolUsage } from './spotlight/ToolUsage'
 import { UserAnalytics } from './spotlight/UserAnalytics'
@@ -41,6 +42,7 @@ export {
   ApiKey,
   Session,
   Interaction,
+  TokenCountRequest,
   Tool,
   ToolUsage,
   UserAnalytics,

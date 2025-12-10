@@ -699,13 +699,27 @@ app.all('/spotlight/:provider/v1/*', async (request: FastifyRequest, reply: Fast
       return
     }
 
-    const result = await handleModelProxy(
-      authHeader || null,
-      xShinzoApiKey || null,
-      provider,
-      endpointPath,
-      request.body as any
-    )
+    // Route to appropriate handler based on endpoint
+    let result
+    if (endpointPath === '/v1/messages/count_tokens') {
+      // Handle count_tokens requests
+      const { handleCountTokens } = await import('./handlers/spotlight')
+      result = await handleCountTokens(
+        authHeader || null,
+        xShinzoApiKey || null,
+        provider,
+        request.body as any
+      )
+    } else {
+      // Handle all other requests (messages, etc.)
+      result = await handleModelProxy(
+        authHeader || null,
+        xShinzoApiKey || null,
+        provider,
+        endpointPath,
+        request.body as any
+      )
+    }
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Model proxy error', error })

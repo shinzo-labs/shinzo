@@ -648,6 +648,40 @@ export const handleModelProxy = async (
       const baseUrl = providerKeyRow?.provider_base_url || getProviderBaseUrl(provider)
       const url = `${baseUrl}${endpointPath}`
 
+      // Clean up request body for Anthropic API compatibility
+      // Claude Code includes internal fields when talking to proxies that need to be filtered
+      if (provider === 'anthropic') {
+        // Valid top-level fields per Anthropic API spec
+        const validRequestFields = new Set([
+          'model', 'messages', 'max_tokens', 'metadata', 'stop_sequences',
+          'stream', 'system', 'temperature', 'thinking', 'tool_choice',
+          'tools', 'top_k', 'top_p', 'service_tier'
+        ])
+
+        // Filter out non-standard request fields (like context_management)
+        const cleanedBody: any = {}
+        for (const [key, value] of Object.entries(requestBody)) {
+          if (validRequestFields.has(key)) {
+            cleanedBody[key] = value
+          }
+        }
+        requestBody = cleanedBody
+
+        // Clean up tools array - remove fields like input_examples
+        if (requestBody.tools) {
+          const validToolFields = new Set(['name', 'description', 'input_schema', 'type', 'cache_control'])
+          requestBody.tools = requestBody.tools.map((tool: any) => {
+            const cleanedTool: any = {}
+            for (const [key, value] of Object.entries(tool)) {
+              if (validToolFields.has(key)) {
+                cleanedTool[key] = value
+              }
+            }
+            return cleanedTool
+          })
+        }
+      }
+
       logger.info({
         message: 'Proxying request to provider',
         provider,
@@ -770,6 +804,259 @@ export const handleModelProxy = async (
     }
   } catch (error: any) {
     logger.error({ message: 'Error in model proxy handler', error })
+    return {
+      response: { error: { type: 'internal_error', message: 'Internal server error' } },
+      error: true,
+      status: 500
+    }
+  }
+}
+
+// ============================================================================
+// Count Tokens Handler
+// ============================================================================
+
+export const handleCountTokens = async (
+  shinzoApiKey: string | null,
+  xShinzoApiKey: string | null,
+  provider: string,
+  requestBody: any
+) => {
+  try {
+    // Determine which auth mode we're using
+    const usingSeparateHeader = !!xShinzoApiKey
+    const shinzoKeyToValidate = xShinzoApiKey || shinzoApiKey
+
+    if (!shinzoKeyToValidate) {
+      return {
+        response: {
+          error: {
+            type: 'authentication_error',
+            message: 'Missing Shinzo API key. Provide either x-shinzo-api-key header or Authorization header.'
+          }
+        },
+        error: true,
+        status: 401
+      }
+    }
+
+    // 1. Validate Shinzo API key
+    const [shinzoKeyResults] = await sequelize.query(
+      `SELECT uuid, user_uuid, key_name, status
+       FROM spotlight.shinzo_api_key
+       WHERE api_key = $1 AND status = 'active'`,
+      { bind: [shinzoKeyToValidate] })
+
+    if (!shinzoKeyResults?.length) {
+      return {
+        response: { error: { type: 'invalid_api_key', message: 'Invalid or inactive Shinzo API key' } },
+        error: true,
+        status: 401
+      }
+    }
+
+    const shinzoKey = shinzoKeyResults[0] as any
+    const userUuid = shinzoKey.user_uuid
+
+    // Update last_used timestamp
+    await sequelize.query(
+      `UPDATE spotlight.shinzo_api_key SET last_used = CURRENT_TIMESTAMP WHERE uuid = $1`,
+      { bind: [shinzoKey.uuid] })
+
+    let providerApiKey: string
+    let providerKeyRow: any = null
+    let authType: 'api_key' | 'subscription' | 'unknown'
+
+    if (usingSeparateHeader) {
+      // MODE 1: x-shinzo-api-key header present
+      providerApiKey = shinzoApiKey!
+      authType = detectAuthType(providerApiKey)
+
+      logger.info({
+        message: 'Count tokens request using direct provider key (MODE 1)',
+        provider,
+        userUuid,
+        authType,
+        shinzoKeyPrefix: shinzoKeyToValidate.substring(0, 12) + '...',
+        providerKeyPrefix: providerApiKey.substring(0, 12) + '...'
+      })
+    } else {
+      // MODE 2: Traditional mode - look up stored provider key
+      const [providerKeyResults] = await sequelize.query(
+        `SELECT uuid, encrypted_key, encryption_iv, provider_base_url, provider
+         FROM spotlight.provider_key
+         WHERE user_uuid = $1 AND provider = $2 AND status = 'active'
+         LIMIT 1`,
+        { bind: [userUuid, provider] })
+
+      if (!providerKeyResults?.length) {
+        return {
+          response: {
+            error: {
+              type: 'no_provider_key',
+              message: `No active ${provider} provider key found. Please add one in your dashboard.`
+            }
+          },
+          error: true,
+          status: 400
+        }
+      }
+
+      providerKeyRow = providerKeyResults[0] as any
+
+      // Decrypt provider key
+      try {
+        providerApiKey = decryptProviderKey(providerKeyRow.encrypted_key, providerKeyRow.encryption_iv)
+        authType = detectAuthType(providerApiKey)
+      } catch (decryptError) {
+        logger.error({ message: 'Failed to decrypt provider key', error: decryptError, userUuid })
+        return {
+          response: { error: { type: 'decryption_error', message: 'Failed to decrypt provider key' } },
+          error: true,
+          status: 500
+        }
+      }
+
+      // Update last_used for provider key
+      await sequelize.query(
+        `UPDATE spotlight.provider_key SET last_used = CURRENT_TIMESTAMP WHERE uuid = $1`,
+        { bind: [providerKeyRow.uuid] })
+    }
+
+    const requestTimestamp = new Date()
+
+    // Extract metadata for tracking
+    const messageCount = requestBody.messages?.length || 0
+    const hasSystemPrompt = !!requestBody.system
+    const hasTools = !!requestBody.tools && requestBody.tools.length > 0
+
+    // Create token count request record
+    const [tokenCountResults] = await sequelize.query(
+      `INSERT INTO spotlight.token_count_request
+       (user_uuid, api_key_uuid, shinzo_api_key_uuid, request_timestamp, model, provider,
+        has_system_prompt, has_tools, message_count, request_data, status, auth_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11)
+       RETURNING uuid`,
+      { bind: [
+        userUuid,
+        providerKeyRow?.uuid || null,
+        shinzoKey.uuid,
+        requestTimestamp,
+        requestBody.model || 'unknown',
+        provider,
+        hasSystemPrompt,
+        hasTools,
+        messageCount,
+        JSON.stringify(requestBody),
+        authType
+      ] })
+
+    const tokenCountRequest = tokenCountResults[0] as any
+
+    // Forward request to provider
+    try {
+      const baseUrl = providerKeyRow?.provider_base_url || getProviderBaseUrl(provider)
+      const url = `${baseUrl}/v1/messages/count_tokens`
+
+      logger.info({
+        message: 'Forwarding count_tokens request to provider',
+        provider,
+        url,
+        userUuid,
+        authType,
+        providerKeyPrefix: providerApiKey.substring(0, 12) + '...',
+        usingSeparateHeader
+      })
+
+      // Build headers based on auth type
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      if (provider === 'anthropic') {
+        if (authType === 'subscription') {
+          headers['Authorization'] = `Bearer ${providerApiKey}`
+          headers['anthropic-beta'] = 'oauth-2025-04-20'
+        } else {
+          headers['x-api-key'] = providerApiKey
+        }
+        headers['anthropic-version'] = '2023-06-01'
+      } else {
+        headers['Authorization'] = `Bearer ${providerApiKey}`
+      }
+
+      const providerResponse = await axios.post(url, requestBody, {
+        headers,
+        timeout: 30000, // Shorter timeout for count_tokens
+      })
+
+      const responseTimestamp = new Date()
+      const latencyMs = responseTimestamp.getTime() - requestTimestamp.getTime()
+
+      // Extract token count from response
+      const inputTokens = providerResponse.data.input_tokens || 0
+
+      // Update token count request with response
+      await sequelize.query(
+        `UPDATE spotlight.token_count_request
+         SET response_timestamp = $1, latency_ms = $2, input_tokens = $3,
+             response_data = $4, status = 'success', updated_at = CURRENT_TIMESTAMP
+         WHERE uuid = $5`,
+        { bind: [
+          responseTimestamp,
+          latencyMs,
+          inputTokens,
+          JSON.stringify(providerResponse.data),
+          tokenCountRequest.uuid
+        ] })
+
+      logger.info({
+        message: 'Count tokens request successful',
+        userUuid,
+        provider,
+        inputTokens,
+        latencyMs
+      })
+
+      return {
+        response: providerResponse.data,
+        status: providerResponse.status
+      }
+    } catch (providerError: any) {
+      logger.error({
+        message: 'Error counting tokens with provider',
+        error: providerError,
+        provider,
+        userUuid,
+        responseStatus: providerError.response?.status,
+        responseData: providerError.response?.data,
+        responseHeaders: providerError.response?.headers
+      })
+
+      // Update token count request with error
+      await sequelize.query(
+        `UPDATE spotlight.token_count_request
+         SET error_message = $1, error_type = $2, status = 'error', updated_at = CURRENT_TIMESTAMP
+         WHERE uuid = $3`,
+        { bind: [
+          providerError.message,
+          providerError.response?.data?.error?.type || 'unknown',
+          tokenCountRequest.uuid
+        ] })
+
+      return {
+        response: {
+          error: {
+            type: 'provider_error',
+            message: providerError.response?.data?.error?.message || providerError.message,
+          }
+        },
+        error: true,
+        status: providerError.response?.status || 500
+      }
+    }
+  } catch (error: any) {
+    logger.error({ message: 'Error in count tokens handler', error })
     return {
       response: { error: { type: 'internal_error', message: 'Internal server error' } },
       error: true,
