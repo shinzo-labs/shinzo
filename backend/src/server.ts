@@ -647,9 +647,15 @@ app.delete('/spotlight/provider_keys/:keyUuid', async (request: AuthenticatedReq
 // Spotlight - Model Proxy (Updated Architecture)
 // ============================================================================
 
-app.post('/spotlight/:provider/v1/messages', async (request: FastifyRequest, reply: FastifyReply) => {
+// Catch-all route for all provider API endpoints (not just /v1/messages)
+app.all('/spotlight/:provider/v1/*', async (request: FastifyRequest, reply: FastifyReply) => {
   try {
     const { provider } = request.params as { provider: string }
+
+    // Extract the endpoint path after /spotlight/:provider
+    // e.g., /spotlight/anthropic/v1/messages/count_tokens -> /v1/messages/count_tokens
+    const fullPath = request.url.split('?')[0] // Remove query params
+    const endpointPath = fullPath.substring(fullPath.indexOf('/v1/'))
 
     // Check for x-shinzo-api-key header (new mode)
     const xShinzoApiKey = request.headers['x-shinzo-api-key'] as string | undefined
@@ -697,6 +703,7 @@ app.post('/spotlight/:provider/v1/messages', async (request: FastifyRequest, rep
       authHeader || null,
       xShinzoApiKey || null,
       provider,
+      endpointPath,
       request.body as any
     )
     reply.status(result.status || 200).send(result.response)

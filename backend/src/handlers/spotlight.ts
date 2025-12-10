@@ -490,6 +490,7 @@ export const handleModelProxy = async (
   shinzoApiKey: string | null,
   xShinzoApiKey: string | null,
   provider: string,
+  endpointPath: string,
   requestBody: any
 ) => {
   try {
@@ -644,14 +645,14 @@ export const handleModelProxy = async (
 
     // 4. Forward request to provider
     try {
-      const endpoint = provider === 'anthropic' ? '/v1/messages' : '/v1/chat/completions'
       const baseUrl = providerKeyRow?.provider_base_url || getProviderBaseUrl(provider)
-      const url = `${baseUrl}${endpoint}`
+      const url = `${baseUrl}${endpointPath}`
 
       logger.info({
         message: 'Proxying request to provider',
         provider,
         url,
+        endpointPath,
         userUuid,
         authType,
         providerKeyPrefix: providerApiKey.substring(0, 12) + '...', // Log prefix for debugging
