@@ -480,7 +480,7 @@ export const handleModelProxy = async (
     const requestTimestamp = new Date()
 
     const { apiKeyUuid, userUuid } = shinzoCredentials
-    const { providerKeyUuid } = providerCredentials
+    const { providerKeyUuid, authType } = providerCredentials
 
     let session: any = null
     const sessionId = requestBody.metadata?.user_id || 'default-session'
@@ -525,7 +525,7 @@ export const handleModelProxy = async (
         requestBody.temperature || null,
         requestBody.system || null,
         JSON.stringify(requestBody),
-        'api_key' // TODO figure out best way to identify subscription vs API-based access
+        authType
       ] })
 
     const interaction = interactionResults[0] as any
@@ -629,7 +629,7 @@ export const handleCountTokens = async (
 ) => {
   try {
     const { apiKeyUuid, userUuid } = shinzoCredentials
-    const { providerKeyUuid } = providerCredentials
+    const { providerKeyUuid, authType } = providerCredentials
     const requestTimestamp = new Date()
     const messageCount = requestBody.messages?.length || 0
     const hasSystemPrompt = !!requestBody.system
@@ -652,7 +652,7 @@ export const handleCountTokens = async (
         hasTools,
         messageCount,
         JSON.stringify(requestBody),
-        'api_key'
+        authType
       ] })
 
     const tokenCountRequest = tokenCountResults[0] as any
