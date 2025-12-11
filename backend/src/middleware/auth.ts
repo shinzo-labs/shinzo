@@ -28,6 +28,7 @@ export interface ShinzoCredentials {
 export interface ProviderCredentials {
   providerKey: string | null
   providerKeyUuid: string | null
+  authType: 'api_key' | 'subscription' | 'unknown'
 }
 
 const requestContainsHeader = (request: FastifyRequest, header: string, prefix?: string): boolean => {
@@ -156,15 +157,17 @@ export const authenticatedShinzoCredentials = async (request: FastifyRequest): P
 }
 
 export const getProviderCredentials = async (request: FastifyRequest, provider: string, shinzoCredentials: ShinzoCredentials): Promise<ProviderCredentials> => {
-  const result: ProviderCredentials = { providerKey: null, providerKeyUuid: null }
+  const result: ProviderCredentials = { providerKey: null, providerKeyUuid: null, authType: 'unknown' }
 
   // Note: all of this logic only works for provider: anthropic at the moment. Other providers TBD.
 
   try {
     if (requestContainsHeader(request, AUTHORIZATION)) {
       result.providerKey = request.headers.authorization?.replace('Bearer ', '') as string
+      result.authType = 'subscription'
     } else if (requestContainsHeader(request, X_API_KEY)) {
       result.providerKey = request.headers[X_API_KEY] as string
+      result.authType = 'api_key'
     }
 
     if (!result.providerKey) {
@@ -200,8 +203,10 @@ export const getProviderCredentials = async (request: FastifyRequest, provider: 
 
       if (result.providerKey.startsWith(ANTHROPIC_OAUTH_KEY_PREFIX)) { // Subscription OAuth keys use Authorization header
         request.headers.authorization = `Bearer ${result.providerKey}`
+        result.authType = 'subscription'
       } else { // API keys use x-api-key header
         request.headers[X_API_KEY] = result.providerKey
+        result.authType = 'api_key'
       }
     }
 
