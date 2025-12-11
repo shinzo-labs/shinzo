@@ -4,7 +4,7 @@ import fastifyRateLimit from '@fastify/rate-limit'
 import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE, LOG_LEVEL } from './config'
 import { logger, pinoConfig } from './logger'
 import { sequelize } from './dbClient'
-import { authenticateJWT, AuthenticatedRequest } from './middleware/auth'
+import { authenticateJWT, AuthenticatedRequest, authenticatedShinzoCredentials, getProviderCredentials } from './middleware/auth'
 
 // Import handlers
 import {
@@ -65,12 +65,15 @@ import {
   updateProviderKeySchema,
   testProviderKeySchema,
   // Model Proxy
+  handleCountTokens,
   handleModelProxy,
+  handleEventLogging,
+  modelAPISpec,
   // Analytics handlers
   handleFetchTokenAnalytics,
   handleFetchSessionAnalytics,
   handleFetchSessionDetail,
-  fetchAnalyticsSchema
+  fetchAnalyticsSchema,
 } from './handlers/spotlight'
 
 // Create Fastify instance
@@ -473,7 +476,7 @@ app.post('/telemetry/ingest_http/traces', async (request: FastifyRequest, reply:
 })
 
 // ============================================================================
-// Spotlight - Shinzo API Key Management
+// Spotlight - AI Agent Analytics
 // ============================================================================
 
 app.post('/spotlight/shinzo_keys', async (request: AuthenticatedRequest, reply: FastifyReply) => {
@@ -547,10 +550,6 @@ app.delete('/spotlight/shinzo_keys/:keyUuid', async (request: AuthenticatedReque
     reply.status(500).send({ error: 'Internal server error' })
   }
 })
-
-// ============================================================================
-// Spotlight - Provider Key Management
-// ============================================================================
 
 app.post('/spotlight/provider_keys/test', async (request: FastifyRequest, reply: FastifyReply) => {
   try {
@@ -643,211 +642,69 @@ app.delete('/spotlight/provider_keys/:keyUuid', async (request: AuthenticatedReq
   }
 })
 
-// ============================================================================
-// Spotlight - Model Proxy (Updated Architecture)
-// ============================================================================
-
-// Catch-all route for all provider API endpoints (not just /v1/messages)
 app.all('/spotlight/:provider/v1/*', async (request: FastifyRequest, reply: FastifyReply) => {
   try {
-    const { provider } = request.params as { provider: string }
+    const shinzoCredentials = await authenticatedShinzoCredentials(request)
+    if (!shinzoCredentials.apiKey) {
+      reply.status(401).send({ error: 'Shinzo API key authentication failed' })
+      return    
+    }
 
     // Extract the endpoint path after /spotlight/:provider
     // e.g., /spotlight/anthropic/v1/messages/count_tokens -> /v1/messages/count_tokens
-    const fullPath = request.url.split('?')[0] // Remove query params
-    const endpointPath = fullPath.substring(fullPath.indexOf('/v1/'))
+    const endpointPath = request.url.match(/^\/spotlight\/([^\/]+)\/v1\/(.*)$/)?.[2]
 
-    // Log ALL incoming headers first for debugging
-    logger.info({
-      message: 'ALL incoming headers (raw)',
-      allHeaders: request.headers,
-      headerKeys: Object.keys(request.headers)
-    })
-
-    // Check for x-shinzo-api-key header (new mode) - try multiple case variations
-    // Treat empty strings as undefined
-    let xShinzoApiKey = request.headers['x-shinzo-api-key'] as string | undefined
-      || request.headers['X-Shinzo-Api-Key'] as string | undefined
-      || request.headers['X-SHINZO-API-KEY'] as string | undefined
-    if (xShinzoApiKey === '') xShinzoApiKey = undefined
-
-    // Extract provider API key from either Authorization or x-api-key header
-    // Authorization: Used for OAuth tokens (sk-ant-oat01-...)
-    // x-api-key: Used for API keys (sk-ant-api03-...)
-    let providerApiKeyHeader = request.headers.authorization?.replace('Bearer ', '')
-    if (!providerApiKeyHeader || providerApiKeyHeader === '') {
-      providerApiKeyHeader = request.headers['x-api-key'] as string | undefined
-    }
-    if (providerApiKeyHeader === '') providerApiKeyHeader = undefined
-
-    logger.info({
-      message: 'Proxy request received (parsed)',
-      provider,
-      endpointPath,
-      fullPath,
-      method: request.method,
-      hasXShinzoApiKey: !!xShinzoApiKey,
-      hasProviderApiKey: !!providerApiKeyHeader,
-      xShinzoApiKeyPrefix: xShinzoApiKey ? xShinzoApiKey.substring(0, 12) + '...' : 'none',
-      providerApiKeyPrefix: providerApiKeyHeader ? providerApiKeyHeader.substring(0, 12) + '...' : 'none',
-      providerApiKeySource: providerApiKeyHeader ? (request.headers.authorization ? 'Authorization' : 'x-api-key') : 'none',
-      headers: {
-        'anthropic-version': request.headers['anthropic-version'],
-        'anthropic-beta': request.headers['anthropic-beta'],
-        'user-agent': request.headers['user-agent'],
-        'content-type': request.headers['content-type']
-      }
-    })
-
-    // Determine authentication mode
-    if (xShinzoApiKey && providerApiKeyHeader) {
-      // MODE 1: x-shinzo-api-key + provider API key both present
-      // Use provider API key header directly (don't replace or lookup)
-      logger.info({ message: 'Using MODE 1 authentication (x-shinzo-api-key + provider API key provided)' })
-    } else if (xShinzoApiKey && !providerApiKeyHeader) {
-      // MODE 2a: x-shinzo-api-key present but NO provider API key
-      // Look up stored provider key from database
-      logger.info({ message: 'Using MODE 2a authentication (x-shinzo-api-key + lookup stored provider key)' })
-    } else if (!xShinzoApiKey && providerApiKeyHeader) {
-      // MODE 1b: Provider API key present without x-shinzo-api-key
-      // Use the provider API key directly (no Shinzo key validation)
-      logger.info({ message: 'Using MODE 1b authentication (provider API key only, no Shinzo validation)' })
-    } else {
-      // No authentication provided at all
-      logger.warn({
-        message: 'Authentication failed: No credentials provided',
-        hasXShinzoApiKey: !!xShinzoApiKey,
-        hasProviderApiKey: !!providerApiKeyHeader
-      })
-      reply.status(401).send({
-        error: {
-          type: 'authentication_error',
-          message: 'Missing authentication. Provide x-shinzo-api-key and/or provider API key (Authorization or x-api-key header).'
-        }
-      })
-      return
-    }
-
-    // Validate provider
-    const validProviders = ['anthropic', 'openai', 'google']
-    if (!validProviders.includes(provider)) {
-      reply.status(400).send({
-        error: {
-          type: 'invalid_request',
-          message: `Invalid provider: ${provider}. Supported providers: ${validProviders.join(', ')}`
-        }
-      })
-      return
-    }
-
-    // Route to appropriate handler based on endpoint
     let result
-    if (endpointPath === '/v1/messages/count_tokens') {
-      // Handle count_tokens requests
-      const { handleCountTokens } = await import('./handlers/spotlight')
-      result = await handleCountTokens(
-        providerApiKeyHeader || null,
-        xShinzoApiKey || null,
-        provider,
-        request.body as any,
-        request.headers
-      )
-    } else {
-      // Handle all other requests (messages, etc.)
-      result = await handleModelProxy(
-        providerApiKeyHeader || null,
-        xShinzoApiKey || null,
-        provider,
-        endpointPath,
-        request.body as any,
-        request.headers
-      )
-    }
 
-    // Forward response headers from provider (except transfer-encoding which is handled by Fastify)
-    if (result.responseHeaders) {
-      for (const [key, value] of Object.entries(result.responseHeaders)) {
-        if (value !== undefined && key.toLowerCase() !== 'transfer-encoding') {
-          reply.header(key, value)
-        }
-      }
-    }
-
-    reply.status(result.status || 200).send(result.response)
-  } catch (error: any) {
-    logger.error({ message: 'Model proxy error', error })
-    reply.status(500).send({ error: { type: 'internal_error', message: 'Internal server error' } })
-  }
-})
-
-// Event logging endpoint for Claude Code analytics
-// Note: Claude Code prefixes this with the provider base URL, so we use /spotlight/:provider/api/event_logging/batch
-app.post('/spotlight/:provider/api/event_logging/batch', async (request: FastifyRequest, reply: FastifyReply) => {
-  try {
     const { provider } = request.params as { provider: string }
 
-    // Log ALL incoming headers first for debugging
-    logger.info({
-      message: 'Event logging - ALL incoming headers (raw)',
-      allHeaders: request.headers,
-      headerKeys: Object.keys(request.headers)
-    })
-
-    // Extract authentication headers (same as main proxy) - try multiple case variations
-    // Treat empty strings as undefined
-    let xShinzoApiKey = request.headers['x-shinzo-api-key'] as string | undefined
-      || request.headers['X-Shinzo-Api-Key'] as string | undefined
-      || request.headers['X-SHINZO-API-KEY'] as string | undefined
-    if (xShinzoApiKey === '') xShinzoApiKey = undefined
-
-    // Extract provider API key from either Authorization or x-api-key header
-    let providerApiKeyHeader = request.headers.authorization?.replace('Bearer ', '')
-    if (!providerApiKeyHeader || providerApiKeyHeader === '') {
-      providerApiKeyHeader = request.headers['x-api-key'] as string | undefined
-    }
-    if (providerApiKeyHeader === '') providerApiKeyHeader = undefined
-
-    logger.info({
-      message: 'Event logging request received (parsed)',
-      provider,
-      hasXShinzoApiKey: !!xShinzoApiKey,
-      hasProviderApiKey: !!providerApiKeyHeader,
-      xShinzoApiKeyPrefix: xShinzoApiKey ? xShinzoApiKey.substring(0, 12) + '...' : 'none',
-      providerApiKeyPrefix: providerApiKeyHeader ? providerApiKeyHeader.substring(0, 12) + '...' : 'none',
-      providerApiKeySource: providerApiKeyHeader ? (request.headers.authorization ? 'Authorization' : 'x-api-key') : 'none',
-      eventCount: (request.body as any)?.events?.length || 0
-    })
-
-    // Validate authentication
-    if (!xShinzoApiKey && !providerApiKeyHeader) {
-      logger.warn({
-        message: 'Event logging auth failed: Missing authentication',
-        hasXShinzoApiKey: !!xShinzoApiKey,
-        hasProviderApiKey: !!providerApiKeyHeader
-      })
-      reply.status(401).send({
-        error: {
-          type: 'authentication_error',
-          message: 'Missing authentication. Provide x-shinzo-api-key and/or provider API key (Authorization or x-api-key header).'
-        }
-      })
+    const providerCredentials = await getProviderCredentials(request, provider, shinzoCredentials)
+    if (!providerCredentials.providerKey) {
+      reply.status(401).send({ error: 'Provider key authentication failed' })
       return
     }
 
-    // Import and call the event logging handler
-    const { handleEventLogging } = await import('./handlers/spotlight')
-    const result = await handleEventLogging(
-      providerApiKeyHeader || null,
-      xShinzoApiKey || null,
-      'anthropic', // Event logging is Anthropic-specific
-      request.body as any,
-      request.headers
-    )
+    if (provider === 'anthropic') {
+      switch(endpointPath) {
+        case modelAPISpec.anthropic.countTokens:
+          result = await handleCountTokens(
+            shinzoCredentials,
+            provider,
+            providerCredentials,
+            request.headers,
+            request.body,
+          )
+          break
+        case modelAPISpec.anthropic.modelProxy:
+          result = await handleModelProxy(
+            shinzoCredentials,
+            provider,
+            providerCredentials,
+            request.headers,
+            request.body,
+          )
+          break
+        case modelAPISpec.anthropic.eventLogging:
+          result = await handleEventLogging(
+            shinzoCredentials,
+            provider,
+            providerCredentials,
+            request.headers,
+            request.body,
+          )
+          break
+        default:
+          reply.status(404).send({ error: `Endpoint ${endpointPath} not found` })
+          return
+      }
+    } else {
+      reply.status(400).send({ error: 'Unsupported provider' })
+      return
+    }
 
-    // Forward response headers if available
     if (result.responseHeaders) {
       for (const [key, value] of Object.entries(result.responseHeaders)) {
-        if (value !== undefined && key.toLowerCase() !== 'transfer-encoding') {
+        if (value !== undefined && key.toLowerCase() !== 'transfer-encoding') { // transfer-encoding is handled by Fastify
           reply.header(key, value)
         }
       }
@@ -855,7 +712,7 @@ app.post('/spotlight/:provider/api/event_logging/batch', async (request: Fastify
 
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
-    logger.error({ message: 'Event logging error', error })
+    logger.error({ message: 'Model provider proxy error', error })
     reply.status(500).send({ error: { type: 'internal_error', message: 'Internal server error' } })
   }
 })
