@@ -21,6 +21,7 @@ import {
   ApiKey,
   Session,
   Interaction,
+  TokenCountRequest,
   Tool,
   ToolUsage,
   UserAnalytics
@@ -64,6 +65,7 @@ HistogramBucket.initialize(sequelize)
 ApiKey.initialize(sequelize)
 Session.initialize(sequelize)
 Interaction.initialize(sequelize)
+TokenCountRequest.initialize(sequelize)
 Tool.initialize(sequelize)
 ToolUsage.initialize(sequelize)
 UserAnalytics.initialize(sequelize)

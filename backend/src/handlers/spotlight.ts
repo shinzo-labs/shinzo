@@ -1,22 +1,35 @@
 import * as yup from 'yup'
-import { ApiKey, Session, Interaction, Tool, ToolUsage, UserAnalytics } from '../models'
+import { Session, Interaction, ToolUsage } from '../models'
 import { logger } from '../logger'
-import { Op, QueryTypes } from 'sequelize'
+import { Op } from 'sequelize'
 import axios from 'axios'
 import {
   generateShinzoApiKey,
   encryptProviderKey,
-  decryptProviderKey,
   getProviderKeyPrefix,
   KeyType,
 } from '../utils'
 import { sequelize } from '../dbClient'
+import { ShinzoCredentials, ProviderCredentials, constructModelAPIHeaders } from '../middleware/auth'
 
-// ============================================================================
-// Schema Definitions
-// ============================================================================
+const TEST_TIMEOUT = 10 * 1000 // 10 seconds
+const COUNT_TOKENS_TIMEOUT = 30 * 1000 // 30 seconds
+const REQUEST_TIMEOUT = 2 * 60 * 1000 // 2 minutes
 
-// Shinzo API Key Schemas
+const SUPPORTED_PROVIDERS = ['anthropic']
+
+export const modelAPISpec: Record<typeof SUPPORTED_PROVIDERS[number], Record<string, string>> = {
+  anthropic: {
+    countTokens: '/v1/messages/count_tokens',
+    modelProxy: '/v1/messages',
+    eventLogging: '/api/event_logging/batch',
+  }
+}
+
+const modelProviderBaseURL: Record<typeof SUPPORTED_PROVIDERS[number], string> = {
+  anthropic: 'https://api.anthropic.com'
+}
+
 export const createShinzoApiKeySchema = yup.object({
   key_name: yup.string().required('Key name is required'),
   key_type: yup.string().oneOf(['live', 'test']).default('live'),
@@ -27,9 +40,8 @@ export const updateShinzoApiKeySchema = yup.object({
   status: yup.string().oneOf(['active', 'inactive', 'revoked']).optional(),
 }).required()
 
-// Provider Key Schemas
 export const createProviderKeySchema = yup.object({
-  provider: yup.string().oneOf(['anthropic', 'openai', 'google', 'custom']).required('Provider is required'),
+  provider: yup.string().oneOf(SUPPORTED_PROVIDERS).required('Provider is required'),
   provider_api_key: yup.string().required('Provider API key is required'),
   provider_base_url: yup.string().url().nullable(),
   label: yup.string().nullable(),
@@ -43,7 +55,7 @@ export const updateProviderKeySchema = yup.object({
 }).required()
 
 export const testProviderKeySchema = yup.object({
-  provider: yup.string().oneOf(['anthropic', 'openai', 'google']).required(),
+  provider: yup.string().oneOf(SUPPORTED_PROVIDERS).required(),
   provider_api_key: yup.string().required(),
   provider_base_url: yup.string().url().nullable(),
 }).required()
@@ -55,21 +67,6 @@ export const fetchAnalyticsSchema = yup.object({
   model: yup.string().optional(),
   provider: yup.string().optional(),
 }).optional()
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-function getProviderBaseUrl(provider: string, customUrl?: string): string {
-  if (customUrl) return customUrl
-
-  const baseUrls: Record<string, string> = {
-    anthropic: 'https://api.anthropic.com',
-    openai: 'https://api.openai.com',
-    google: 'https://generativelanguage.googleapis.com',
-  }
-  return baseUrls[provider] || ''
-}
 
 // ============================================================================
 // Shinzo API Key CRUD Operations
@@ -242,20 +239,17 @@ export const handleTestProviderKey = async (
   request: yup.InferType<typeof testProviderKeySchema>
 ) => {
   try {
-    const baseUrl = getProviderBaseUrl(request.provider, request.provider_base_url || undefined)
-    const endpoint = request.provider === 'anthropic' ? '/v1/messages' : '/v1/chat/completions'
-    const url = `${baseUrl}${endpoint}`
+    const url = `${modelProviderBaseURL[request.provider]}${modelAPISpec[request.provider].modelProxy}`
 
-    // Simple test request
     const testBody = request.provider === 'anthropic'
       ? {
           model: 'claude-3-haiku-20240307',
-          max_tokens: 10,
+          max_tokens: 1,
           messages: [{ role: 'user', content: 'test' }]
         }
       : {
           model: 'gpt-3.5-turbo',
-          max_tokens: 10,
+          max_tokens: 1,
           messages: [{ role: 'user', content: 'test' }]
         }
 
@@ -264,9 +258,9 @@ export const handleTestProviderKey = async (
         'Content-Type': 'application/json',
         'x-api-key': request.provider_api_key,
         'Authorization': `Bearer ${request.provider_api_key}`,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': '2023-06-01', // TODO is this necessary?
       },
-      timeout: 10000,
+      timeout: TEST_TIMEOUT,
     })
 
     return {
@@ -280,7 +274,7 @@ export const handleTestProviderKey = async (
       return {
         response: { message: 'Invalid API key', success: false },
         error: true,
-        status: 200 // Return 200 with error message in body
+        status: 200
       }
     }
 
@@ -297,10 +291,18 @@ export const handleCreateProviderKey = async (
   request: yup.InferType<typeof createProviderKeySchema>
 ) => {
   try {
-    // Encrypt the provider API key
     const { encryptedKey, iv } = encryptProviderKey(request.provider_api_key)
     const keyPrefix = getProviderKeyPrefix(request.provider_api_key)
-    const baseUrl = getProviderBaseUrl(request.provider, request.provider_base_url || undefined)
+    const baseUrl = modelProviderBaseURL[request.provider]
+    if (!baseUrl) {
+      return {
+        response: 'Invalid provider',
+        error: true,
+        status: 400
+      }
+    }
+
+    // Future TODO: remove provider_base_url from provider key table (it's unnecessary)
 
     const [results] = await sequelize.query(
       `INSERT INTO spotlight.provider_key
@@ -467,142 +469,73 @@ export const handleDeleteProviderKey = async (userUuid: string, keyUuid: string)
   }
 }
 
-// ============================================================================
-// Model Proxy Handler (Updated for new architecture)
-// ============================================================================
-
 export const handleModelProxy = async (
-  shinzoApiKey: string,
+  shinzoCredentials: ShinzoCredentials,
   provider: string,
-  requestBody: any
+  providerCredentials: ProviderCredentials,
+  requestHeaders: Record<string, string | string[] | undefined>,
+  requestBody: any,
 ) => {
   try {
-    // 1. Validate Shinzo API key
-    const [shinzoKeyResults] = await sequelize.query(
-      `SELECT uuid, user_uuid, key_name, status
-       FROM spotlight.shinzo_api_key
-       WHERE api_key = $1 AND status = 'active'`,
-      { bind: [shinzoApiKey] })
-
-    if (!shinzoKeyResults?.length) {
-      return {
-        response: { error: { type: 'invalid_api_key', message: 'Invalid or inactive Shinzo API key' } },
-        error: true,
-        status: 401
-      }
-    }
-
-    const shinzoKey = shinzoKeyResults[0] as any
-    const userUuid = shinzoKey.user_uuid
-
-    // Update last_used timestamp
-    await sequelize.query(
-      `UPDATE spotlight.shinzo_api_key SET last_used = CURRENT_TIMESTAMP WHERE uuid = $1`,
-      { bind: [shinzoKey.uuid] })
-
-    // 2. Look up active provider key for this user and provider
-    const [providerKeyResults] = await sequelize.query(
-      `SELECT uuid, encrypted_key, encryption_iv, provider_base_url, provider
-       FROM spotlight.provider_key
-       WHERE user_uuid = $1 AND provider = $2 AND status = 'active'
-       LIMIT 1`,
-      { bind: [userUuid, provider] })
-
-    if (!providerKeyResults?.length) {
-      return {
-        response: {
-          error: {
-            type: 'no_provider_key',
-            message: `No active ${provider} provider key found. Please add one in your dashboard.`
-          }
-        },
-        error: true,
-        status: 400
-      }
-    }
-
-    const providerKeyRow = providerKeyResults[0] as any
-
-    // 3. Decrypt provider key
-    let providerApiKey: string
-    try {
-      providerApiKey = decryptProviderKey(providerKeyRow.encrypted_key, providerKeyRow.encryption_iv)
-    } catch (decryptError) {
-      logger.error({ message: 'Failed to decrypt provider key', error: decryptError, userUuid })
-      return {
-        response: { error: { type: 'decryption_error', message: 'Failed to decrypt provider key' } },
-        error: true,
-        status: 500
-      }
-    }
-
-    // Update last_used for provider key
-    await sequelize.query(
-      `UPDATE spotlight.provider_key SET last_used = CURRENT_TIMESTAMP WHERE uuid = $1`,
-      { bind: [providerKeyRow.uuid] })
-
     const requestTimestamp = new Date()
+
+    const { apiKeyUuid, userUuid } = shinzoCredentials
+    const { providerKeyUuid } = providerCredentials
+
+    let session: any = null
     const sessionId = requestBody.metadata?.user_id || 'default-session'
 
-    // Get or create session
+    // Future TODO: divorce provider credentials and API key from session, since they can change mid-session
+
     let [sessionResults] = await sequelize.query(
       `SELECT uuid, total_requests, total_input_tokens, total_output_tokens, total_cached_tokens
-       FROM spotlight.session
-       WHERE user_uuid = $1 AND shinzo_api_key_uuid = $2 AND session_id = $3 AND end_time IS NULL
-       LIMIT 1`,
-      { bind: [userUuid, shinzoKey.uuid, sessionId] })
+        FROM spotlight.session
+        WHERE user_uuid = $1 AND shinzo_api_key_uuid = $2 AND session_id = $3 AND end_time IS NULL
+        LIMIT 1`,
+      { bind: [userUuid, apiKeyUuid, sessionId] }
+    )
 
-    let session
-    if (!sessionResults?.length) {
+    if (sessionResults?.length) {
+      session = sessionResults[0] as any
+    } else {
       const [newSessionResults] = await sequelize.query(
         `INSERT INTO spotlight.session (user_uuid, api_key_uuid, shinzo_api_key_uuid, session_id, start_time)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING uuid, total_requests, total_input_tokens, total_output_tokens, total_cached_tokens`,
-        { bind: [userUuid, providerKeyRow.uuid, shinzoKey.uuid, sessionId, requestTimestamp] })
+          VALUES ($1, $2, $3, $4, $5)
+          RETURNING uuid, total_requests, total_input_tokens, total_output_tokens, total_cached_tokens`,
+        { bind: [userUuid, providerKeyUuid, apiKeyUuid, sessionId, requestTimestamp] }
+      )
       session = newSessionResults[0] as any
-    } else {
-      session = sessionResults[0] as any
     }
 
-    // Create interaction record
     const [interactionResults] = await sequelize.query(
       `INSERT INTO spotlight.interaction
        (session_uuid, user_uuid, api_key_uuid, shinzo_api_key_uuid, request_timestamp, model, provider,
-        max_tokens, temperature, system_prompt, request_data, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending')
+        max_tokens, temperature, system_prompt, request_data, status, auth_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12)
        RETURNING uuid`,
       { bind: [
         session.uuid,
         userUuid,
-        providerKeyRow.uuid,
-        shinzoKey.uuid,
+        providerKeyUuid,
+        apiKeyUuid,
         requestTimestamp,
         requestBody.model || 'unknown',
         provider,
         requestBody.max_tokens || null,
         requestBody.temperature || null,
         requestBody.system || null,
-        JSON.stringify(requestBody)
+        JSON.stringify(requestBody),
+        'api_key' // TODO figure out best way to identify subscription vs API-based access
       ] })
 
     const interaction = interactionResults[0] as any
 
-    // 4. Forward request to provider
     try {
-      const endpoint = provider === 'anthropic' ? '/v1/messages' : '/v1/chat/completions'
-      const url = `${providerKeyRow.provider_base_url}${endpoint}`
+      const url = `${modelProviderBaseURL[provider]}${modelAPISpec[provider].modelProxy}`
 
-      logger.info({ message: 'Proxying request to provider', provider, url, userUuid })
+      const headers = constructModelAPIHeaders(requestHeaders)
 
-      const providerResponse = await axios.post(url, requestBody, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': providerApiKey,
-          'Authorization': `Bearer ${providerApiKey}`,
-          'anthropic-version': '2023-06-01',
-        },
-        timeout: 120000,
-      })
+      const providerResponse = await axios.post(url, requestBody, { headers, timeout: REQUEST_TIMEOUT })
 
       const responseTimestamp = new Date()
       const latencyMs = responseTimestamp.getTime() - requestTimestamp.getTime()
@@ -614,7 +547,6 @@ export const handleModelProxy = async (
       const cacheCreationTokens = usage.cache_creation_input_tokens || 0
       const cacheReadTokens = usage.cache_read_input_tokens || 0
 
-      // Update interaction with response
       await sequelize.query(
         `UPDATE spotlight.interaction
          SET response_timestamp = $1, response_id = $2, stop_reason = $3, latency_ms = $4,
@@ -634,7 +566,6 @@ export const handleModelProxy = async (
           interaction.uuid
         ] })
 
-      // Update session totals
       await sequelize.query(
         `UPDATE spotlight.session
          SET total_requests = total_requests + 1,
@@ -645,17 +576,19 @@ export const handleModelProxy = async (
          WHERE uuid = $4`,
         { bind: [inputTokens, outputTokens, cacheReadTokens, session.uuid] })
 
-      // Track tools and user analytics (similar to before, but omitted for brevity)
-      // ... (implement tool tracking and user analytics as in original)
-
       return {
         response: providerResponse.data,
+        responseHeaders: providerResponse.headers,
         status: providerResponse.status
       }
     } catch (providerError: any) {
-      logger.error({ message: 'Error proxying to provider', error: providerError, provider, userUuid })
+      logger.error({
+        message: 'Error proxying to provider',
+        error: providerError,
+        provider,
+        userUuid
+      })
 
-      // Update interaction with error
       await sequelize.query(
         `UPDATE spotlight.interaction
          SET error_message = $1, error_type = $2, status = 'error', updated_at = CURRENT_TIMESTAMP
@@ -683,6 +616,165 @@ export const handleModelProxy = async (
       response: { error: { type: 'internal_error', message: 'Internal server error' } },
       error: true,
       status: 500
+    }
+  }
+}
+
+export const handleCountTokens = async (
+  shinzoCredentials: ShinzoCredentials,
+  provider: string,
+  providerCredentials: ProviderCredentials,
+  requestHeaders: Record<string, string | string[] | undefined>,
+  requestBody: any,
+) => {
+  try {
+    const { apiKeyUuid, userUuid } = shinzoCredentials
+    const { providerKeyUuid } = providerCredentials
+    const requestTimestamp = new Date()
+    const messageCount = requestBody.messages?.length || 0
+    const hasSystemPrompt = !!requestBody.system
+    const hasTools = !!requestBody.tools && requestBody.tools.length > 0
+
+    const [tokenCountResults] = await sequelize.query(
+      `INSERT INTO spotlight.token_count_request
+       (user_uuid, api_key_uuid, shinzo_api_key_uuid, request_timestamp, model, provider,
+        has_system_prompt, has_tools, message_count, request_data, status, auth_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11)
+       RETURNING uuid`,
+      { bind: [
+        userUuid,
+        providerKeyUuid,
+        apiKeyUuid,
+        requestTimestamp,
+        requestBody.model || 'unknown',
+        provider,
+        hasSystemPrompt,
+        hasTools,
+        messageCount,
+        JSON.stringify(requestBody),
+        'api_key'
+      ] })
+
+    const tokenCountRequest = tokenCountResults[0] as any
+
+    try {
+      const url = `${modelProviderBaseURL[provider]}${modelAPISpec[provider].countTokens}`
+
+      const headers = constructModelAPIHeaders(requestHeaders)
+
+      const providerResponse = await axios.post(url, requestBody, {
+        headers,
+        timeout: COUNT_TOKENS_TIMEOUT,
+      })
+
+      const responseTimestamp = new Date()
+      const latencyMs = responseTimestamp.getTime() - requestTimestamp.getTime()
+      const inputTokens = providerResponse.data.input_tokens || 0
+
+      await sequelize.query(
+        `UPDATE spotlight.token_count_request
+         SET response_timestamp = $1, latency_ms = $2, input_tokens = $3,
+             response_data = $4, status = 'success', updated_at = CURRENT_TIMESTAMP
+         WHERE uuid = $5`,
+        { bind: [
+          responseTimestamp,
+          latencyMs,
+          inputTokens,
+          JSON.stringify(providerResponse.data),
+          tokenCountRequest.uuid
+        ] }
+      )
+
+      return {
+        response: providerResponse.data,
+        responseHeaders: providerResponse.headers,
+        status: providerResponse.status
+      }
+    } catch (providerError: any) {
+      logger.error({
+        message: 'Error counting tokens with provider',
+        error: providerError,
+        provider,
+        userUuid,
+        responseStatus: providerError.response?.status,
+        responseData: providerError.response?.data,
+        responseHeaders: providerError.response?.headers
+      })
+
+      // Update token count request with error
+      await sequelize.query(
+        `UPDATE spotlight.token_count_request
+         SET error_message = $1, error_type = $2, status = 'error', updated_at = CURRENT_TIMESTAMP
+         WHERE uuid = $3`,
+        { bind: [
+          providerError.message,
+          providerError.response?.data?.error?.type || 'unknown',
+          tokenCountRequest.uuid
+        ] })
+
+      return {
+        response: {
+          error: {
+            type: 'provider_error',
+            message: providerError.response?.data?.error?.message || providerError.message,
+          }
+        },
+        error: true,
+        status: providerError.response?.status || 500
+      }
+    }
+  } catch (error: any) {
+    logger.error({ message: 'Error in count tokens handler', error })
+    return {
+      response: { error: { type: 'internal_error', message: 'Internal server error' } },
+      error: true,
+      status: 500
+    }
+  }
+}
+
+export const handleEventLogging = async (
+  shinzoCredentials: ShinzoCredentials,
+  provider: string,
+  providerCredentials: ProviderCredentials,
+  requestHeaders: Record<string, string | string[] | undefined>,
+  requestBody: any,
+) => {
+  try {
+    const { apiKeyUuid, userUuid } = shinzoCredentials
+    
+    const headers = constructModelAPIHeaders(requestHeaders)
+
+    const url = `${modelProviderBaseURL[provider]}${modelAPISpec[provider].eventLogging}`
+
+    const providerResponse = await axios.post(url, requestBody, {
+      headers,
+      timeout: 30000,
+    })
+
+    return {
+      response: providerResponse.data,
+      responseHeaders: providerResponse.headers,
+      status: providerResponse.status
+    }
+  } catch (providerError: any) {
+    logger.error({
+      message: 'Error forwarding event logging to provider',
+      error: providerError,
+      provider,
+      responseStatus: providerError.response?.status,
+      responseData: providerError.response?.data
+    })
+
+    return {
+      response: providerError.response?.data || {
+        error: {
+          type: 'provider_error',
+          message: providerError.message,
+        }
+      },
+      error: true,
+      status: providerError.response?.status || 500
     }
   }
 }

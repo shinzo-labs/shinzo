@@ -1,11 +1,12 @@
-\restrict 23tUHISVuQFzk4FMyCfLCWKjrPdzrGcq6uWrOeNSx6k4f9Uhrl8dIXO5fJWac76
+\restrict p2O7tSVx4dJ1kG2HmIQtC8MfNkIAE5WGeeTRyS5onfr2fW2hUJ75UQmLF8Ldrri
 
 -- Dumped from database version 15.14 (Homebrew)
--- Dumped by pg_dump version 15.14 (Homebrew)
+-- Dumped by pg_dump version 17.6
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -402,7 +403,7 @@ CREATE TABLE spotlight.interaction (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     session_uuid uuid NOT NULL,
     user_uuid uuid NOT NULL,
-    api_key_uuid uuid NOT NULL,
+    api_key_uuid uuid,
     request_timestamp timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     model text NOT NULL,
     provider text NOT NULL,
@@ -423,8 +424,24 @@ CREATE TABLE spotlight.interaction (
     error_type text,
     status text DEFAULT 'pending'::text NOT NULL,
     shinzo_api_key_uuid uuid,
+    auth_type text,
+    CONSTRAINT interaction_auth_type_check CHECK ((auth_type = ANY (ARRAY['api_key'::text, 'subscription'::text, 'unknown'::text]))),
     CONSTRAINT interaction_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'success'::text, 'error'::text])))
 );
+
+
+--
+-- Name: COLUMN interaction.api_key_uuid; Type: COMMENT; Schema: spotlight; Owner: -
+--
+
+COMMENT ON COLUMN spotlight.interaction.api_key_uuid IS 'Foreign key to provider_key table. Null when using x-shinzo-api-key header with direct provider key auth.';
+
+
+--
+-- Name: COLUMN interaction.auth_type; Type: COMMENT; Schema: spotlight; Owner: -
+--
+
+COMMENT ON COLUMN spotlight.interaction.auth_type IS 'Type of authentication used: api_key (sk-ant-api03-...), subscription (sk-ant-oat0-...), or unknown';
 
 
 --
@@ -477,7 +494,7 @@ CREATE TABLE spotlight.session (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     user_uuid uuid NOT NULL,
-    api_key_uuid uuid NOT NULL,
+    api_key_uuid uuid,
     session_id text NOT NULL,
     start_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     end_time timestamp without time zone,
@@ -487,6 +504,13 @@ CREATE TABLE spotlight.session (
     total_cached_tokens integer DEFAULT 0,
     shinzo_api_key_uuid uuid
 );
+
+
+--
+-- Name: COLUMN session.api_key_uuid; Type: COMMENT; Schema: spotlight; Owner: -
+--
+
+COMMENT ON COLUMN spotlight.session.api_key_uuid IS 'Foreign key to provider_key table. Null when using x-shinzo-api-key header with direct provider key auth.';
 
 
 --
@@ -508,6 +532,38 @@ CREATE TABLE spotlight.shinzo_api_key (
     metadata jsonb DEFAULT '{}'::jsonb,
     CONSTRAINT shinzo_api_key_key_type_check CHECK ((key_type = ANY (ARRAY['live'::text, 'test'::text]))),
     CONSTRAINT shinzo_api_key_status_check CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text, 'revoked'::text])))
+);
+
+
+--
+-- Name: token_count_request; Type: TABLE; Schema: spotlight; Owner: -
+--
+
+CREATE TABLE spotlight.token_count_request (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    user_uuid uuid NOT NULL,
+    api_key_uuid uuid,
+    shinzo_api_key_uuid uuid NOT NULL,
+    request_timestamp timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    model text NOT NULL,
+    provider text NOT NULL,
+    has_system_prompt boolean DEFAULT false,
+    has_tools boolean DEFAULT false,
+    message_count integer NOT NULL,
+    response_timestamp timestamp without time zone,
+    latency_ms integer,
+    input_tokens integer,
+    request_data jsonb NOT NULL,
+    response_data jsonb,
+    error_message text,
+    error_type text,
+    auth_type text,
+    status text DEFAULT 'pending'::text NOT NULL,
+    CONSTRAINT token_count_request_auth_type_check CHECK ((auth_type = ANY (ARRAY['api_key'::text, 'subscription'::text, 'unknown'::text]))),
+    CONSTRAINT token_count_request_provider_check CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'google'::text]))),
+    CONSTRAINT token_count_request_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'success'::text, 'error'::text])))
 );
 
 
@@ -842,6 +898,14 @@ ALTER TABLE ONLY spotlight.shinzo_api_key
 
 
 --
+-- Name: token_count_request token_count_request_pkey; Type: CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.token_count_request
+    ADD CONSTRAINT token_count_request_pkey PRIMARY KEY (uuid);
+
+
+--
 -- Name: tool tool_pkey; Type: CONSTRAINT; Schema: spotlight; Owner: -
 --
 
@@ -1140,6 +1204,13 @@ CREATE INDEX idx_interaction_api_key ON spotlight.interaction USING btree (api_k
 
 
 --
+-- Name: idx_interaction_auth_type; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_interaction_auth_type ON spotlight.interaction USING btree (auth_type);
+
+
+--
 -- Name: idx_interaction_model; Type: INDEX; Schema: spotlight; Owner: -
 --
 
@@ -1277,6 +1348,34 @@ CREATE INDEX idx_shinzo_api_key_type ON spotlight.shinzo_api_key USING btree (ke
 --
 
 CREATE INDEX idx_shinzo_api_key_user ON spotlight.shinzo_api_key USING btree (user_uuid);
+
+
+--
+-- Name: idx_token_count_request_provider; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_token_count_request_provider ON spotlight.token_count_request USING btree (provider, request_timestamp DESC);
+
+
+--
+-- Name: idx_token_count_request_shinzo_key; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_token_count_request_shinzo_key ON spotlight.token_count_request USING btree (shinzo_api_key_uuid);
+
+
+--
+-- Name: idx_token_count_request_status; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_token_count_request_status ON spotlight.token_count_request USING btree (status, request_timestamp DESC);
+
+
+--
+-- Name: idx_token_count_request_user_timestamp; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_token_count_request_user_timestamp ON spotlight.token_count_request USING btree (user_uuid, request_timestamp DESC);
 
 
 --
@@ -1750,6 +1849,30 @@ ALTER TABLE ONLY spotlight.shinzo_api_key
 
 
 --
+-- Name: token_count_request token_count_request_api_key_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.token_count_request
+    ADD CONSTRAINT token_count_request_api_key_uuid_fkey FOREIGN KEY (api_key_uuid) REFERENCES spotlight.provider_key(uuid);
+
+
+--
+-- Name: token_count_request token_count_request_shinzo_api_key_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.token_count_request
+    ADD CONSTRAINT token_count_request_shinzo_api_key_uuid_fkey FOREIGN KEY (shinzo_api_key_uuid) REFERENCES spotlight.shinzo_api_key(uuid);
+
+
+--
+-- Name: token_count_request token_count_request_user_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.token_count_request
+    ADD CONSTRAINT token_count_request_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
+
+
+--
 -- Name: tool_usage tool_usage_interaction_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
 --
 
@@ -1785,7 +1908,7 @@ ALTER TABLE ONLY spotlight.user_analytics
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 23tUHISVuQFzk4FMyCfLCWKjrPdzrGcq6uWrOeNSx6k4f9Uhrl8dIXO5fJWac76
+\unrestrict p2O7tSVx4dJ1kG2HmIQtC8MfNkIAE5WGeeTRyS5onfr2fW2hUJ75UQmLF8Ldrri
 
 
 --
@@ -1801,4 +1924,7 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20251002000000'),
     ('20251120000000'),
     ('20251120010000'),
-    ('20251120020000');
+    ('20251120020000'),
+    ('20251204000000'),
+    ('20251204000001'),
+    ('20251210000000');
