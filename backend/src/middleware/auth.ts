@@ -4,6 +4,12 @@ import { sequelize } from '../dbClient'
 import { logger } from '../logger'
 import { decryptProviderKey } from '../utils'
 
+const X_SHINZO_API_KEY = 'x-shinzo-api-key'
+const X_API_KEY = 'x-api-key'
+const AUTHORIZATION = 'authorization'
+const SHINZO_KEY_PREFIX = 'sk_shinzo'
+const ANTHROPIC_OAUTH_KEY_PREFIX = 'sk-ant-oat'
+
 export interface AuthenticatedRequest extends FastifyRequest {
   user?: {
     uuid: string
@@ -15,7 +21,7 @@ export interface AuthenticatedRequest extends FastifyRequest {
 export interface ShinzoCredentials {
   apiKey: string
   apiKeyUuid: string
-  apiKeyHeader: 'x-shinzo-api-key' | 'authorization'
+  apiKeyHeader?: typeof X_SHINZO_API_KEY | typeof X_API_KEY | typeof AUTHORIZATION
   userUuid: string
 }
 
@@ -24,28 +30,30 @@ export interface ProviderCredentials {
   providerKeyUuid: string | null
 }
 
+const requestContainsHeader = (request: FastifyRequest, header: string, prefix?: string): boolean => {
+    let value = request.headers[header]
+    if (typeof value !== 'string' || !value) return false
+    if (!prefix) return true
+    if (header === AUTHORIZATION) value = value?.replace('Bearer ', '')
+    return value.startsWith(prefix)
+  }
+
 export const constructModelAPIHeaders = (requestHeaders: Record<string, string | string[] | undefined>) => {
   const headers: Record<string, string> = {}
 
-  // Headers that should NOT be forwarded to the upstream provider
   const skipHeaders = new Set([
     'host',           // Don't forward the proxy host to the provider (causes SSL issues)
     'connection',     // Connection-specific headers
     'content-length', // Let axios calculate this
-    'x-shinzo-api-key', // Shinzo-specific header
+    X_SHINZO_API_KEY, // Shinzo-specific header
   ])
 
   for (const [key, value] of Object.entries(requestHeaders)) {
     const lowerKey = key.toLowerCase()
 
-    // Skip headers that shouldn't be forwarded
-    if (skipHeaders.has(lowerKey)) {
-      continue
-    }
+    if (skipHeaders.has(lowerKey)) continue
 
-    if (value !== undefined) {
-      headers[key] = Array.isArray(value) ? value.join(', ') : value
-    }
+    if (value !== undefined) headers[key] = Array.isArray(value) ? value.join(', ') : value
   }
 
   return headers
@@ -89,28 +97,32 @@ export const authenticateJWT = async (request: AuthenticatedRequest, reply: Fast
 }
 
 export const authenticatedShinzoCredentials = async (request: FastifyRequest): Promise<ShinzoCredentials> => {
-  const result: ShinzoCredentials = {
+  let result: ShinzoCredentials = {
     apiKey: '',
     apiKeyUuid: '',
-    apiKeyHeader: 'x-shinzo-api-key',
+    apiKeyHeader: undefined,
     userUuid: '',
   }
 
   try {
-    const xShinzoApiKeyHeader = request.headers['x-shinzo-api-key']
+    let apiKeyHeader: typeof X_SHINZO_API_KEY | typeof X_API_KEY | typeof AUTHORIZATION | undefined
 
-    const apiKeyHeader = (typeof xShinzoApiKeyHeader === 'string' && xShinzoApiKeyHeader)
-     ? 'x-shinzo-api-key'
-     : 'authorization'
-
-    let apiKey = request.headers[apiKeyHeader]
-    delete request.headers[apiKeyHeader]
-
-    if (!apiKey || typeof apiKey !== 'string') {
+    if (requestContainsHeader(request, X_SHINZO_API_KEY, SHINZO_KEY_PREFIX)) {
+      apiKeyHeader = X_SHINZO_API_KEY
+    } else if (requestContainsHeader(request, X_API_KEY, SHINZO_KEY_PREFIX)) {
+      apiKeyHeader = X_API_KEY
+    } else if (requestContainsHeader(request, AUTHORIZATION, SHINZO_KEY_PREFIX)) {
+      apiKeyHeader = AUTHORIZATION
+    } else {
       return result
     }
 
+    let apiKey = request.headers[apiKeyHeader]
+    if (!(apiKey && typeof apiKey === 'string')) return result
+
     apiKey = apiKey.replace('Bearer ', '')
+
+    delete request.headers[apiKeyHeader]
 
     const [shinzoKeyResults] = await sequelize.query(
       `SELECT uuid, user_uuid, key_name, status
@@ -129,10 +141,13 @@ export const authenticatedShinzoCredentials = async (request: FastifyRequest): P
       { bind: [shinzoKey.uuid] }
     )
 
-    result.apiKeyUuid = shinzoKey.uuid
-    result.apiKey = apiKey
-    result.apiKeyHeader = apiKeyHeader
-    result.userUuid = shinzoKey.user_uuid
+    result = {
+      apiKeyUuid: shinzoKey.uuid,
+      apiKey: apiKey,
+      apiKeyHeader: apiKeyHeader,
+      userUuid: shinzoKey.user_uuid
+    }
+
     return result
   } catch (error) {
     logger.error({ message: 'Shinzo API key authentication error', error })
@@ -141,19 +156,16 @@ export const authenticatedShinzoCredentials = async (request: FastifyRequest): P
 }
 
 export const getProviderCredentials = async (request: FastifyRequest, provider: string, shinzoCredentials: ShinzoCredentials): Promise<ProviderCredentials> => {
-  const result: ProviderCredentials = {
-    providerKey: null,
-    providerKeyUuid: null,
-  }
+  const result: ProviderCredentials = { providerKey: null, providerKeyUuid: null }
+
+  // Note: all of this logic only works for provider: anthropic at the moment. Other providers TBD.
 
   try {
-    const providerAuthToken = shinzoCredentials.apiKeyHeader !== 'authorization'
-      ? request.headers.authorization?.replace('Bearer ', '')
-      : null
-    const providerApiKey = typeof request.headers['x-api-key'] === 'string'
-      ? request.headers['x-api-key']
-      : null
-    result.providerKey = providerAuthToken || providerApiKey
+    if (requestContainsHeader(request, AUTHORIZATION)) {
+      result.providerKey = request.headers.authorization?.replace('Bearer ', '') as string
+    } else if (requestContainsHeader(request, X_API_KEY)) {
+      result.providerKey = request.headers[X_API_KEY] as string
+    }
 
     if (!result.providerKey) {
       const [providerKeyResults] = await sequelize.query(
@@ -186,7 +198,11 @@ export const getProviderCredentials = async (request: FastifyRequest, provider: 
 
       result.providerKeyUuid = providerKeyRow.uuid
 
-      request.headers.authorization = `Bearer ${result.providerKey}` // TODO confirm that this works for both API and subscription-based access
+      if (result.providerKey.startsWith(ANTHROPIC_OAUTH_KEY_PREFIX)) { // Subscription OAuth keys use Authorization header
+        request.headers.authorization = `Bearer ${result.providerKey}`
+      } else { // API keys use x-api-key header
+        request.headers[X_API_KEY] = result.providerKey
+      }
     }
 
     return result
