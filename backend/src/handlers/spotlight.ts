@@ -10,7 +10,7 @@ import {
   KeyType,
 } from '../utils'
 import { sequelize } from '../dbClient'
-import { ShinzoCredentials, ProviderCredentials } from '../middleware/auth'
+import { ShinzoCredentials, ProviderCredentials, constructModelAPIHeaders } from '../middleware/auth'
 
 const TEST_TIMEOUT = 10 * 1000 // 10 seconds
 const COUNT_TOKENS_TIMEOUT = 30 * 1000 // 30 seconds
@@ -22,7 +22,7 @@ export const modelAPISpec: Record<typeof SUPPORTED_PROVIDERS[number], Record<str
   anthropic: {
     countTokens: '/v1/messages/count_tokens',
     modelProxy: '/v1/messages',
-    eventLogging: '/v1/messages/event_logging/batch',
+    eventLogging: '/api/event_logging/batch',
   }
 }
 
@@ -67,16 +67,6 @@ export const fetchAnalyticsSchema = yup.object({
   model: yup.string().optional(),
   provider: yup.string().optional(),
 }).optional()
-
-const constructHeaders = (requestHeaders: Record<string, string | string[] | undefined>) => {
-  const headers: Record<string, string> = {}
-  for (const [key, value] of Object.entries(requestHeaders)) {
-    if (value !== undefined) {
-      headers[key] = Array.isArray(value) ? value.join(', ') : value
-    }
-  }
-  return headers
-}
 
 // ============================================================================
 // Shinzo API Key CRUD Operations
@@ -543,7 +533,7 @@ export const handleModelProxy = async (
     try {
       const url = `${modelProviderBaseURL[provider]}${modelAPISpec[provider].modelProxy}`
 
-      const headers = constructHeaders(requestHeaders)
+      const headers = constructModelAPIHeaders(requestHeaders)
 
       const providerResponse = await axios.post(url, requestBody, { headers, timeout: REQUEST_TIMEOUT })
 
@@ -670,7 +660,7 @@ export const handleCountTokens = async (
     try {
       const url = `${modelProviderBaseURL[provider]}${modelAPISpec[provider].countTokens}`
 
-      const headers = constructHeaders(requestHeaders)
+      const headers = constructModelAPIHeaders(requestHeaders)
 
       const providerResponse = await axios.post(url, requestBody, {
         headers,
@@ -753,7 +743,7 @@ export const handleEventLogging = async (
   try {
     const { apiKeyUuid, userUuid } = shinzoCredentials
     
-    const headers = constructHeaders(requestHeaders)
+    const headers = constructModelAPIHeaders(requestHeaders)
 
     const url = `${modelProviderBaseURL[provider]}${modelAPISpec[provider].eventLogging}`
 

@@ -4,7 +4,7 @@ import fastifyRateLimit from '@fastify/rate-limit'
 import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE, LOG_LEVEL } from './config'
 import { logger, pinoConfig } from './logger'
 import { sequelize } from './dbClient'
-import { authenticateJWT, AuthenticatedRequest, authenticatedShinzoCredentials, getProviderCredentials } from './middleware/auth'
+import { authenticateJWT, AuthenticatedRequest, authenticatedShinzoCredentials, getProviderCredentials, constructModelAPIResponseHeaders } from './middleware/auth'
 
 // Import handlers
 import {
@@ -642,6 +642,45 @@ app.delete('/spotlight/provider_keys/:keyUuid', async (request: AuthenticatedReq
   }
 })
 
+// Event logging endpoint (separate from /v1/ endpoints)
+app.post('/spotlight/:provider/api/event_logging/batch', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const shinzoCredentials = await authenticatedShinzoCredentials(request)
+    if (!shinzoCredentials.apiKey) {
+      reply.status(401).send({ error: 'Shinzo API key authentication failed' })
+      return
+    }
+
+    const { provider } = request.params as { provider: string }
+
+    if (provider !== 'anthropic') {
+      reply.status(400).send({ error: 'Unsupported provider' })
+      return
+    }
+
+    const providerCredentials = await getProviderCredentials(request, provider, shinzoCredentials)
+    if (!providerCredentials.providerKey) {
+      reply.status(401).send({ error: 'Provider key authentication failed' })
+      return
+    }
+
+    const result = await handleEventLogging(
+      shinzoCredentials,
+      provider,
+      providerCredentials,
+      request.headers,
+      request.body,
+    )
+
+    constructModelAPIResponseHeaders(result, reply)
+
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Event logging error', error })
+    reply.status(500).send({ error: { type: 'internal_error', message: 'Internal server error' } })
+  }
+})
+
 app.all('/spotlight/:provider/v1/*', async (request: FastifyRequest, reply: FastifyReply) => {
   try {
     const shinzoCredentials = await authenticatedShinzoCredentials(request)
@@ -650,9 +689,11 @@ app.all('/spotlight/:provider/v1/*', async (request: FastifyRequest, reply: Fast
       return    
     }
 
-    // Extract the endpoint path after /spotlight/:provider
-    // e.g., /spotlight/anthropic/v1/messages/count_tokens -> /v1/messages/count_tokens
-    const endpointPath = request.url.match(/^\/spotlight\/([^\/]+)\/v1\/(.*)$/)?.[2]
+    // Extract the endpoint path including /v1/ prefix
+    // e.g., /spotlight/anthropic/v1/messages/count_tokens?beta=true -> /v1/messages/count_tokens
+    const urlWithoutQuery = request.url.split('?')[0] // Remove query params
+    const match = urlWithoutQuery.match(/^\/spotlight\/([^\/]+)(\/v1\/.*)$/)
+    const endpointPath = match?.[2] || '' // Extract /v1/... part
 
     let result
 
@@ -702,13 +743,7 @@ app.all('/spotlight/:provider/v1/*', async (request: FastifyRequest, reply: Fast
       return
     }
 
-    if (result.responseHeaders) {
-      for (const [key, value] of Object.entries(result.responseHeaders)) {
-        if (value !== undefined && key.toLowerCase() !== 'transfer-encoding') { // transfer-encoding is handled by Fastify
-          reply.header(key, value)
-        }
-      }
-    }
+    constructModelAPIResponseHeaders(result, reply)
 
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {

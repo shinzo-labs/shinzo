@@ -20,8 +20,45 @@ export interface ShinzoCredentials {
 }
 
 export interface ProviderCredentials {
-  providerKey?: string
-  providerKeyUuid?: string
+  providerKey: string | null
+  providerKeyUuid: string | null
+}
+
+export const constructModelAPIHeaders = (requestHeaders: Record<string, string | string[] | undefined>) => {
+  const headers: Record<string, string> = {}
+
+  // Headers that should NOT be forwarded to the upstream provider
+  const skipHeaders = new Set([
+    'host',           // Don't forward the proxy host to the provider (causes SSL issues)
+    'connection',     // Connection-specific headers
+    'content-length', // Let axios calculate this
+    'x-shinzo-api-key', // Shinzo-specific header
+  ])
+
+  for (const [key, value] of Object.entries(requestHeaders)) {
+    const lowerKey = key.toLowerCase()
+
+    // Skip headers that shouldn't be forwarded
+    if (skipHeaders.has(lowerKey)) {
+      continue
+    }
+
+    if (value !== undefined) {
+      headers[key] = Array.isArray(value) ? value.join(', ') : value
+    }
+  }
+
+  return headers
+}
+
+export const constructModelAPIResponseHeaders = (result: any, reply: FastifyReply) => {
+  if (result.responseHeaders) {
+    for (const [key, value] of Object.entries(result.responseHeaders)) {
+      if (value !== undefined && key.toLowerCase() !== 'transfer-encoding') {
+        reply.header(key, value)
+      }
+    }
+  }
 }
 
 export const authenticateJWT = async (request: AuthenticatedRequest, reply: FastifyReply): Promise<boolean> => {
@@ -66,12 +103,14 @@ export const authenticatedShinzoCredentials = async (request: FastifyRequest): P
      ? 'x-shinzo-api-key'
      : 'authorization'
 
-    const apiKey = request.headers[apiKeyHeader]
+    let apiKey = request.headers[apiKeyHeader]
     delete request.headers[apiKeyHeader]
 
     if (!apiKey || typeof apiKey !== 'string') {
       return result
     }
+
+    apiKey = apiKey.replace('Bearer ', '')
 
     const [shinzoKeyResults] = await sequelize.query(
       `SELECT uuid, user_uuid, key_name, status
@@ -103,17 +142,17 @@ export const authenticatedShinzoCredentials = async (request: FastifyRequest): P
 
 export const getProviderCredentials = async (request: FastifyRequest, provider: string, shinzoCredentials: ShinzoCredentials): Promise<ProviderCredentials> => {
   const result: ProviderCredentials = {
-    providerKey: undefined,
-    providerKeyUuid: undefined,
+    providerKey: null,
+    providerKeyUuid: null,
   }
 
   try {
     const providerAuthToken = shinzoCredentials.apiKeyHeader !== 'authorization'
       ? request.headers.authorization?.replace('Bearer ', '')
-      : undefined
+      : null
     const providerApiKey = typeof request.headers['x-api-key'] === 'string'
       ? request.headers['x-api-key']
-      : undefined
+      : null
     result.providerKey = providerAuthToken || providerApiKey
 
     if (!result.providerKey) {
