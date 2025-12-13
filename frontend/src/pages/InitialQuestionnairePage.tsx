@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Flex, Text, Heading, Button, Card, Checkbox, Select, Box, Callout } from '@radix-ui/themes'
+import { Flex, Text, Heading, Button, Card, Checkbox, Select, Box, Callout, Badge } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { useUserPreferences } from '../contexts/UserPreferencesContext'
 

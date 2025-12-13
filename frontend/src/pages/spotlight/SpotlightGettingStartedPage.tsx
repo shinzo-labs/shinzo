@@ -221,7 +221,7 @@ export const SpotlightGettingStartedPage: React.FC = () => {
             variant="solid"
             onClick={() => window.location.href = '/spotlight/api-keys'}
           >
-            <Icons.KeyIcon />
+            <Icons.LockClosedIcon />
             Go to API Keys Page
           </Button>
         </Flex>
