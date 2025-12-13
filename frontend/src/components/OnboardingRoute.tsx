@@ -50,28 +50,6 @@ export const OnboardingRoute: React.FC<OnboardingRouteProps> = ({ children }) =>
     )
   }
 
-  // If survey not completed, show dialog
-  if (!survey && showDialog) {
-    return (
-      <InitialQuestionnaireDialog
-        open={true}
-        onComplete={async () => {
-          setShowDialog(false)
-          setSurveyLoading(true)
-          // Refresh survey data
-          try {
-            const response = await surveyService.fetchSurvey(token!)
-            setSurvey(response.survey)
-          } catch (error) {
-            console.error('Error refetching survey:', error)
-          } finally {
-            setSurveyLoading(false)
-          }
-        }}
-      />
-    )
-  }
-
   // Determine if user has any data at all
   const hasAnyData = hasTelemetry || hasSpotlightData
 
@@ -89,5 +67,26 @@ export const OnboardingRoute: React.FC<OnboardingRouteProps> = ({ children }) =>
     return <Navigate to="/spotlight/getting-started" replace />
   }
 
-  return <>{children}</>
+  // Render children with optional survey dialog overlay
+  return (
+    <>
+      {children}
+      <InitialQuestionnaireDialog
+        open={!survey && showDialog}
+        onComplete={async () => {
+          setShowDialog(false)
+          setSurveyLoading(true)
+          // Refresh survey data
+          try {
+            const response = await surveyService.fetchSurvey(token!)
+            setSurvey(response.survey)
+          } catch (error) {
+            console.error('Error refetching survey:', error)
+          } finally {
+            setSurveyLoading(false)
+          }
+        }}
+      />
+    </>
+  )
 }
