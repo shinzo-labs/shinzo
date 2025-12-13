@@ -55,10 +55,18 @@ export const OnboardingRoute: React.FC<OnboardingRouteProps> = ({ children }) =>
     return (
       <InitialQuestionnaireDialog
         open={true}
-        onComplete={() => {
+        onComplete={async () => {
           setShowDialog(false)
+          setSurveyLoading(true)
           // Refresh survey data
-          surveyService.fetchSurvey(token!).then(response => setSurvey(response.survey))
+          try {
+            const response = await surveyService.fetchSurvey(token!)
+            setSurvey(response.survey)
+          } catch (error) {
+            console.error('Error refetching survey:', error)
+          } finally {
+            setSurveyLoading(false)
+          }
         }}
       />
     )
@@ -77,8 +85,8 @@ export const OnboardingRoute: React.FC<OnboardingRouteProps> = ({ children }) =>
       return <Navigate to="/getting-started" replace />
     }
 
-    // Fallback to MCP getting started if no usage type is set
-    return <Navigate to="/getting-started" replace />
+    // Fallback to Spotlight getting started as backup
+    return <Navigate to="/spotlight/getting-started" replace />
   }
 
   return <>{children}</>

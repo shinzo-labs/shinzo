@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Flex, Text, Heading, Button, Card, Checkbox, Select, Callout, Badge, Dialog } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { useAuth } from '../contexts/AuthContext'
@@ -13,7 +12,6 @@ interface InitialQuestionnaireDialogProps {
 }
 
 export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProps> = ({ open, onComplete }) => {
-  const navigate = useNavigate()
   const { token } = useAuth()
   const [selectedTypes, setSelectedTypes] = useState<UsageType[]>([])
   const [role, setRole] = useState<string>('')
@@ -55,15 +53,8 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
         referral_sources: referralSources.length > 0 ? referralSources : undefined
       })
 
-      // Close dialog and trigger completion callback
+      // Trigger completion callback - OnboardingRoute will handle navigation
       onComplete()
-
-      // Navigate based on first selected type
-      if (selectedTypes.includes('ai-agent')) {
-        navigate('/spotlight/getting-started')
-      } else if (selectedTypes.includes('mcp-server')) {
-        navigate('/getting-started')
-      }
     } catch (err) {
       console.error('Failed to save survey:', err)
       setError('Failed to save your responses. Please try again.')
