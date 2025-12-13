@@ -1,30 +1,36 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Flex, Text, Heading, Button, Card, Checkbox, Select, Box, Callout, Badge } from '@radix-ui/themes'
+import { Flex, Text, Heading, Button, Card, Checkbox, Select, Callout, Badge, Dialog } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
-import { useUserPreferences } from '../contexts/UserPreferencesContext'
+import { useAuth } from '../contexts/AuthContext'
+import { surveyService } from '../backendService'
 
-type UsageIntent = 'ai-agent' | 'mcp-server'
+type UsageType = 'ai-agent' | 'mcp-server'
 
-export const InitialQuestionnairePage: React.FC = () => {
+interface InitialQuestionnaireDialogProps {
+  open: boolean
+  onComplete: () => void
+}
+
+export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProps> = ({ open, onComplete }) => {
   const navigate = useNavigate()
-  const { savePreference } = useUserPreferences()
-  const [selectedIntents, setSelectedIntents] = useState<UsageIntent[]>([])
+  const { token } = useAuth()
+  const [selectedTypes, setSelectedTypes] = useState<UsageType[]>([])
   const [role, setRole] = useState<string>('')
-  const [hearAbout, setHearAbout] = useState<string[]>([])
+  const [referralSources, setReferralSources] = useState<string[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleIntentToggle = (intent: UsageIntent) => {
-    setSelectedIntents(prev =>
-      prev.includes(intent)
-        ? prev.filter(i => i !== intent)
-        : [...prev, intent]
+  const handleTypeToggle = (type: UsageType) => {
+    setSelectedTypes(prev =>
+      prev.includes(type)
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
     )
   }
 
-  const handleHearAboutToggle = (source: string) => {
-    setHearAbout(prev =>
+  const handleReferralToggle = (source: string) => {
+    setReferralSources(prev =>
       prev.includes(source)
         ? prev.filter(s => s !== source)
         : [...prev, source]
@@ -32,9 +38,9 @@ export const InitialQuestionnairePage: React.FC = () => {
   }
 
   const handleSubmit = async () => {
-    // Validate that at least one usage intent is selected
-    if (selectedIntents.length === 0) {
-      setError('Please select at least one usage intent')
+    // Validate that at least one usage type is selected
+    if (selectedTypes.length === 0) {
+      setError('Please select at least one usage type')
       return
     }
 
@@ -42,28 +48,24 @@ export const InitialQuestionnairePage: React.FC = () => {
     setError(null)
 
     try {
-      // Save questionnaire responses
-      await savePreference('onboarding_usage_intents', selectedIntents)
+      // Save survey responses to database
+      await surveyService.saveSurvey(token!, {
+        usage_types: selectedTypes,
+        role: role || undefined,
+        referral_sources: referralSources.length > 0 ? referralSources : undefined
+      })
 
-      if (role) {
-        await savePreference('onboarding_role', role)
-      }
+      // Close dialog and trigger completion callback
+      onComplete()
 
-      if (hearAbout.length > 0) {
-        await savePreference('onboarding_hear_about', hearAbout)
-      }
-
-      // Mark questionnaire as completed
-      await savePreference('questionnaire_completed', true)
-
-      // Navigate based on first selected intent
-      if (selectedIntents.includes('ai-agent')) {
+      // Navigate based on first selected type
+      if (selectedTypes.includes('ai-agent')) {
         navigate('/spotlight/getting-started')
-      } else if (selectedIntents.includes('mcp-server')) {
+      } else if (selectedTypes.includes('mcp-server')) {
         navigate('/getting-started')
       }
     } catch (err) {
-      console.error('Failed to save questionnaire:', err)
+      console.error('Failed to save survey:', err)
       setError('Failed to save your responses. Please try again.')
     } finally {
       setSubmitting(false)
@@ -71,28 +73,23 @@ export const InitialQuestionnairePage: React.FC = () => {
   }
 
   return (
-    <Flex
-      direction="column"
-      align="center"
-      justify="center"
-      style={{
-        minHeight: '100vh',
-        background: 'var(--gray-2)',
-        padding: '24px'
-      }}
-    >
-      <Card style={{ maxWidth: '600px', width: '100%', padding: '32px' }}>
+    <Dialog.Root open={open}>
+      <Dialog.Content style={{ maxWidth: '600px' }}>
         <Flex direction="column" gap="6">
           {/* Header */}
           <Flex direction="column" gap="2" align="center">
             <Icons.RocketIcon width="48" height="48" color="var(--blue-9)" />
-            <Heading size="6" align="center">Welcome to Shinzo!</Heading>
-            <Text color="gray" align="center">
-              Let's get you started with a few quick questions to personalize your experience
-            </Text>
+            <Dialog.Title>
+              <Heading size="6" align="center">Welcome to Shinzo!</Heading>
+            </Dialog.Title>
+            <Dialog.Description>
+              <Text color="gray" align="center">
+                Let's get you started with a few quick questions to personalize your experience
+              </Text>
+            </Dialog.Description>
           </Flex>
 
-          {/* Question 1: Usage Intent (Required) */}
+          {/* Question 1: Usage Type (Required) */}
           <Flex direction="column" gap="3">
             <Flex align="center" gap="2">
               <Heading size="4">What would you like to do with Shinzo?</Heading>
@@ -103,15 +100,15 @@ export const InitialQuestionnairePage: React.FC = () => {
             </Text>
 
             <Card
-              onClick={() => handleIntentToggle('ai-agent')}
+              onClick={() => handleTypeToggle('ai-agent')}
               style={{
                 cursor: 'pointer',
-                backgroundColor: selectedIntents.includes('ai-agent') ? 'var(--blue-2)' : undefined,
-                borderColor: selectedIntents.includes('ai-agent') ? 'var(--blue-6)' : undefined
+                backgroundColor: selectedTypes.includes('ai-agent') ? 'var(--blue-2)' : undefined,
+                borderColor: selectedTypes.includes('ai-agent') ? 'var(--blue-6)' : undefined
               }}
             >
               <Flex align="center" gap="3" style={{ padding: '8px' }}>
-                <Checkbox checked={selectedIntents.includes('ai-agent')} />
+                <Checkbox checked={selectedTypes.includes('ai-agent')} />
                 <Flex direction="column" gap="1" style={{ flex: 1 }}>
                   <Text weight="medium">Track AI Agent usage</Text>
                   <Text size="2" color="gray">
@@ -122,15 +119,15 @@ export const InitialQuestionnairePage: React.FC = () => {
             </Card>
 
             <Card
-              onClick={() => handleIntentToggle('mcp-server')}
+              onClick={() => handleTypeToggle('mcp-server')}
               style={{
                 cursor: 'pointer',
-                backgroundColor: selectedIntents.includes('mcp-server') ? 'var(--blue-2)' : undefined,
-                borderColor: selectedIntents.includes('mcp-server') ? 'var(--blue-6)' : undefined
+                backgroundColor: selectedTypes.includes('mcp-server') ? 'var(--blue-2)' : undefined,
+                borderColor: selectedTypes.includes('mcp-server') ? 'var(--blue-6)' : undefined
               }}
             >
               <Flex align="center" gap="3" style={{ padding: '8px' }}>
-                <Checkbox checked={selectedIntents.includes('mcp-server')} />
+                <Checkbox checked={selectedTypes.includes('mcp-server')} />
                 <Flex direction="column" gap="1" style={{ flex: 1 }}>
                   <Text weight="medium">Track MCP Server usage</Text>
                   <Text size="2" color="gray">
@@ -174,15 +171,15 @@ export const InitialQuestionnairePage: React.FC = () => {
               {['Reddit', 'LinkedIn', 'X', 'Word of Mouth', 'Website', 'Other'].map(source => (
                 <Card
                   key={source}
-                  onClick={() => handleHearAboutToggle(source)}
+                  onClick={() => handleReferralToggle(source)}
                   style={{
                     cursor: 'pointer',
-                    backgroundColor: hearAbout.includes(source) ? 'var(--blue-2)' : undefined,
-                    borderColor: hearAbout.includes(source) ? 'var(--blue-6)' : undefined
+                    backgroundColor: referralSources.includes(source) ? 'var(--blue-2)' : undefined,
+                    borderColor: referralSources.includes(source) ? 'var(--blue-6)' : undefined
                   }}
                 >
                   <Flex align="center" gap="3" style={{ padding: '4px 8px' }}>
-                    <Checkbox checked={hearAbout.includes(source)} />
+                    <Checkbox checked={referralSources.includes(source)} />
                     <Text>{source}</Text>
                   </Flex>
                 </Card>
@@ -204,14 +201,14 @@ export const InitialQuestionnairePage: React.FC = () => {
           <Button
             size="3"
             onClick={handleSubmit}
-            disabled={submitting || selectedIntents.length === 0}
+            disabled={submitting || selectedTypes.length === 0}
             style={{ width: '100%' }}
           >
             {submitting ? 'Saving...' : 'Get Started'}
             <Icons.ArrowRightIcon />
           </Button>
         </Flex>
-      </Card>
-    </Flex>
+      </Dialog.Content>
+    </Dialog.Root>
   )
 }

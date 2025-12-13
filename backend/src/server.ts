@@ -48,6 +48,12 @@ import {
 } from './handlers/userPreferences'
 
 import {
+  handleSaveUserSurvey,
+  handleGetUserSurvey,
+  saveSurveySchema
+} from './handlers/userSurvey'
+
+import {
   // Shinzo API Key handlers
   handleCreateShinzoApiKey,
   handleFetchShinzoApiKeys,
@@ -317,6 +323,42 @@ app.delete('/user/preferences/:preferenceKey', async (request: AuthenticatedRequ
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Delete user preference error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// User survey endpoints
+app.post('/user/survey', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const validatedBody = await saveSurveySchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleSaveUserSurvey(request.user!.uuid, validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Save user survey error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/user/survey', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleGetUserSurvey(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Get user survey error', error })
     reply.status(500).send({ error: 'Internal server error' })
   }
 })

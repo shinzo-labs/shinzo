@@ -1,4 +1,4 @@
-\restrict p2O7tSVx4dJ1kG2HmIQtC8MfNkIAE5WGeeTRyS5onfr2fW2hUJ75UQmLF8Ldrri
+\restrict lxlhUWfl6NOD5HSKhZbBALH43MxdJInPHgh2rmvQBFKEsEcctRwLSzrrx4q09LB
 
 -- Dumped from database version 15.14 (Homebrew)
 -- Dumped by pg_dump version 17.6
@@ -100,6 +100,21 @@ CREATE TABLE main.user_preferences (
     user_uuid uuid NOT NULL,
     preference_key text NOT NULL,
     preference_value jsonb NOT NULL
+);
+
+
+--
+-- Name: user_survey; Type: TABLE; Schema: main; Owner: -
+--
+
+CREATE TABLE main.user_survey (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    user_uuid uuid NOT NULL,
+    usage_types text[] NOT NULL,
+    role text,
+    referral_sources text[]
 );
 
 
@@ -698,6 +713,22 @@ ALTER TABLE ONLY main.user_preferences
 
 
 --
+-- Name: user_survey user_survey_pkey; Type: CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.user_survey
+    ADD CONSTRAINT user_survey_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: user_survey user_survey_user_uuid_key; Type: CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.user_survey
+    ADD CONSTRAINT user_survey_user_uuid_key UNIQUE (user_uuid);
+
+
+--
 -- Name: histogram_bucket histogram_bucket_metric_uuid_bucket_index_key; Type: CONSTRAINT; Schema: open_telemetry; Owner: -
 --
 
@@ -956,6 +987,13 @@ CREATE INDEX idx_user_preferences_user_key ON main.user_preferences USING btree 
 --
 
 CREATE INDEX idx_user_subscription_tier ON main."user" USING btree (subscription_tier_uuid);
+
+
+--
+-- Name: idx_user_survey_user_uuid; Type: INDEX; Schema: main; Owner: -
+--
+
+CREATE INDEX idx_user_survey_user_uuid ON main.user_survey USING btree (user_uuid);
 
 
 --
@@ -1463,6 +1501,13 @@ CREATE TRIGGER updated_at_user_preferences BEFORE UPDATE ON main.user_preference
 
 
 --
+-- Name: user_survey updated_at_user_survey; Type: TRIGGER; Schema: main; Owner: -
+--
+
+CREATE TRIGGER updated_at_user_survey BEFORE UPDATE ON main.user_survey FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
 -- Name: histogram_bucket updated_at_histogram_bucket; Type: TRIGGER; Schema: open_telemetry; Owner: -
 --
 
@@ -1630,6 +1675,14 @@ ALTER TABLE ONLY main.user_preferences
 
 ALTER TABLE ONLY main."user"
     ADD CONSTRAINT user_subscription_tier_uuid_fkey FOREIGN KEY (subscription_tier_uuid) REFERENCES main.subscription_tier(uuid);
+
+
+--
+-- Name: user_survey user_survey_user_uuid_fkey; Type: FK CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.user_survey
+    ADD CONSTRAINT user_survey_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
 
 
 --
@@ -1908,7 +1961,7 @@ ALTER TABLE ONLY spotlight.user_analytics
 -- PostgreSQL database dump complete
 --
 
-\unrestrict p2O7tSVx4dJ1kG2HmIQtC8MfNkIAE5WGeeTRyS5onfr2fW2hUJ75UQmLF8Ldrri
+\unrestrict lxlhUWfl6NOD5HSKhZbBALH43MxdJInPHgh2rmvQBFKEsEcctRwLSzrrx4q09LB
 
 
 --
@@ -1927,4 +1980,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20251120020000'),
     ('20251204000000'),
     ('20251204000001'),
-    ('20251210000000');
+    ('20251210000000'),
+    ('20251213000000');

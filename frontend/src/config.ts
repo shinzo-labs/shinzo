@@ -5,3 +5,7 @@ export const REFRESH_INTERVAL = parseInt(process.env.REACT_APP_REFRESH_INTERVAL_
 export const MAX_CACHE_AGE = parseInt(process.env.REACT_APP_MAX_CACHE_AGE ?? '300000')
 export const ENABLE_REALTIME = process.env.REACT_APP_ENABLE_REALTIME === 'true'
 export const DEFAULT_TIME_RANGE = process.env.REACT_APP_DEFAULT_TIME_RANGE ?? '1h'
+
+// Onboarding and UI constants
+export const CHECK_INTERVAL = 5_000 // ms - Poll interval for checking telemetry data
+export const CLIPBOARD_TIMEOUT = 2_000 // ms - Duration to show "Copied!" message

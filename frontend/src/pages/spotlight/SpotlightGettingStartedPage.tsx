@@ -4,9 +4,8 @@ import { Card, Flex, Text, Heading, Box, Button, Code, Badge, Callout, Spinner }
 import * as Icons from '@radix-ui/react-icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useHasSpotlightData } from '../../hooks/useHasSpotlightData'
-import axios from 'axios'
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000'
+import { spotlightService } from '../../backendService'
+import { CLIPBOARD_TIMEOUT } from '../../config'
 
 type Provider = 'anthropic' | 'openai' | 'gemini'
 type IntegrationType = 'generic' | 'claude-code'
@@ -24,26 +23,23 @@ export const SpotlightGettingStartedPage: React.FC = () => {
     const fetchOrCreateShinzoKey = async () => {
       try {
         // Try to fetch existing Shinzo API keys
-        const response = await axios.get(`${BACKEND_URL}/spotlight/shinzo_keys`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
+        const response = await spotlightService.fetchShinzoApiKeys(token!)
 
-        const keys = response.data.shinzo_api_keys || []
+        const keys = response.shinzo_api_keys || []
 
         if (keys.length > 0) {
           // Use the first active key
-          const activeKey = keys.find((k: any) => k.status === 'active')
+          const activeKey = keys.find((k) => k.status === 'active')
           if (activeKey) {
             setShinzoApiKey(activeKey.api_key)
           }
         } else {
           // Create a new key if none exist
-          const createResponse = await axios.post(
-            `${BACKEND_URL}/spotlight/shinzo_keys`,
-            { key_name: 'Default Onboarding Key', key_type: 'live' },
-            { headers: { Authorization: `Bearer ${token}` } }
-          )
-          setShinzoApiKey(createResponse.data.api_key)
+          const createResponse = await spotlightService.createShinzoApiKey(token!, {
+            key_name: 'Default Onboarding Key',
+            key_type: 'live'
+          })
+          setShinzoApiKey(createResponse.api_key)
         }
       } catch (error) {
         console.error('Failed to fetch or create Shinzo API key:', error)
@@ -62,7 +58,7 @@ export const SpotlightGettingStartedPage: React.FC = () => {
     setCopiedStates(prev => ({ ...prev, [buttonId]: true }))
     setTimeout(() => {
       setCopiedStates(prev => ({ ...prev, [buttonId]: false }))
-    }, 2000)
+    }, CLIPBOARD_TIMEOUT)
   }
 
   const renderProviderSelection = () => (

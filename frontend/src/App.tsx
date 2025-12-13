@@ -13,9 +13,6 @@ import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
 import { VerifyPage } from './pages/auth/VerifyPage'
 
-// Onboarding pages
-import { InitialQuestionnairePage } from './pages/InitialQuestionnairePage'
-
 // Main app pages
 import { DashboardPage } from './pages/DashboardPage'
 import { GettingStartedPage } from './pages/GettingStartedPage'
@@ -57,13 +54,6 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/verify" element={<VerifyPage />} />
-
-                {/* Onboarding routes */}
-                <Route path="/questionnaire" element={
-                  <ProtectedRoute>
-                    <InitialQuestionnairePage />
-                  </ProtectedRoute>
-                } />
 
                 {/* Protected routes */}
                 <Route path="/dashboard" element={
@@ -143,7 +133,7 @@ function App() {
                 } />
 
                 {/* Default redirect */}
-                <Route path="/" element={<Navigate to="/questionnaire" replace />} />
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Routes>
               </div>
               </Router>
