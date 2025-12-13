@@ -13,6 +13,9 @@ import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
 import { VerifyPage } from './pages/auth/VerifyPage'
 
+// Onboarding pages
+import { InitialQuestionnairePage } from './pages/InitialQuestionnairePage'
+
 // Main app pages
 import { DashboardPage } from './pages/DashboardPage'
 import { GettingStartedPage } from './pages/GettingStartedPage'
@@ -26,6 +29,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { SpotlightApiKeysPage } from './pages/spotlight/SpotlightApiKeysPage'
 import { SpotlightTokenAnalyticsPage } from './pages/spotlight/SpotlightTokenAnalyticsPage'
 import { SpotlightSessionAnalyticsPage } from './pages/spotlight/SpotlightSessionAnalyticsPage'
+import { SpotlightGettingStartedPage } from './pages/spotlight/SpotlightGettingStartedPage'
 
 import './App.css'
 
@@ -54,6 +58,13 @@ function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/verify" element={<VerifyPage />} />
 
+                {/* Onboarding routes */}
+                <Route path="/questionnaire" element={
+                  <ProtectedRoute>
+                    <InitialQuestionnairePage />
+                  </ProtectedRoute>
+                } />
+
                 {/* Protected routes */}
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
@@ -65,6 +76,11 @@ function App() {
                 <Route path="/getting-started" element={
                   <ProtectedRoute>
                     <GettingStartedPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/spotlight/getting-started" element={
+                  <ProtectedRoute>
+                    <SpotlightGettingStartedPage />
                   </ProtectedRoute>
                 } />
                 <Route path="/traces" element={
@@ -127,7 +143,7 @@ function App() {
                 } />
 
                 {/* Default redirect */}
-                <Route path="/" element={<Navigate to="/getting-started" replace />} />
+                <Route path="/" element={<Navigate to="/questionnaire" replace />} />
               </Routes>
               </div>
               </Router>
