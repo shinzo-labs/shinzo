@@ -155,16 +155,17 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
           {currentQuestion.options.map(option => {
             const isSelected = selectedValues.includes(option.value)
             return (
-              <React.Fragment key={option.value}>
-                <Card
-                  onClick={() => handleMultiSelectToggle(currentQuestion.id, option.value)}
-                  style={{
-                    cursor: 'pointer',
-                    backgroundColor: isSelected ? 'var(--blue-2)' : undefined,
-                    borderColor: isSelected ? 'var(--blue-6)' : undefined
-                  }}
-                >
-                  <Flex align="center" gap="3" style={{ padding: option.description ? '8px' : '4px 8px' }}>
+              <Card
+                key={option.value}
+                onClick={() => handleMultiSelectToggle(currentQuestion.id, option.value)}
+                style={{
+                  cursor: 'pointer',
+                  backgroundColor: isSelected ? 'var(--blue-2)' : undefined,
+                  borderColor: isSelected ? 'var(--blue-6)' : undefined
+                }}
+              >
+                <Flex direction="column" gap="3" style={{ padding: option.description ? '8px' : '4px 8px' }}>
+                  <Flex align="center" gap="3">
                     {option.icon}
                     <Checkbox checked={isSelected} />
                     <Flex direction="column" gap="1" style={{ flex: 1 }}>
@@ -174,16 +175,20 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
                       )}
                     </Flex>
                   </Flex>
-                </Card>
-                {option.requiresTextInput && isSelected && (
-                  <TextField.Root
-                    placeholder="Please specify..."
-                    value={textInputs[`${currentQuestion.id}_${option.value}`] || ''}
-                    onChange={(e) => handleTextInputChange(`${currentQuestion.id}_${option.value}`, e.target.value)}
-                    style={{ marginLeft: '40px', marginTop: '-4px' }}
-                  />
-                )}
-              </React.Fragment>
+                  {option.requiresTextInput && isSelected && (
+                    <TextField.Root
+                      placeholder="Please specify..."
+                      value={textInputs[`${currentQuestion.id}_${option.value}`] || ''}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        handleTextInputChange(`${currentQuestion.id}_${option.value}`, e.target.value)
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ marginLeft: '40px' }}
+                    />
+                  )}
+                </Flex>
+              </Card>
             )
           })}
         </Flex>
@@ -197,30 +202,35 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
             {currentQuestion.options.map(option => {
               const isSelected = selectedValue === option.value
               return (
-                <React.Fragment key={option.value}>
-                  <Card
-                    onClick={() => handleSingleSelect(currentQuestion.id, option.value)}
-                    style={{
-                      cursor: 'pointer',
-                      backgroundColor: isSelected ? 'var(--blue-2)' : undefined,
-                      borderColor: isSelected ? 'var(--blue-6)' : undefined
-                    }}
-                  >
-                    <Flex align="center" gap="3" style={{ padding: '4px 8px' }}>
+                <Card
+                  key={option.value}
+                  onClick={() => handleSingleSelect(currentQuestion.id, option.value)}
+                  style={{
+                    cursor: 'pointer',
+                    backgroundColor: isSelected ? 'var(--blue-2)' : undefined,
+                    borderColor: isSelected ? 'var(--blue-6)' : undefined
+                  }}
+                >
+                  <Flex direction="column" gap="3" style={{ padding: '4px 8px' }}>
+                    <Flex align="center" gap="3">
                       {option.icon}
                       <RadioGroup.Item value={option.value} />
                       <Text weight="medium" style={{ flex: 1 }}>{option.label}</Text>
                     </Flex>
-                  </Card>
-                  {option.requiresTextInput && isSelected && (
-                    <TextField.Root
-                      placeholder="Please specify..."
-                      value={textInputs[`${currentQuestion.id}_${option.value}`] || ''}
-                      onChange={(e) => handleTextInputChange(`${currentQuestion.id}_${option.value}`, e.target.value)}
-                      style={{ marginLeft: '40px', marginTop: '-4px' }}
-                    />
-                  )}
-                </React.Fragment>
+                    {option.requiresTextInput && isSelected && (
+                      <TextField.Root
+                        placeholder="Please specify..."
+                        value={textInputs[`${currentQuestion.id}_${option.value}`] || ''}
+                        onChange={(e) => {
+                          e.stopPropagation()
+                          handleTextInputChange(`${currentQuestion.id}_${option.value}`, e.target.value)
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ marginLeft: '40px' }}
+                      />
+                    )}
+                  </Flex>
+                </Card>
               )
             })}
           </Flex>
