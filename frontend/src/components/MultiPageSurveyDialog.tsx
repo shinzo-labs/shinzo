@@ -24,6 +24,7 @@ export interface SurveyConfig {
   description: string
   icon?: React.ReactNode
   questions: Question[]
+  hideRequiredBadge?: boolean // If true, hides the "Required" badge even when questions are required
 }
 
 interface MultiPageSurveyDialogProps {
@@ -263,7 +264,7 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
           <Flex direction="column" gap="3">
             <Flex align="center" gap="2">
               <Heading size="4">{currentQuestion.question}</Heading>
-              {currentQuestion.required && (
+              {currentQuestion.required && !config.hideRequiredBadge && (
                 <Badge color="gray">Required</Badge>
               )}
             </Flex>

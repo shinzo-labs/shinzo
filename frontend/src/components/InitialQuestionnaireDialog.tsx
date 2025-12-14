@@ -17,6 +17,7 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
     title: 'Welcome to Shinzo!',
     description: "Let's get you started with a few quick questions to personalize your experience.",
     icon: <img src="/ShinzoIcon512.png" alt="Shinzo" width="64" height="64" />,
+    hideRequiredBadge: true, // All questions are required, so no need to show the badge
     questions: [
       {
         id: 'usage_types',
@@ -46,7 +47,7 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
         id: 'role',
         type: 'single-select-radio',
         question: 'What is your role?',
-        required: false,
+        required: true,
         options: [
           { label: 'Software Engineer', value: 'software-engineer' },
           { label: 'Engineering Manager', value: 'engineering-manager' },
@@ -61,7 +62,7 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
         type: 'multi-select',
         question: 'How did you hear about Shinzo?',
         description: 'Select all that apply.',
-        required: false,
+        required: true,
         options: [
           {
             label: 'Reddit',
