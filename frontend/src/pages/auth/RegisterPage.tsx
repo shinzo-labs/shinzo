@@ -31,6 +31,14 @@ export const RegisterPage: React.FC = () => {
   const passwordStrengthLabels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong']
   const passwordStrengthColors = ['red', 'orange', 'yellow', 'blue', 'green']
 
+  // Check if all required fields are filled and valid
+  const isFormValid =
+    email.trim() !== '' &&
+    password.length >= 8 &&
+    confirmPassword !== '' &&
+    password === confirmPassword &&
+    agreeToTerms
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -305,9 +313,9 @@ export const RegisterPage: React.FC = () => {
                 type="submit"
                 size="3"
                 style={{ width: '100%' }}
-                disabled={loading}
+                disabled={loading || !isFormValid}
               >
-                {loading ? 'Creating account...' : 'Create account'}
+                {loading ? 'Creating Account...' : 'Create Account'}
               </Button>
             </Flex>
           </form>
