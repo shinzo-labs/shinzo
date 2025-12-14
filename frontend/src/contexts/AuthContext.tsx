@@ -141,6 +141,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const error = await response.text()
       throw new Error(error || 'Verification failed')
     }
+
+    const data = await response.json()
+
+    // Store token and user data for automatic login
+    if (data.token) {
+      localStorage.setItem('token', data.token)
+      setToken(data.token)
+      setUser(data.user)
+    }
+
+    return data
   }
 
   const resendVerification = async (email: string) => {
