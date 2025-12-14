@@ -279,7 +279,7 @@ export class EmailService {
     <div class="email-container">
         <div class="header">
             <div class="logo-container">
-                <img src="${FRONTEND_URL}/ShinzoIcon512.png" alt="Shinzo Logo" class="logo-icon">
+                <img src="${FRONTEND_URL}/images/ShinzoIcon512.png" alt="Shinzo Logo" class="logo-icon">
             </div>
             <h1 class="logo-text">Shinzo Platform</h1>
             <p class="header-title">Verify Your Email Address</p>

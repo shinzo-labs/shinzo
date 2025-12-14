@@ -96,7 +96,7 @@ export const Sidebar: React.FC = () => {
       {/* Logo */}
       <Flex align="center" gap="3" style={{ padding: '16px', height: '64px', borderBottom: '1px solid var(--gray-6)' }}>
         <img
-          src="/ShinzoIcon512.png"
+          src="/images/ShinzoIcon512.png"
           alt="Shinzo Logo"
           style={{
             width: '32px',

@@ -16,7 +16,7 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
   const surveyConfig: SurveyConfig = {
     title: 'Welcome to Shinzo!',
     description: "Let's get you started with a few quick questions to personalize your experience.",
-    icon: <img src="/ShinzoIcon512.png" alt="Shinzo" width="64" height="64" />,
+    icon: <img src="/images/ShinzoIcon512.png" alt="Shinzo" width="64" height="64" />,
     hideRequiredBadge: true, // All questions are required, so no need to show the badge
     questions: [
       {
