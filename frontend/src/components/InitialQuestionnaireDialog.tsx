@@ -15,31 +15,36 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
   // Survey configuration
   const surveyConfig: SurveyConfig = {
     title: 'Welcome to Shinzo!',
-    description: "Let's get you started with a few quick questions to personalize your experience",
-    icon: <Icons.RocketIcon width="48" height="48" color="var(--blue-9)" />,
+    description: "Let's get you started with a few quick questions to personalize your experience.",
+    icon: <img src="/ShinzoIcon512.png" alt="Shinzo" width="64" height="64" />,
     questions: [
       {
         id: 'usage_types',
         type: 'multi-select',
         question: 'What would you like to do with Shinzo?',
-        description: 'Select all that apply',
+        description: 'Select all that apply.',
         required: true,
         options: [
           {
             label: 'Track AI Agent usage',
             value: 'ai-agent',
-            description: 'Monitor Claude API usage, token consumption, and agent interactions'
+            description: 'Monitor Claude API usage, token consumption, and agent interactions.'
           },
           {
             label: 'Track MCP Server usage',
             value: 'mcp-server',
-            description: 'Monitor MCP server telemetry, traces, spans, and metrics'
+            description: 'Monitor MCP server telemetry, traces, spans, and metrics.'
+          },
+          {
+            label: 'Something Else',
+            value: 'something-else',
+            requiresTextInput: true
           }
         ]
       },
       {
         id: 'role',
-        type: 'single-select',
+        type: 'single-select-radio',
         question: 'What is your role?',
         required: false,
         options: [
@@ -48,22 +53,46 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
           { label: 'Product Manager', value: 'product-manager' },
           { label: 'VP/Director', value: 'vp-director' },
           { label: 'C-Suite/Executive', value: 'c-suite' },
-          { label: 'Other', value: 'other' }
+          { label: 'Other', value: 'other', requiresTextInput: true }
         ]
       },
       {
         id: 'referral_sources',
         type: 'multi-select',
         question: 'How did you hear about Shinzo?',
-        description: 'Select all that apply',
+        description: 'Select all that apply.',
         required: false,
         options: [
-          { label: 'Reddit', value: 'Reddit' },
-          { label: 'LinkedIn', value: 'LinkedIn' },
-          { label: 'X', value: 'X' },
-          { label: 'Word of Mouth', value: 'Word of Mouth' },
-          { label: 'Website', value: 'Website' },
-          { label: 'Other', value: 'Other' }
+          {
+            label: 'Reddit',
+            value: 'Reddit',
+            icon: <Icons.ChatBubbleIcon color="var(--orange-9)" />
+          },
+          {
+            label: 'LinkedIn',
+            value: 'LinkedIn',
+            icon: <Icons.LinkedInLogoIcon color="var(--blue-9)" />
+          },
+          {
+            label: 'X (Twitter)',
+            value: 'X',
+            icon: <Icons.TwitterLogoIcon color="var(--gray-12)" />
+          },
+          {
+            label: 'Word of Mouth',
+            value: 'Word of Mouth',
+            icon: <Icons.SpeakerLoudIcon />
+          },
+          {
+            label: 'Website',
+            value: 'Website',
+            icon: <Icons.GlobeIcon />
+          },
+          {
+            label: 'Other',
+            value: 'Other',
+            requiresTextInput: true
+          }
         ]
       }
     ]
@@ -75,11 +104,29 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
     const role = answers.role as string || undefined
     const referral_sources = answers.referral_sources as string[] || undefined
 
-    await surveyService.saveSurvey(token!, {
+    // Include text inputs for custom answers
+    const enrichedData: any = {
       usage_types,
       role,
       referral_sources: referral_sources && referral_sources.length > 0 ? referral_sources : undefined
-    })
+    }
+
+    // Add custom text for "Something Else" if provided
+    if (answers['usage_types_something-else_text']) {
+      enrichedData.usage_types_custom = answers['usage_types_something-else_text']
+    }
+
+    // Add custom text for "Other" role if provided
+    if (answers['role_other_text']) {
+      enrichedData.role_custom = answers['role_other_text']
+    }
+
+    // Add custom text for "Other" referral source if provided
+    if (answers['referral_sources_Other_text']) {
+      enrichedData.referral_sources_custom = answers['referral_sources_Other_text']
+    }
+
+    await surveyService.saveSurvey(token!, enrichedData)
 
     // Trigger completion callback
     onComplete()

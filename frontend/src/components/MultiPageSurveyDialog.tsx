@@ -1,16 +1,18 @@
 import React, { useState } from 'react'
-import { Flex, Text, Heading, Button, Card, Checkbox, Select, Callout, Badge, Dialog } from '@radix-ui/themes'
+import { Flex, Text, Heading, Button, Card, Checkbox, Callout, Badge, Dialog, RadioGroup, TextField } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 
 export interface QuestionOption {
   label: string
   value: string
   description?: string
+  icon?: React.ReactNode
+  requiresTextInput?: boolean // If true, shows text input when selected
 }
 
 export interface Question {
   id: string
-  type: 'multi-select' | 'single-select'
+  type: 'multi-select' | 'single-select' | 'single-select-radio'
   question: string
   description?: string
   required: boolean
@@ -33,6 +35,7 @@ interface MultiPageSurveyDialogProps {
 export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ open, config, onSubmit }) => {
   const [currentPage, setCurrentPage] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
+  const [textInputs, setTextInputs] = useState<Record<string, string>>({}) // For "Other" and "Something Else" inputs
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,7 +47,22 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
   const isAnswered = (questionId: string): boolean => {
     const answer = answers[questionId]
     if (!answer) return false
-    if (Array.isArray(answer)) return answer.length > 0
+    if (Array.isArray(answer)) {
+      // For multi-select, check if any require text input and if they're filled
+      const selectedOptions = currentQuestion.options.filter(opt => answer.includes(opt.value))
+      const requiresText = selectedOptions.some(opt => opt.requiresTextInput)
+      if (requiresText) {
+        return answer.length > 0 && selectedOptions.every(opt =>
+          !opt.requiresTextInput || (textInputs[`${questionId}_${opt.value}`] || '').trim().length > 0
+        )
+      }
+      return answer.length > 0
+    }
+    // For single-select, check if it requires text input
+    const selectedOption = currentQuestion.options.find(opt => opt.value === answer)
+    if (selectedOption?.requiresTextInput) {
+      return answer !== '' && (textInputs[`${questionId}_${answer}`] || '').trim().length > 0
+    }
     return answer !== ''
   }
 
@@ -57,6 +75,15 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
       ? currentAnswer.filter(v => v !== value)
       : [...currentAnswer, value]
     setAnswers(prev => ({ ...prev, [questionId]: newAnswer }))
+
+    // Clear text input if deselecting an option that requires text
+    if (currentAnswer.includes(value)) {
+      setTextInputs(prev => {
+        const newInputs = { ...prev }
+        delete newInputs[`${questionId}_${value}`]
+        return newInputs
+      })
+    }
   }
 
   // Handle single-select
@@ -64,10 +91,15 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
     setAnswers(prev => ({ ...prev, [questionId]: value }))
   }
 
+  // Handle text input change
+  const handleTextInputChange = (key: string, value: string) => {
+    setTextInputs(prev => ({ ...prev, [key]: value }))
+  }
+
   // Navigation handlers
   const handleNext = () => {
     if (currentQuestion.required && !currentQuestionAnswered) {
-      setError(`Please answer this question before continuing`)
+      setError(`Please answer this question before continuing.`)
       return
     }
     setError(null)
@@ -81,7 +113,7 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
 
   const handleSkip = () => {
     if (currentQuestion.required) {
-      setError('This question is required and cannot be skipped')
+      setError('This question is required and cannot be skipped.')
       return
     }
     setError(null)
@@ -90,7 +122,7 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
 
   const handleSubmit = async () => {
     if (currentQuestion.required && !currentQuestionAnswered) {
-      setError('Please answer this question before submitting')
+      setError('Please answer this question before submitting.')
       return
     }
 
@@ -98,7 +130,15 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
     setError(null)
 
     try {
-      await onSubmit(answers)
+      // Merge text inputs into answers for options that require them
+      const enrichedAnswers = { ...answers }
+      Object.keys(textInputs).forEach(key => {
+        const [questionId, optionValue] = key.split('_')
+        if (textInputs[key]) {
+          enrichedAnswers[`${questionId}_${optionValue}_text`] = textInputs[key]
+        }
+      })
+      await onSubmit(enrichedAnswers)
     } catch (err) {
       console.error('Failed to submit survey:', err)
       setError('Failed to submit your responses. Please try again.')
@@ -112,44 +152,83 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
       const selectedValues = (answers[currentQuestion.id] as string[]) || []
       return (
         <Flex direction="column" gap="2">
-          {currentQuestion.options.map(option => (
-            <Card
-              key={option.value}
-              onClick={() => handleMultiSelectToggle(currentQuestion.id, option.value)}
-              style={{
-                cursor: 'pointer',
-                backgroundColor: selectedValues.includes(option.value) ? 'var(--blue-2)' : undefined,
-                borderColor: selectedValues.includes(option.value) ? 'var(--blue-6)' : undefined
-              }}
-            >
-              <Flex align="center" gap="3" style={{ padding: option.description ? '8px' : '4px 8px' }}>
-                <Checkbox checked={selectedValues.includes(option.value)} />
-                <Flex direction="column" gap="1" style={{ flex: 1 }}>
-                  <Text weight="medium">{option.label}</Text>
-                  {option.description && (
-                    <Text size="2" color="gray">{option.description}</Text>
-                  )}
-                </Flex>
-              </Flex>
-            </Card>
-          ))}
+          {currentQuestion.options.map(option => {
+            const isSelected = selectedValues.includes(option.value)
+            return (
+              <React.Fragment key={option.value}>
+                <Card
+                  onClick={() => handleMultiSelectToggle(currentQuestion.id, option.value)}
+                  style={{
+                    cursor: 'pointer',
+                    backgroundColor: isSelected ? 'var(--blue-2)' : undefined,
+                    borderColor: isSelected ? 'var(--blue-6)' : undefined
+                  }}
+                >
+                  <Flex align="center" gap="3" style={{ padding: option.description ? '8px' : '4px 8px' }}>
+                    {option.icon}
+                    <Checkbox checked={isSelected} />
+                    <Flex direction="column" gap="1" style={{ flex: 1 }}>
+                      <Text weight="medium">{option.label}</Text>
+                      {option.description && (
+                        <Text size="2" color="gray">{option.description}</Text>
+                      )}
+                    </Flex>
+                  </Flex>
+                </Card>
+                {option.requiresTextInput && isSelected && (
+                  <TextField.Root
+                    placeholder="Please specify..."
+                    value={textInputs[`${currentQuestion.id}_${option.value}`] || ''}
+                    onChange={(e) => handleTextInputChange(`${currentQuestion.id}_${option.value}`, e.target.value)}
+                    style={{ marginLeft: '40px', marginTop: '-4px' }}
+                  />
+                )}
+              </React.Fragment>
+            )
+          })}
         </Flex>
       )
-    } else {
-      // single-select
+    } else if (currentQuestion.type === 'single-select-radio') {
+      // Radio button style for single-select
       const selectedValue = answers[currentQuestion.id] as string || ''
       return (
-        <Select.Root value={selectedValue} onValueChange={(value) => handleSingleSelect(currentQuestion.id, value)}>
-          <Select.Trigger placeholder="Select an option..." style={{ width: '100%' }} />
-          <Select.Content>
-            {currentQuestion.options.map(option => (
-              <Select.Item key={option.value} value={option.value}>
-                {option.label}
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
+        <RadioGroup.Root value={selectedValue} onValueChange={(value) => handleSingleSelect(currentQuestion.id, value)}>
+          <Flex direction="column" gap="2">
+            {currentQuestion.options.map(option => {
+              const isSelected = selectedValue === option.value
+              return (
+                <React.Fragment key={option.value}>
+                  <Card
+                    onClick={() => handleSingleSelect(currentQuestion.id, option.value)}
+                    style={{
+                      cursor: 'pointer',
+                      backgroundColor: isSelected ? 'var(--blue-2)' : undefined,
+                      borderColor: isSelected ? 'var(--blue-6)' : undefined
+                    }}
+                  >
+                    <Flex align="center" gap="3" style={{ padding: '4px 8px' }}>
+                      {option.icon}
+                      <RadioGroup.Item value={option.value} />
+                      <Text weight="medium" style={{ flex: 1 }}>{option.label}</Text>
+                    </Flex>
+                  </Card>
+                  {option.requiresTextInput && isSelected && (
+                    <TextField.Root
+                      placeholder="Please specify..."
+                      value={textInputs[`${currentQuestion.id}_${option.value}`] || ''}
+                      onChange={(e) => handleTextInputChange(`${currentQuestion.id}_${option.value}`, e.target.value)}
+                      style={{ marginLeft: '40px', marginTop: '-4px' }}
+                    />
+                  )}
+                </React.Fragment>
+              )
+            })}
+          </Flex>
+        </RadioGroup.Root>
       )
+    } else {
+      // Fallback to dropdown for single-select (not used currently)
+      return null
     }
   }
 
@@ -174,9 +253,9 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
           <Flex direction="column" gap="3">
             <Flex align="center" gap="2">
               <Heading size="4">{currentQuestion.question}</Heading>
-              <Badge color={currentQuestion.required ? 'red' : 'gray'}>
-                {currentQuestion.required ? 'Required' : 'Optional'}
-              </Badge>
+              {currentQuestion.required && (
+                <Badge color="gray">Required</Badge>
+              )}
             </Flex>
             {currentQuestion.description && (
               <Text size="2" color="gray">{currentQuestion.description}</Text>
