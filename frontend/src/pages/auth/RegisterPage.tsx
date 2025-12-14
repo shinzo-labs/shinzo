@@ -279,6 +279,11 @@ export const RegisterPage: React.FC = () => {
                   placeholder="Confirm your password"
                   required
                 />
+                {confirmPassword && password !== confirmPassword && (
+                  <Text size="1" color="red">
+                    Passwords must match
+                  </Text>
+                )}
               </Flex>
 
               <Flex align="start" gap="2">
