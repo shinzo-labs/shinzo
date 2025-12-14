@@ -67,17 +67,17 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
           {
             label: 'Reddit',
             value: 'Reddit',
-            icon: <Icons.ChatBubbleIcon color="var(--orange-9)" />
+            icon: <img src="/images/reddit.png" alt="Reddit" width="24" height="24" />
           },
           {
             label: 'LinkedIn',
             value: 'LinkedIn',
-            icon: <Icons.LinkedInLogoIcon color="var(--blue-9)" />
+            icon: <img src="/images/linkedin.png" alt="LinkedIn" width="24" height="24" />
           },
           {
             label: 'X (Twitter)',
             value: 'X',
-            icon: <Icons.TwitterLogoIcon color="var(--gray-12)" />
+            icon: <img src="/images/x-twitter.png" alt="X (Twitter)" width="24" height="24" />
           },
           {
             label: 'Word of Mouth',
@@ -92,6 +92,7 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
           {
             label: 'Other',
             value: 'Other',
+            icon: <Icons.QuestionMarkCircledIcon />,
             requiresTextInput: true
           }
         ]

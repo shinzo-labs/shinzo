@@ -155,14 +155,18 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
         <Flex direction="column" gap="2">
           {currentQuestion.options.map(option => {
             const isSelected = selectedValues.includes(option.value)
+            const [isHovered, setIsHovered] = React.useState(false)
             return (
               <Card
                 key={option.value}
                 onClick={() => handleMultiSelectToggle(currentQuestion.id, option.value)}
+                onMouseEnter={() => setIsHovered(true)}
+                onMouseLeave={() => setIsHovered(false)}
                 style={{
                   cursor: 'pointer',
-                  backgroundColor: isSelected ? 'var(--blue-2)' : undefined,
-                  borderColor: isSelected ? 'var(--blue-6)' : undefined
+                  backgroundColor: isSelected ? 'var(--blue-2)' : isHovered ? 'var(--gray-3)' : undefined,
+                  borderColor: isSelected ? 'var(--blue-6)' : isHovered ? 'var(--blue-4)' : undefined,
+                  transition: 'all 0.2s ease'
                 }}
               >
                 <Flex direction="column" gap="3" style={{ padding: option.description ? '8px' : '4px 8px' }}>
@@ -202,14 +206,18 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
           <Flex direction="column" gap="2">
             {currentQuestion.options.map(option => {
               const isSelected = selectedValue === option.value
+              const [isHovered, setIsHovered] = React.useState(false)
               return (
                 <Card
                   key={option.value}
                   onClick={() => handleSingleSelect(currentQuestion.id, option.value)}
+                  onMouseEnter={() => setIsHovered(true)}
+                  onMouseLeave={() => setIsHovered(false)}
                   style={{
                     cursor: 'pointer',
-                    backgroundColor: isSelected ? 'var(--blue-2)' : undefined,
-                    borderColor: isSelected ? 'var(--blue-6)' : undefined
+                    backgroundColor: isSelected ? 'var(--blue-2)' : isHovered ? 'var(--gray-3)' : undefined,
+                    borderColor: isSelected ? 'var(--blue-6)' : isHovered ? 'var(--blue-4)' : undefined,
+                    transition: 'all 0.2s ease'
                   }}
                 >
                   <Flex direction="column" gap="3" style={{ padding: '4px 8px' }}>
