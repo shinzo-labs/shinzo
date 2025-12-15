@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useHasSpotlightData } from '../../hooks/useHasSpotlightData'
 import { spotlightService } from '../../backendService'
 import { OnboardingHeader, OnboardingStep, CodeSnippet } from '../../components/onboarding'
+import { BACKEND_URL } from '../../config'
 
 type IntegrationType = 'claude-code' | 'anthropic-sdk' | 'codex'
 
@@ -49,15 +50,15 @@ export const SpotlightGettingStartedPage: React.FC = () => {
     }
   }, [token])
 
-  const claudeCodeSetupMacOS = `echo 'export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"' >> ~/.zshrc
+  const claudeCodeSetupMacOS = `echo 'export ANTHROPIC_BASE_URL="${BACKEND_URL}/spotlight/anthropic"' >> ~/.zshrc
 echo 'export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.zshrc
 source ~/.zshrc`
 
-  const claudeCodeSetupLinux = `echo 'export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"' >> ~/.bashrc
+  const claudeCodeSetupLinux = `echo 'export ANTHROPIC_BASE_URL="${BACKEND_URL}/spotlight/anthropic"' >> ~/.bashrc
 echo 'export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.bashrc
 source ~/.bashrc`
 
-  const claudeCodeSetupWindows = `[System.Environment]::SetEnvironmentVariable('ANTHROPIC_BASE_URL', 'https://api.app.shinzo.ai/spotlight/anthropic', 'User')
+  const claudeCodeSetupWindows = `[System.Environment]::SetEnvironmentVariable('ANTHROPIC_BASE_URL', '${BACKEND_URL}/spotlight/anthropic', 'User')
 [System.Environment]::SetEnvironmentVariable('ANTHROPIC_CUSTOM_HEADERS', 'x-shinzo-api-key: ${shinzoApiKey}', 'User')`
 
   const anthropicSdkSetupCodeTypescript = `import Anthropic from "@anthropic-ai/sdk";
@@ -288,7 +289,7 @@ print(message.content)`
               description="Set the environment variables for your application. You can add or update API keys later in the settings page."
             >
               <CodeSnippet
-                code={`export ANTHROPIC_API_KEY="${shinzoApiKey}" && export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"`}
+                code={`export ANTHROPIC_API_KEY="${shinzoApiKey}" && export ANTHROPIC_BASE_URL="${BACKEND_URL}/spotlight/anthropic"`}
                 copyId="set-environment-variables"
                 inline
               />
