@@ -301,3 +301,76 @@ export const userPreferencesService = {
     return handleResponse(response)
   }
 }
+
+interface SpotlightSession {
+  uuid: string
+  session_id: string
+  created_at: string
+  updated_at: string
+}
+
+interface ShinzoApiKey {
+  uuid: string
+  key_name: string
+  api_key: string
+  key_prefix: string
+  key_type: 'live' | 'test'
+  status: 'active' | 'inactive' | 'revoked'
+  last_used: string | null
+  created_at: string
+}
+
+interface UserSurvey {
+  uuid: string
+  usage_types: string[]
+  role?: string
+  referral_sources?: string[]
+  created_at: string
+}
+
+export const spotlightService = {
+  async fetchSessions(token: string, params: { limit?: number; offset?: number }): Promise<{ sessions: SpotlightSession[] }> {
+    const queryParams = new URLSearchParams()
+    if (params.limit) queryParams.append('limit', params.limit.toString())
+    if (params.offset) queryParams.append('offset', params.offset.toString())
+
+    const response = await fetch(`${API_BASE_URL}/spotlight/sessions?${queryParams}`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async fetchShinzoApiKeys(token: string): Promise<{ shinzo_api_keys: ShinzoApiKey[] }> {
+    const response = await fetch(`${API_BASE_URL}/spotlight/shinzo_keys`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async createShinzoApiKey(token: string, data: { key_name: string; key_type: 'live' | 'test' }): Promise<ShinzoApiKey> {
+    const response = await fetch(`${API_BASE_URL}/spotlight/shinzo_keys`, {
+      method: 'POST',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(data)
+    })
+    return handleResponse(response)
+  }
+}
+
+export const surveyService = {
+  async saveSurvey(token: string, data: { usage_types: string[]; role?: string; referral_sources?: string[] }): Promise<{ survey: UserSurvey }> {
+    const response = await fetch(`${API_BASE_URL}/user/survey`, {
+      method: 'POST',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(data)
+    })
+    return handleResponse(response)
+  },
+
+  async fetchSurvey(token: string): Promise<{ survey: UserSurvey | null }> {
+    const response = await fetch(`${API_BASE_URL}/user/survey`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  }
+}

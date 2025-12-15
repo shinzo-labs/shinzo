@@ -42,7 +42,7 @@ export const LoginPage: React.FC = () => {
         }}
       >
         <img
-          src="/ShinzoIcon512.png"
+          src="/images/ShinzoIcon512.png"
           alt="Back to Shinzo"
           style={{
             width: '48px',
@@ -61,7 +61,7 @@ export const LoginPage: React.FC = () => {
               style={{ textDecoration: 'none' }}
             >
               <img
-                src="/ShinzoIcon512.png"
+                src="/images/ShinzoIcon512.png"
                 alt="Shinzo Labs"
                 style={{
                   width: '128px',
@@ -131,7 +131,21 @@ export const LoginPage: React.FC = () => {
                   <Callout.Icon>
                     <ExclamationTriangleIcon />
                   </Callout.Icon>
-                  <Callout.Text>{error}</Callout.Text>
+                  <Callout.Text>
+                    {error}
+                    {error.includes('verify your email') && (
+                      <>
+                        {' '}
+                        <Link
+                          to="/verify"
+                          state={{ email }}
+                          style={{ color: 'var(--red-11)', textDecoration: 'underline' }}
+                        >
+                          Click here to verify your email
+                        </Link>
+                      </>
+                    )}
+                  </Callout.Text>
                 </Callout.Root>
               )}
 

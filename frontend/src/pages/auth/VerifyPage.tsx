@@ -56,8 +56,8 @@ export const VerifyPage: React.FC = () => {
       await verify(emailToUse, tokenToUse)
       setSuccess(true)
       setTimeout(() => {
-        navigate('/login')
-      }, 3000)
+        navigate('/')  // Redirect to app root, which will handle routing based on onboarding status
+      }, 2000)  // Reduced from 3s to 2s for better UX
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed')
     } finally {
@@ -110,10 +110,10 @@ export const VerifyPage: React.FC = () => {
             <Flex direction="column" gap="2" align="center">
               <Heading size="6">Email Verified!</Heading>
               <Text size="2" color="gray" align="center">
-                Your email has been successfully verified. You can now sign in to your account.
+                Your email has been successfully verified. You're now logged in!
               </Text>
               <Text size="1" color="gray" align="center">
-                Redirecting to login page in 3 seconds...
+                Taking you to your dashboard...
               </Text>
             </Flex>
           </Flex>

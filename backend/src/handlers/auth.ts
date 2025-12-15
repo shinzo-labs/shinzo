@@ -227,10 +227,19 @@ export const handleVerifyUser = async (request: yup.InferType<typeof verifyUserS
       // Continue with verification even if token generation fails
     }
 
+    // Generate JWT token for automatic login
+    const token = generateJWT(user)
+
     return {
       response: {
         message: 'Email verified successfully',
-        verified: true
+        verified: true,
+        token,
+        user: {
+          uuid: user.uuid,
+          email: user.email,
+          verified: true
+        }
       },
       status: 200
     }

@@ -5,6 +5,7 @@ import {
   User,
   SubscriptionTier,
   UserPreferences,
+  UserSurvey,
   Resource,
   ResourceAttribute,
   IngestToken,
@@ -49,6 +50,7 @@ export const sequelize = new Sequelize(DATABASE_URL, {
 User.initialize(sequelize)
 SubscriptionTier.initialize(sequelize)
 UserPreferences.initialize(sequelize)
+UserSurvey.initialize(sequelize)
 Resource.initialize(sequelize)
 ResourceAttribute.initialize(sequelize)
 IngestToken.initialize(sequelize)
