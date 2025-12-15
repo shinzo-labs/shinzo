@@ -1,88 +1,19 @@
 import React, { useState, useEffect } from 'react'
 import { AppLayout } from '../../components/layout/AppLayout'
-import { Card, Flex, Text, Heading, Button, Code, Badge, Callout, Spinner } from '@radix-ui/themes'
+import { Flex, Text, Tabs, Button, Callout, Spinner, Badge } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useHasSpotlightData } from '../../hooks/useHasSpotlightData'
 import { spotlightService } from '../../backendService'
-import { CLIPBOARD_TIMEOUT } from '../../config'
+import { OnboardingHeader, OnboardingStep, CodeSnippet } from '../../components/onboarding'
 
-interface AppIntegration {
-  id: string
-  name: string
-  icon: React.ReactNode
-  requiresApiKey: boolean
-  comingSoon?: boolean
-  description?: string
-}
-
-interface AppCategory {
-  id: string
-  name: string
-  items: AppIntegration[]
-}
-
-const APP_INTEGRATIONS: AppCategory[] = [
-  {
-    id: 'cli-agents',
-    name: 'CLI Agents',
-    items: [
-      { id: 'claude-code', name: 'Claude Code', icon: <Icons.CodeIcon />, requiresApiKey: false },
-      { id: 'codex', name: 'Codex', icon: <Icons.CodeIcon />, requiresApiKey: true, comingSoon: true },
-      { id: 'gemini-cli', name: 'Gemini CLI', icon: <Icons.StarIcon />, requiresApiKey: true, comingSoon: true },
-    ]
-  },
-  {
-    id: 'code-ides',
-    name: 'Code IDEs',
-    items: [
-      { id: 'cursor', name: 'Cursor', icon: <Icons.CursorArrowIcon />, requiresApiKey: true, comingSoon: true },
-      { id: 'windsurf', name: 'Windsurf', icon: <Icons.Component1Icon />, requiresApiKey: true, comingSoon: true },
-      { id: 'vscode', name: 'VS Code', icon: <Icons.CodeIcon />, requiresApiKey: true, comingSoon: true },
-    ]
-  },
-  {
-    id: 'ai-sdks',
-    name: 'AI SDKs',
-    items: [
-      { id: 'anthropic-sdk', name: 'Anthropic SDK', icon: <Icons.CodeIcon />, requiresApiKey: true },
-      { id: 'openai-sdk', name: 'OpenAI SDK', icon: <Icons.CodeIcon />, requiresApiKey: true, comingSoon: true },
-      { id: 'langchain', name: 'LangChain', icon: <Icons.Link2Icon />, requiresApiKey: true, comingSoon: true },
-    ]
-  },
-  {
-    id: 'ai-gateways',
-    name: 'AI Gateways',
-    items: [
-      { id: 'litellm', name: 'LiteLLM', icon: <Icons.LayersIcon />, requiresApiKey: true, comingSoon: true },
-      { id: 'openrouter', name: 'OpenRouter', icon: <Icons.MixIcon />, requiresApiKey: true, comingSoon: true },
-      { id: 'portkey', name: 'Portkey', icon: <Icons.LockClosedIcon />, requiresApiKey: true, comingSoon: true },
-    ]
-  },
-  {
-    id: 'direct-api',
-    name: 'Direct API',
-    items: [
-      { id: 'anthropic-api', name: 'Anthropic', icon: <Icons.GlobeIcon />, requiresApiKey: true },
-      { id: 'openai-api', name: 'OpenAI', icon: <Icons.GlobeIcon />, requiresApiKey: true, comingSoon: true },
-      { id: 'gemini-api', name: 'Gemini', icon: <Icons.GlobeIcon />, requiresApiKey: true, comingSoon: true },
-    ]
-  },
-  {
-    id: 'custom',
-    name: 'Custom Integration',
-    items: [
-      { id: 'custom', name: 'Custom Integration', icon: <Icons.MixerHorizontalIcon />, requiresApiKey: true },
-    ]
-  }
-]
+type IntegrationType = 'claude-code' | 'anthropic-sdk' | 'codex'
 
 export const SpotlightGettingStartedPage: React.FC = () => {
   const { token } = useAuth()
-  const [selectedApp, setSelectedApp] = useState<AppIntegration | null>(null)
+  const [selectedIntegration, setSelectedIntegration] = useState<IntegrationType>('claude-code')
   const [shinzoApiKey, setShinzoApiKey] = useState<string>('')
   const [loading, setLoading] = useState(true)
-  const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
   const { hasSpotlightData } = useHasSpotlightData()
 
   useEffect(() => {
@@ -115,211 +46,10 @@ export const SpotlightGettingStartedPage: React.FC = () => {
     }
   }, [token])
 
-  const copyToClipboard = (text: string, buttonId: string) => {
-    navigator.clipboard.writeText(text)
-    setCopiedStates(prev => ({ ...prev, [buttonId]: true }))
-    setTimeout(() => {
-      setCopiedStates(prev => ({ ...prev, [buttonId]: false }))
-    }, CLIPBOARD_TIMEOUT)
-  }
+  const claudeCodeSetupCode = `export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"
+export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"`
 
-  const renderAppSelection = () => (
-    <Card>
-      <Flex direction="column" gap="6">
-        <Flex direction="column" gap="2">
-          <Heading size="5">Choose Your Integration</Heading>
-          <Text color="gray">
-            Select the application or service you want to track with Shinzo AI Analytics.
-          </Text>
-        </Flex>
-
-        {APP_INTEGRATIONS.map(app => (
-          <Flex key={app.id} direction="column" gap="3">
-            <Text size="3" weight="medium" color="gray">
-              {app.name}
-            </Text>
-            <Flex direction="column" gap="2">
-              {app.items.map((item: AppIntegration) => (
-                <Card
-                  key={item.id}
-                  onClick={() => !item.comingSoon && setSelectedApp(item)}
-                  style={{
-                    cursor: item.comingSoon ? 'not-allowed' : 'pointer',
-                    backgroundColor: selectedApp?.id === item.id ? 'var(--blue-2)' : undefined,
-                    borderColor: selectedApp?.id === item.id ? 'var(--blue-6)' : undefined,
-                    opacity: item.comingSoon ? 0.6 : 1
-                  }}
-                >
-                  <Flex align="center" justify="between" style={{ padding: '12px' }}>
-                    <Flex align="center" gap="3">
-                      <Flex
-                        align="center"
-                        justify="center"
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          backgroundColor: 'var(--gray-3)',
-                          borderRadius: '8px'
-                        }}
-                      >
-                        {item.icon}
-                      </Flex>
-                      <Flex direction="column" gap="1">
-                        <Text weight="medium">{item.name}</Text>
-                        {item.description && (
-                          <Text size="2" color="gray">{item.description}</Text>
-                        )}
-                      </Flex>
-                    </Flex>
-                    {item.comingSoon && (
-                      <Badge color="gray">Coming Soon</Badge>
-                    )}
-                  </Flex>
-                </Card>
-              ))}
-            </Flex>
-          </Flex>
-        ))}
-      </Flex>
-    </Card>
-  )
-
-  const renderSetupInstructions = () => {
-    if (!selectedApp) return null
-
-    // Claude Code special case - no API key setup needed
-    if (selectedApp.id === 'claude-code') {
-      return (
-        <Card>
-          <Flex direction="column" gap="6">
-            <Flex direction="column" gap="2">
-              <Heading size="5">Setup {selectedApp.name}</Heading>
-              <Text color="gray">
-                Configure {selectedApp.name} to send analytics to Shinzo using custom headers.
-              </Text>
-            </Flex>
-
-            <Flex direction="column" gap="4">
-              <Flex direction="column" gap="2">
-                <Text weight="medium">1. Set your Shinzo API key</Text>
-                <Text size="2" color="gray">
-                  Add this to your shell configuration (~/.zshrc or ~/.bashrc):
-                </Text>
-                <Flex gap="2" align="center">
-                  <Code style={{ flex: 1, padding: '12px' }}>
-                    export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: {shinzoApiKey}"
-                  </Code>
-                  <Button
-                    variant="soft"
-                    onClick={() => copyToClipboard(`export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"`, 'claude-code-header')}
-                  >
-                    {copiedStates['claude-code-header'] ? <Icons.CheckIcon /> : <Icons.CopyIcon />}
-                  </Button>
-                </Flex>
-              </Flex>
-
-              <Flex direction="column" gap="2">
-                <Text weight="medium">2. Set the Shinzo base URL</Text>
-                <Flex gap="2" align="center">
-                  <Code style={{ flex: 1, padding: '12px' }}>
-                    export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"
-                  </Code>
-                  <Button
-                    variant="soft"
-                    onClick={() => copyToClipboard('export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"', 'claude-code-url')}
-                  >
-                    {copiedStates['claude-code-url'] ? <Icons.CheckIcon /> : <Icons.CopyIcon />}
-                  </Button>
-                </Flex>
-              </Flex>
-
-              <Flex direction="column" gap="2">
-                <Text weight="medium">3. Reload your shell and test</Text>
-                <Code style={{ padding: '12px' }}>
-                  source ~/.zshrc  # or source ~/.bashrc
-                </Code>
-                <Text size="2" color="gray">
-                  Now use {selectedApp.name} normally and your analytics will appear below!
-                </Text>
-              </Flex>
-
-              <Callout.Root color="blue">
-                <Callout.Icon>
-                  <Icons.InfoCircledIcon />
-                </Callout.Icon>
-                <Callout.Text>
-                  Note: OAuth authentication flows will bypass Shinzo routing. Use API key authentication for full {selectedApp.name} analytics coverage.
-                </Callout.Text>
-              </Callout.Root>
-            </Flex>
-          </Flex>
-        </Card>
-      )
-    }
-
-    // Generic integration with API key requirement
-    if (selectedApp.requiresApiKey) {
-      return (
-        <Card>
-          <Flex direction="column" gap="6">
-            <Flex direction="column" gap="2">
-              <Heading size="5">Setup {selectedApp.name}</Heading>
-              <Text color="gray">
-                Configure your integration to route requests through Shinzo.
-              </Text>
-            </Flex>
-
-            <Flex direction="column" gap="4">
-              <Flex direction="column" gap="2">
-                <Text weight="medium">1. Add your provider API key</Text>
-                <Text size="2" color="gray">
-                  First, add your {selectedApp.name} API key in{' '}
-                  <Text style={{ color: 'var(--accent-9)', cursor: 'pointer' }}>
-                    Settings → API Keys
-                  </Text>
-                </Text>
-              </Flex>
-
-              <Flex direction="column" gap="2">
-                <Text weight="medium">2. Use Shinzo's proxy endpoint</Text>
-                <Text size="2" color="gray">
-                  Update your application to use Shinzo's API endpoint:
-                </Text>
-                <Flex gap="2" align="center">
-                  <Code style={{ flex: 1, padding: '12px' }}>
-                    https://api.app.shinzo.ai/spotlight/anthropic
-                  </Code>
-                  <Button
-                    variant="soft"
-                    onClick={() => copyToClipboard('https://api.app.shinzo.ai/spotlight/anthropic', 'proxy-url')}
-                  >
-                    {copiedStates['proxy-url'] ? <Icons.CheckIcon /> : <Icons.CopyIcon />}
-                  </Button>
-                </Flex>
-              </Flex>
-
-              <Flex direction="column" gap="2">
-                <Text weight="medium">3. Include your Shinzo API key</Text>
-                <Text size="2" color="gray">
-                  Add this header to your requests:
-                </Text>
-                <Flex gap="2" align="center">
-                  <Code style={{ flex: 1, padding: '12px' }}>
-                    x-shinzo-api-key: {shinzoApiKey}
-                  </Code>
-                  <Button
-                    variant="soft"
-                    onClick={() => copyToClipboard(`x-shinzo-api-key: ${shinzoApiKey}`, 'shinzo-key')}
-                  >
-                    {copiedStates['shinzo-key'] ? <Icons.CheckIcon /> : <Icons.CopyIcon />}
-                  </Button>
-                </Flex>
-              </Flex>
-
-              <Flex direction="column" gap="2">
-                <Text weight="medium">4. Example code</Text>
-                <Code style={{ padding: '12px', whiteSpace: 'pre-wrap' }}>
-{`import Anthropic from "@anthropic-ai/sdk";
+  const anthropicSdkSetupCode = `import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -327,46 +57,7 @@ const client = new Anthropic({
   defaultHeaders: {
     "x-shinzo-api-key": "${shinzoApiKey}"
   }
-});`}
-                </Code>
-              </Flex>
-            </Flex>
-          </Flex>
-        </Card>
-      )
-    }
-
-    return null
-  }
-
-  const renderSuccessState = () => (
-    <Card>
-      <Flex direction="column" gap="4" align="center" style={{ padding: '32px' }}>
-        <Flex
-          align="center"
-          justify="center"
-          style={{
-            width: '64px',
-            height: '64px',
-            backgroundColor: 'var(--green-3)',
-            borderRadius: '50%'
-          }}
-        >
-          <Icons.CheckIcon width="32" height="32" color="var(--green-9)" />
-        </Flex>
-        <Flex direction="column" gap="2" align="center">
-          <Heading size="5">Analytics Active!</Heading>
-          <Text color="gray" align="center">
-            Shinzo is now tracking your AI agent analytics. Start using your application to see data appear.
-          </Text>
-        </Flex>
-        <Button size="3" onClick={() => window.location.href = '/spotlight'}>
-          View Analytics Dashboard
-          <Icons.ArrowRightIcon />
-        </Button>
-      </Flex>
-    </Card>
-  )
+});`
 
   if (loading) {
     return (
@@ -380,33 +71,235 @@ const client = new Anthropic({
 
   return (
     <AppLayout>
-      <Flex direction="column" gap="6" style={{ maxWidth: '900px', margin: '0 auto', padding: '24px' }}>
-        <Flex direction="column" gap="2">
-          <Heading size="7">AI Analytics Setup</Heading>
-          <Text color="gray" size="4">
-            Connect your AI application to start tracking usage, costs, and performance.
-          </Text>
-        </Flex>
+      <Flex direction="column" gap="6">
+        <OnboardingHeader
+          title="AI Analytics Setup"
+          description="Connect your AI application to start tracking usage, costs, and performance"
+          successMessage="Your Shinzo API key has been automatically generated! Choose an integration below and start sending analytics data."
+          showSuccess={!!shinzoApiKey}
+        />
 
-        {hasSpotlightData ? (
-          renderSuccessState()
-        ) : (
-          <Flex direction="column" gap="6">
-            {renderAppSelection()}
-            {selectedApp && renderSetupInstructions()}
+        {/* Step 1: Choose Your Integration */}
+        <OnboardingStep
+          stepNumber={1}
+          title="Choose Your Integration"
+          description="Select how you want to track your AI usage with Shinzo"
+        >
+          <Tabs.Root value={selectedIntegration} onValueChange={(value) => setSelectedIntegration(value as IntegrationType)}>
+            <Tabs.List>
+              <Tabs.Trigger value="claude-code">Claude Code</Tabs.Trigger>
+              <Tabs.Trigger value="anthropic-sdk">Anthropic SDK</Tabs.Trigger>
+              <Tabs.Trigger value="codex" disabled>
+                Codex
+                <Badge size="1" color="gray" style={{ marginLeft: '8px' }}>Coming Soon</Badge>
+              </Tabs.Trigger>
+            </Tabs.List>
+          </Tabs.Root>
 
-            {selectedApp && (
+          {selectedIntegration === 'claude-code' && (
+            <Text size="2">
+              The Claude Code CLI automatically routes requests through Shinzo when configured with custom headers.
+              Perfect for tracking your AI coding assistant usage.
+            </Text>
+          )}
+
+          {selectedIntegration === 'anthropic-sdk' && (
+            <Text size="2">
+              The Anthropic SDK integration allows you to track all Claude API calls from your application code.
+              Great for production applications and custom AI workflows.
+            </Text>
+          )}
+        </OnboardingStep>
+
+        {/* Step 2: Configure Your Integration */}
+        {selectedIntegration === 'claude-code' && (
+          <OnboardingStep
+            stepNumber={2}
+            title="Configure Environment Variables"
+            description="Add these to your shell configuration (~/.zshrc or ~/.bashrc)"
+          >
+            <CodeSnippet
+              code={claudeCodeSetupCode}
+              copyId="claude-code-setup"
+            />
+
+            <Callout.Root color="blue">
+              <Callout.Icon>
+                <Icons.InfoCircledIcon />
+              </Callout.Icon>
+              <Callout.Text>
+                After adding these variables, reload your shell with: <Text weight="bold" style={{ fontFamily: 'monospace' }}>source ~/.zshrc</Text>
+              </Callout.Text>
+            </Callout.Root>
+          </OnboardingStep>
+        )}
+
+        {selectedIntegration === 'anthropic-sdk' && (
+          <>
+            <OnboardingStep
+              stepNumber={2}
+              title="Install the Anthropic SDK"
+              description="Add the Anthropic SDK to your project if you haven't already"
+            >
+              <Tabs.Root defaultValue="npm">
+                <Tabs.List>
+                  <Tabs.Trigger value="npm">npm</Tabs.Trigger>
+                  <Tabs.Trigger value="pnpm">pnpm</Tabs.Trigger>
+                  <Tabs.Trigger value="yarn">yarn</Tabs.Trigger>
+                  <Tabs.Trigger value="python">Python</Tabs.Trigger>
+                </Tabs.List>
+
+                <Flex direction="column" gap="3" style={{ marginTop: '16px' }}>
+                  <Tabs.Content value="npm">
+                    <CodeSnippet
+                      code="npm install @anthropic-ai/sdk"
+                      copyId="npm-install"
+                      inline
+                    />
+                  </Tabs.Content>
+
+                  <Tabs.Content value="pnpm">
+                    <CodeSnippet
+                      code="pnpm add @anthropic-ai/sdk"
+                      copyId="pnpm-install"
+                      inline
+                    />
+                  </Tabs.Content>
+
+                  <Tabs.Content value="yarn">
+                    <CodeSnippet
+                      code="yarn add @anthropic-ai/sdk"
+                      copyId="yarn-install"
+                      inline
+                    />
+                  </Tabs.Content>
+
+                  <Tabs.Content value="python">
+                    <CodeSnippet
+                      code="pip install anthropic"
+                      copyId="python-install"
+                      inline
+                    />
+                  </Tabs.Content>
+                </Flex>
+              </Tabs.Root>
+            </OnboardingStep>
+
+            <OnboardingStep
+              stepNumber={3}
+              title="Configure Your Client"
+              description="Update your Anthropic client initialization to route through Shinzo"
+            >
+              <CodeSnippet
+                code={anthropicSdkSetupCode}
+                copyId="anthropic-sdk-setup"
+              />
+
+              <Callout.Root color="blue">
+                <Callout.Icon>
+                  <Icons.InfoCircledIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  Make sure you still have your Anthropic API key set as an environment variable or pass it directly to the client.
+                </Callout.Text>
+              </Callout.Root>
+            </OnboardingStep>
+          </>
+        )}
+
+        {/* Step 3/4: Run and Verify */}
+        <OnboardingStep
+          stepNumber={selectedIntegration === 'anthropic-sdk' ? 4 : 3}
+          title="Run Your Application & Verify"
+          description="Start making AI requests and your analytics will appear automatically"
+        >
+          <Flex direction="column" gap="2" style={{ paddingLeft: '20px' }}>
+            <Flex align="center" gap="2">
+              <Icons.CheckIcon color="var(--green-9)" />
+              <Text size="2">Claude API requests are made</Text>
+            </Flex>
+            <Flex align="center" gap="2">
+              <Icons.CheckIcon color="var(--green-9)" />
+              <Text size="2">Analytics data is sent to Shinzo</Text>
+            </Flex>
+            <Flex align="center" gap="2">
+              <Icons.CheckIcon color="var(--green-9)" />
+              <Text size="2">Data appears in your dashboard within seconds</Text>
+            </Flex>
+          </Flex>
+
+          <Callout.Root>
+            <Callout.Icon>
+              <Icons.InfoCircledIcon />
+            </Callout.Icon>
+            <Callout.Text>
+              Note: OAuth authentication flows will bypass Shinzo routing. Use API key authentication for full analytics coverage.
+            </Callout.Text>
+          </Callout.Root>
+        </OnboardingStep>
+
+        {/* Step 4/5: Success State */}
+        <OnboardingStep
+          stepNumber={
+            hasSpotlightData ? (
+              <Icons.CheckIcon width="20" height="20" />
+            ) : (
+              selectedIntegration === 'anthropic-sdk' ? 5 : 4
+            )
+          }
+          title="See Live Analytics via the Dashboard"
+          variant={hasSpotlightData ? 'success' : 'pending'}
+        >
+          {hasSpotlightData ? (
+            <>
+              <Callout.Root color="green">
+                <Callout.Icon>
+                  <Icons.CheckCircledIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  <Text weight="bold">Great! We're receiving analytics from your application!</Text>
+                  <Text size="2" style={{ marginTop: '4px', display: 'block' }}>
+                    Click the button below to view your data in the Dashboard.
+                  </Text>
+                </Callout.Text>
+              </Callout.Root>
+              <Button
+                variant="solid"
+                size="3"
+                color="green"
+                onClick={() => window.location.href = '/spotlight'}
+                style={{ alignSelf: 'flex-start', cursor: 'pointer' }}
+              >
+                <Icons.DashboardIcon />
+                <span style={{ marginLeft: 8 }}>Open Dashboard</span>
+                <Icons.ArrowRightIcon style={{ marginLeft: 8 }} />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Flex align="center" gap="3">
+                <Spinner size="3" />
+                <Flex direction="column" gap="1">
+                  <Text weight="medium">Waiting for analytics data...</Text>
+                  <Text size="2" color="gray">
+                    Once your application makes Claude API requests, the Dashboard will be unlocked automatically.
+                  </Text>
+                </Flex>
+              </Flex>
               <Callout.Root>
                 <Callout.Icon>
                   <Icons.InfoCircledIcon />
                 </Callout.Icon>
                 <Callout.Text>
-                  Once you've completed the setup, make a request with your application and your analytics will appear automatically.
+                  <Text size="2">
+                    Make sure your application is configured correctly and making requests to Claude.
+                    The platform is actively checking for incoming analytics events.
+                  </Text>
                 </Callout.Text>
               </Callout.Root>
-            )}
-          </Flex>
-        )}
+            </>
+          )}
+        </OnboardingStep>
       </Flex>
     </AppLayout>
   )
