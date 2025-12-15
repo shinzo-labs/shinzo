@@ -123,11 +123,6 @@ export const Sidebar: React.FC = () => {
 
       {/* Navigation */}
       <Flex direction="column" style={{ flex: 1, padding: '16px', gap: '4px', overflowY: 'auto' }}>
-        <div style={{ margin: '16px 0 8px 0', paddingLeft: '12px' }}>
-          <Text size="1" weight="bold" color="gray" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            MCP Telemetry
-          </Text>
-        </div>
         {sidebarConfig.map((section) => (
           <>
             <div style={{ margin: '16px 0 8px 0', paddingLeft: '12px' }}>
