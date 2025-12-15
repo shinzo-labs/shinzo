@@ -80,14 +80,14 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
             icon: <img src="/images/x-twitter.png" alt="X (Twitter)" width="24" height="24" />
           },
           {
-            label: 'Word of Mouth',
-            value: 'Word of Mouth',
-            icon: <Icons.SpeakerLoudIcon />
-          },
-          {
-            label: 'Website',
+            label: 'Web Search',
             value: 'Website',
             icon: <Icons.GlobeIcon />
+          },
+          {
+            label: 'Word of Mouth',
+            value: 'Word of Mouth',
+            icon: <Icons.PersonIcon />
           },
           {
             label: 'Other',
