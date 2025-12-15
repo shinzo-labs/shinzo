@@ -39,6 +39,7 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
   const [textInputs, setTextInputs] = useState<Record<string, string>>({}) // For "Other" and "Something Else" inputs
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hoveredOption, setHoveredOption] = useState<string | null>(null) // Track which option is hovered
 
   const currentQuestion = config.questions[currentPage]
   const isLastPage = currentPage === config.questions.length - 1
@@ -155,13 +156,13 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
         <Flex direction="column" gap="2">
           {currentQuestion.options.map(option => {
             const isSelected = selectedValues.includes(option.value)
-            const [isHovered, setIsHovered] = React.useState(false)
+            const isHovered = hoveredOption === option.value
             return (
               <Card
                 key={option.value}
                 onClick={() => handleMultiSelectToggle(currentQuestion.id, option.value)}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
+                onMouseEnter={() => setHoveredOption(option.value)}
+                onMouseLeave={() => setHoveredOption(null)}
                 style={{
                   cursor: 'pointer',
                   backgroundColor: isSelected ? 'var(--blue-2)' : isHovered ? 'var(--gray-3)' : undefined,
@@ -206,13 +207,13 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
           <Flex direction="column" gap="2">
             {currentQuestion.options.map(option => {
               const isSelected = selectedValue === option.value
-              const [isHovered, setIsHovered] = React.useState(false)
+              const isHovered = hoveredOption === option.value
               return (
                 <Card
                   key={option.value}
                   onClick={() => handleSingleSelect(currentQuestion.id, option.value)}
-                  onMouseEnter={() => setIsHovered(true)}
-                  onMouseLeave={() => setIsHovered(false)}
+                  onMouseEnter={() => setHoveredOption(option.value)}
+                  onMouseLeave={() => setHoveredOption(null)}
                   style={{
                     cursor: 'pointer',
                     backgroundColor: isSelected ? 'var(--blue-2)' : isHovered ? 'var(--gray-3)' : undefined,
