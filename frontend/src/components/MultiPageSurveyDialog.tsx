@@ -77,15 +77,6 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
       ? currentAnswer.filter(v => v !== value)
       : [...currentAnswer, value]
     setAnswers(prev => ({ ...prev, [questionId]: newAnswer }))
-
-    // Clear text input if deselecting an option that requires text
-    if (currentAnswer.includes(value)) {
-      setTextInputs(prev => {
-        const newInputs = { ...prev }
-        delete newInputs[`${questionId}_${value}`]
-        return newInputs
-      })
-    }
   }
 
   // Handle single-select
@@ -165,8 +156,8 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
                 onMouseLeave={() => setHoveredOption(null)}
                 style={{
                   cursor: 'pointer',
-                  backgroundColor: isSelected ? 'var(--blue-2)' : isHovered ? 'var(--gray-3)' : undefined,
-                  borderColor: isSelected ? 'var(--blue-6)' : isHovered ? 'var(--blue-4)' : undefined,
+                  backgroundColor: isSelected && isHovered ? 'var(--blue-3)' : isSelected ? 'var(--blue-2)' : isHovered ? 'var(--gray-3)' : undefined,
+                  borderColor: isSelected && isHovered ? 'var(--blue-7)' : isSelected ? 'var(--blue-6)' : isHovered ? 'var(--blue-4)' : undefined,
                   transition: 'all 0.2s ease'
                 }}
               >
@@ -339,7 +330,7 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
               variant="soft"
               onClick={handlePrevious}
               disabled={isFirstPage || submitting}
-              style={{ visibility: isFirstPage ? 'hidden' : 'visible' }}
+              style={{ visibility: isFirstPage ? 'hidden' : 'visible', cursor: 'pointer' }}
             >
               <Icons.ArrowLeftIcon />
               Previous
@@ -351,6 +342,7 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
                   variant="outline"
                   onClick={handleSkip}
                   disabled={submitting}
+                  style={{ cursor: 'pointer' }}
                 >
                   Skip
                 </Button>
@@ -359,6 +351,7 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
                 <Button
                   onClick={handleNext}
                   disabled={submitting || (currentQuestion.required && !currentQuestionAnswered)}
+                  style={{ cursor: 'pointer' }}
                 >
                   Next
                   <Icons.ArrowRightIcon />
@@ -367,6 +360,7 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
                 <Button
                   onClick={handleSubmit}
                   disabled={submitting || (currentQuestion.required && !currentQuestionAnswered)}
+                  style={{ cursor: 'pointer' }}
                 >
                   {submitting ? 'Submitting...' : 'Submit'}
                   <Icons.CheckIcon />
