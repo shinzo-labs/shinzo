@@ -172,7 +172,19 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
               >
                 <Flex direction="column" gap="3" style={{ padding: option.description ? '8px' : '4px 8px' }}>
                   <Flex align="center" gap="3">
-                    {option.icon}
+                    {option.icon && (
+                      <Flex
+                        align="center"
+                        justify="center"
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          flexShrink: 0
+                        }}
+                      >
+                        {option.icon}
+                      </Flex>
+                    )}
                     <Checkbox checked={isSelected} />
                     <Flex direction="column" gap="1" style={{ flex: 1 }}>
                       <Text weight="medium">{option.label}</Text>
@@ -223,7 +235,19 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
                 >
                   <Flex direction="column" gap="3" style={{ padding: '4px 8px' }}>
                     <Flex align="center" gap="3">
-                      {option.icon}
+                      {option.icon && (
+                        <Flex
+                          align="center"
+                          justify="center"
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            flexShrink: 0
+                          }}
+                        >
+                          {option.icon}
+                        </Flex>
+                      )}
                       <RadioGroup.Item value={option.value} />
                       <Text weight="medium" style={{ flex: 1 }}>{option.label}</Text>
                     </Flex>
