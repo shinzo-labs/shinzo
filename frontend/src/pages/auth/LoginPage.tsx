@@ -131,7 +131,21 @@ export const LoginPage: React.FC = () => {
                   <Callout.Icon>
                     <ExclamationTriangleIcon />
                   </Callout.Icon>
-                  <Callout.Text>{error}</Callout.Text>
+                  <Callout.Text>
+                    {error}
+                    {error.includes('verify your email') && (
+                      <>
+                        {' '}
+                        <Link
+                          to="/verify"
+                          state={{ email }}
+                          style={{ color: 'var(--red-11)', textDecoration: 'underline' }}
+                        >
+                          Click here to verify your email
+                        </Link>
+                      </>
+                    )}
+                  </Callout.Text>
                 </Callout.Root>
               )}
 
