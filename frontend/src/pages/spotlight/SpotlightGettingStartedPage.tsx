@@ -9,12 +9,15 @@ import { OnboardingHeader, OnboardingStep, CodeSnippet } from '../../components/
 
 type IntegrationType = 'claude-code' | 'anthropic-sdk' | 'codex'
 
+type SdkType = 'typescript' | 'python'
+
 export const SpotlightGettingStartedPage: React.FC = () => {
   const { token } = useAuth()
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationType>('claude-code')
   const [shinzoApiKey, setShinzoApiKey] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const { hasSpotlightData } = useHasSpotlightData()
+  const [sdkType, setSdkType] = useState<SdkType>('typescript')
 
   useEffect(() => {
     const fetchOrCreateShinzoKey = async () => {
@@ -46,10 +49,11 @@ export const SpotlightGettingStartedPage: React.FC = () => {
     }
   }, [token])
 
-  const claudeCodeSetupCode = `export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"
-export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"`
+  const claudeCodeSetupCode = `echo 'export ANTHROPIC_BASE_URL=https://api.app.shinzo.ai/spotlight/anthropic
+export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.zshrc;
+source ~/.zshrc`
 
-  const anthropicSdkSetupCode = `import Anthropic from "@anthropic-ai/sdk";
+  const anthropicSdkSetupCodeTypescript = `import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -58,6 +62,16 @@ const client = new Anthropic({
     "x-shinzo-api-key": "${shinzoApiKey}"
   }
 });`
+
+  const anthropicSdkSetupCodePython = `from anthropic import Anthropic
+
+client = Anthropic(
+    api_key="your-anthropic-api-key",
+    base_url="https://api.app.shinzo.ai/spotlight/anthropic",
+    default_headers={
+        "x-shinzo-api-key": "${shinzoApiKey}"
+    }
+)`
 
   if (loading) {
     return (
@@ -87,9 +101,9 @@ const client = new Anthropic({
         >
           <Tabs.Root value={selectedIntegration} onValueChange={(value) => setSelectedIntegration(value as IntegrationType)}>
             <Tabs.List>
-              <Tabs.Trigger value="claude-code">Claude Code</Tabs.Trigger>
-              <Tabs.Trigger value="anthropic-sdk">Anthropic SDK</Tabs.Trigger>
-              <Tabs.Trigger value="codex" disabled>
+              <Tabs.Trigger value="claude-code" style={{ cursor: 'pointer' }}>Claude Code</Tabs.Trigger>
+              <Tabs.Trigger value="anthropic-sdk" style={{ cursor: 'pointer' }}>Anthropic SDK</Tabs.Trigger>
+              <Tabs.Trigger value="codex" disabled style={{ cursor: 'not-allowed' }}>
                 Codex
                 <Badge size="1" color="gray" style={{ marginLeft: '8px' }}>Coming Soon</Badge>
               </Tabs.Trigger>
@@ -138,60 +152,88 @@ const client = new Anthropic({
           <>
             <OnboardingStep
               stepNumber={2}
-              title="Install the Anthropic SDK"
-              description="Add the Anthropic SDK to your project if you haven't already"
+              title="Choose Your SDK Language"
+              description="Select the programming language for your application"
             >
-              <Tabs.Root defaultValue="npm">
+              <Tabs.Root value={sdkType} onValueChange={(value) => setSdkType(value as SdkType)}>
                 <Tabs.List>
-                  <Tabs.Trigger value="npm">npm</Tabs.Trigger>
-                  <Tabs.Trigger value="pnpm">pnpm</Tabs.Trigger>
-                  <Tabs.Trigger value="yarn">yarn</Tabs.Trigger>
-                  <Tabs.Trigger value="python">Python</Tabs.Trigger>
+                  <Tabs.Trigger value="typescript" style={{ cursor: 'pointer' }}>TypeScript / JavaScript</Tabs.Trigger>
+                  <Tabs.Trigger value="python" style={{ cursor: 'pointer' }}>Python</Tabs.Trigger>
                 </Tabs.List>
-
-                <Flex direction="column" gap="3" style={{ marginTop: '16px' }}>
-                  <Tabs.Content value="npm">
-                    <CodeSnippet
-                      code="npm install @anthropic-ai/sdk"
-                      copyId="npm-install"
-                      inline
-                    />
-                  </Tabs.Content>
-
-                  <Tabs.Content value="pnpm">
-                    <CodeSnippet
-                      code="pnpm add @anthropic-ai/sdk"
-                      copyId="pnpm-install"
-                      inline
-                    />
-                  </Tabs.Content>
-
-                  <Tabs.Content value="yarn">
-                    <CodeSnippet
-                      code="yarn add @anthropic-ai/sdk"
-                      copyId="yarn-install"
-                      inline
-                    />
-                  </Tabs.Content>
-
-                  <Tabs.Content value="python">
-                    <CodeSnippet
-                      code="pip install anthropic"
-                      copyId="python-install"
-                      inline
-                    />
-                  </Tabs.Content>
-                </Flex>
               </Tabs.Root>
+
+              {sdkType === 'typescript' && (
+                <Text size="2">
+                  The TypeScript SDK provides seamless integration with Node.js and JavaScript applications.
+                  Perfect for web apps, APIs, and server-side applications.
+                </Text>
+              )}
+
+              {sdkType === 'python' && (
+                <Text size="2">
+                  The Python SDK provides native integration with Python applications.
+                  Great for data science, automation, and backend services.
+                </Text>
+              )}
             </OnboardingStep>
 
             <OnboardingStep
               stepNumber={3}
+              title="Install the Anthropic SDK"
+              description={sdkType === 'typescript'
+                ? 'Add the Anthropic SDK to your project using your preferred package manager'
+                : 'Install the Anthropic SDK using pip'}
+            >
+              {sdkType === 'typescript' ? (
+                <Tabs.Root defaultValue="npm">
+                  <Tabs.List>
+                    <Tabs.Trigger value="npm" style={{ cursor: 'pointer' }}>npm</Tabs.Trigger>
+                    <Tabs.Trigger value="pnpm" style={{ cursor: 'pointer' }}>pnpm</Tabs.Trigger>
+                    <Tabs.Trigger value="yarn" style={{ cursor: 'pointer' }}>yarn</Tabs.Trigger>
+                  </Tabs.List>
+
+                  <Flex direction="column" gap="3" style={{ marginTop: '16px' }}>
+                    <Tabs.Content value="npm">
+                      <CodeSnippet
+                        code="npm install @anthropic-ai/sdk"
+                        copyId="npm-install"
+                        inline
+                      />
+                    </Tabs.Content>
+
+                    <Tabs.Content value="pnpm">
+                      <CodeSnippet
+                        code="pnpm add @anthropic-ai/sdk"
+                        copyId="pnpm-install"
+                        inline
+                      />
+                    </Tabs.Content>
+
+                    <Tabs.Content value="yarn">
+                      <CodeSnippet
+                        code="yarn add @anthropic-ai/sdk"
+                        copyId="yarn-install"
+                        inline
+                      />
+                    </Tabs.Content>
+                  </Flex>
+                </Tabs.Root>
+              ) : (
+                <CodeSnippet
+                  code="pip install anthropic"
+                  copyId="python-install"
+                  inline
+                />
+              )}
+            </OnboardingStep>
+
+            <OnboardingStep
+              stepNumber={4}
               title="Configure Your Client"
               description="Update your Anthropic client initialization to route through Shinzo"
             >
               <CodeSnippet
-                code={anthropicSdkSetupCode}
+                code={sdkType === 'typescript' ? anthropicSdkSetupCodeTypescript : anthropicSdkSetupCodePython}
                 copyId="anthropic-sdk-setup"
               />
 
@@ -200,16 +242,16 @@ const client = new Anthropic({
                   <Icons.InfoCircledIcon />
                 </Callout.Icon>
                 <Callout.Text>
-                  Make sure you still have your Anthropic API key set as an environment variable or pass it directly to the client.
+                  Make sure you have your Anthropic API key {sdkType === 'typescript' ? 'set as an environment variable or pass it directly to the client' : 'available to pass to the client'}.
                 </Callout.Text>
               </Callout.Root>
             </OnboardingStep>
           </>
         )}
 
-        {/* Step 3/4: Run and Verify */}
+        {/* Step 3/5: Run and Verify */}
         <OnboardingStep
-          stepNumber={selectedIntegration === 'anthropic-sdk' ? 4 : 3}
+          stepNumber={selectedIntegration === 'anthropic-sdk' ? 5 : 3}
           title="Run Your Application & Verify"
           description="Start making AI requests and your analytics will appear automatically"
         >
@@ -238,13 +280,13 @@ const client = new Anthropic({
           </Callout.Root>
         </OnboardingStep>
 
-        {/* Step 4/5: Success State */}
+        {/* Step 4/6: Success State */}
         <OnboardingStep
           stepNumber={
             hasSpotlightData ? (
               <Icons.CheckIcon width="20" height="20" />
             ) : (
-              selectedIntegration === 'anthropic-sdk' ? 5 : 4
+              selectedIntegration === 'anthropic-sdk' ? 6 : 4
             )
           }
           title="See Live Analytics via the Dashboard"
