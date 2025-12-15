@@ -334,7 +334,7 @@ export const spotlightService = {
     if (params.limit) queryParams.append('limit', params.limit.toString())
     if (params.offset) queryParams.append('offset', params.offset.toString())
 
-    const response = await fetch(`${API_BASE_URL}/spotlight/sessions?${queryParams}`, {
+    const response = await fetch(`${API_BASE_URL}/spotlight/analytics/sessions?${queryParams}`, {
       headers: getAuthHeaders(token)
     })
     return handleResponse(response)

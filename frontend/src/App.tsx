@@ -5,8 +5,7 @@ import { Theme } from '@radix-ui/themes'
 import { AuthProvider } from './contexts/AuthContext'
 import { UserPreferencesProvider } from './contexts/UserPreferencesContext'
 import { RefreshProvider } from './contexts/RefreshContext'
-import { ProtectedRoute } from './components/ProtectedRoute'
-import { OnboardingRoute } from './components/OnboardingRoute'
+import { AppRoute } from './components/AppRoute'
 
 // Auth pages
 import { LoginPage } from './pages/auth/LoginPage'
@@ -55,81 +54,65 @@ function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/verify" element={<VerifyPage />} />
 
-                {/* Protected routes */}
+                {/* Protected routes with onboarding */}
                 <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <OnboardingRoute>
-                      <DashboardPage />
-                    </OnboardingRoute>
-                  </ProtectedRoute>
-                } />
-                <Route path="/getting-started" element={
-                  <ProtectedRoute>
-                    <GettingStartedPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/spotlight/getting-started" element={
-                  <ProtectedRoute>
-                    <SpotlightGettingStartedPage />
-                  </ProtectedRoute>
+                  <AppRoute protected requireOnboarding>
+                    <DashboardPage />
+                  </AppRoute>
                 } />
                 <Route path="/traces" element={
-                  <ProtectedRoute>
-                    <OnboardingRoute>
-                      <TracesPage />
-                    </OnboardingRoute>
-                  </ProtectedRoute>
+                  <AppRoute protected requireOnboarding>
+                    <TracesPage />
+                  </AppRoute>
                 } />
                 <Route path="/spans" element={
-                  <ProtectedRoute>
-                    <OnboardingRoute>
-                      <SpansPage />
-                    </OnboardingRoute>
-                  </ProtectedRoute>
+                  <AppRoute protected requireOnboarding>
+                    <SpansPage />
+                  </AppRoute>
                 } />
                 <Route path="/metrics" element={
-                  <ProtectedRoute>
-                    <OnboardingRoute>
-                      <MetricsPage />
-                    </OnboardingRoute>
-                  </ProtectedRoute>
+                  <AppRoute protected requireOnboarding>
+                    <MetricsPage />
+                  </AppRoute>
                 } />
                 <Route path="/resources" element={
-                  <ProtectedRoute>
-                    <OnboardingRoute>
-                      <ResourcesPage />
-                    </OnboardingRoute>
-                  </ProtectedRoute>
+                  <AppRoute protected requireOnboarding>
+                    <ResourcesPage />
+                  </AppRoute>
                 } />
                 <Route path="/settings" element={
-                  <ProtectedRoute>
-                    <OnboardingRoute>
-                      <SettingsPage />
-                    </OnboardingRoute>
-                  </ProtectedRoute>
+                  <AppRoute protected requireOnboarding>
+                    <SettingsPage />
+                  </AppRoute>
                 } />
 
-                {/* Spotlight routes */}
+                {/* Spotlight routes with onboarding */}
                 <Route path="/spotlight/api-keys" element={
-                  <ProtectedRoute>
-                    <OnboardingRoute>
-                      <SpotlightApiKeysPage />
-                    </OnboardingRoute>
-                  </ProtectedRoute>
+                  <AppRoute protected requireOnboarding>
+                    <SpotlightApiKeysPage />
+                  </AppRoute>
                 } />
                 <Route path="/spotlight/token-analytics" element={
-                  <ProtectedRoute>
-                    <OnboardingRoute>
-                      <SpotlightTokenAnalyticsPage />
-                    </OnboardingRoute>
-                  </ProtectedRoute>
+                  <AppRoute protected requireOnboarding>
+                    <SpotlightTokenAnalyticsPage />
+                  </AppRoute>
                 } />
                 <Route path="/spotlight/session-analytics" element={
-                  <ProtectedRoute>
-                    <OnboardingRoute>
-                      <SpotlightSessionAnalyticsPage />
-                    </OnboardingRoute>
-                  </ProtectedRoute>
+                  <AppRoute protected requireOnboarding>
+                    <SpotlightSessionAnalyticsPage />
+                  </AppRoute>
+                } />
+
+                {/* Protected routes with survey requirement (getting-started pages) */}
+                <Route path="/getting-started" element={
+                  <AppRoute protected requireOnboarding>
+                    <GettingStartedPage />
+                  </AppRoute>
+                } />
+                <Route path="/spotlight/getting-started" element={
+                  <AppRoute protected requireOnboarding>
+                    <SpotlightGettingStartedPage />
+                  </AppRoute>
                 } />
 
                 {/* Default redirect */}

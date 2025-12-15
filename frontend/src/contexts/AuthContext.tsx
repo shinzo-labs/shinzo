@@ -146,7 +146,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Store token and user data for automatic login
     if (data.token) {
-      localStorage.setItem('token', data.token)
+      localStorage.setItem('auth_token', data.token)
       setToken(data.token)
       setUser(data.user)
     }
