@@ -49,21 +49,16 @@ export const SpotlightGettingStartedPage: React.FC = () => {
     }
   }, [token])
 
-  const claudeCodeSetupMacOS = `# Add to ~/.zshrc (for zsh) or ~/.bash_profile (for bash)
-echo 'export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"' >> ~/.zshrc
+  const claudeCodeSetupMacOS = `echo 'export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"' >> ~/.zshrc
 echo 'export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.zshrc
 source ~/.zshrc`
 
-  const claudeCodeSetupLinux = `# Add to ~/.bashrc
-echo 'export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"' >> ~/.bashrc
+  const claudeCodeSetupLinux = `echo 'export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"' >> ~/.bashrc
 echo 'export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.bashrc
 source ~/.bashrc`
 
-  const claudeCodeSetupWindows = `# PowerShell - Set environment variables permanently
-[System.Environment]::SetEnvironmentVariable('ANTHROPIC_BASE_URL', 'https://api.app.shinzo.ai/spotlight/anthropic', 'User')
-[System.Environment]::SetEnvironmentVariable('ANTHROPIC_CUSTOM_HEADERS', 'x-shinzo-api-key: ${shinzoApiKey}', 'User')
-
-# Restart your terminal for changes to take effect`
+  const claudeCodeSetupWindows = `[System.Environment]::SetEnvironmentVariable('ANTHROPIC_BASE_URL', 'https://api.app.shinzo.ai/spotlight/anthropic', 'User')
+[System.Environment]::SetEnvironmentVariable('ANTHROPIC_CUSTOM_HEADERS', 'x-shinzo-api-key: ${shinzoApiKey}', 'User')`
 
   const anthropicSdkSetupCodeTypescript = `import Anthropic from "@anthropic-ai/sdk";
 
@@ -135,10 +130,20 @@ print(message.content)`
           </Tabs.Root>
 
           {selectedIntegration === 'claude-code' && (
-            <Text size="2">
-              The Claude Code CLI automatically routes requests through Shinzo when configured with custom headers.
-              Perfect for tracking your AI coding assistant usage.
-            </Text>
+            <>
+              <Text size="2">
+                The Claude Code CLI automatically routes requests through Shinzo when configured with custom headers.
+                Perfect for tracking your AI coding assistant usage.
+              </Text>
+              <Callout.Root color="amber">
+                <Callout.Icon>
+                  <Icons.ExclamationTriangleIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  Note: Make sure you're logged into Claude Code before proceeding, as the configuration may block OAuth authentication flows.
+                </Callout.Text>
+              </Callout.Root>
+            </>
           )}
 
           {selectedIntegration === 'anthropic-sdk' && (
@@ -169,9 +174,14 @@ print(message.content)`
                     code={claudeCodeSetupMacOS}
                     copyId="claude-code-macos"
                   />
-                  <Text size="2" color="gray" style={{ marginTop: '8px' }}>
-                    For bash users, replace <Text style={{ fontFamily: 'monospace' }}>~/.zshrc</Text> with <Text style={{ fontFamily: 'monospace' }}>~/.bash_profile</Text>
-                  </Text>
+                  <Callout.Root color="blue">
+                    <Callout.Icon>
+                      <Icons.InfoCircledIcon />
+                    </Callout.Icon>
+                    <Callout.Text>
+                      If you are a Bash user: replace <Text style={{ fontFamily: 'monospace' }}>~/.zshrc</Text> with <Text style={{ fontFamily: 'monospace' }}>~/.bashrc</Text>.
+                    </Callout.Text>
+                  </Callout.Root>
                 </Tabs.Content>
 
                 <Tabs.Content value="linux">
@@ -179,9 +189,6 @@ print(message.content)`
                     code={claudeCodeSetupLinux}
                     copyId="claude-code-linux"
                   />
-                  <Text size="2" color="gray" style={{ marginTop: '8px' }}>
-                    If using zsh, replace <Text style={{ fontFamily: 'monospace' }}>~/.bashrc</Text> with <Text style={{ fontFamily: 'monospace' }}>~/.zshrc</Text>
-                  </Text>
                 </Tabs.Content>
 
                 <Tabs.Content value="windows">
@@ -189,30 +196,17 @@ print(message.content)`
                     code={claudeCodeSetupWindows}
                     copyId="claude-code-windows"
                   />
-                  <Text size="2" color="gray" style={{ marginTop: '8px' }}>
-                    Run these commands in PowerShell as Administrator for best results
-                  </Text>
+                  <Callout.Root color="blue">
+                  <Callout.Icon>
+                      <Icons.InfoCircledIcon />
+                    </Callout.Icon>
+                    <Callout.Text>
+                      You may need to restart the terminal for the changes to take effect. Run the commands as Administrator for best results.
+                    </Callout.Text>
+                  </Callout.Root>
                 </Tabs.Content>
               </Flex>
             </Tabs.Root>
-
-            <Callout.Root color="blue">
-              <Callout.Icon>
-                <Icons.InfoCircledIcon />
-              </Callout.Icon>
-              <Callout.Text>
-                After setting environment variables, restart your terminal or IDE for changes to take effect.
-              </Callout.Text>
-            </Callout.Root>
-
-            <Callout.Root color="amber">
-              <Callout.Icon>
-                <Icons.ExclamationTriangleIcon />
-              </Callout.Icon>
-              <Callout.Text>
-                Note: Make sure you're logged in to Claude Code first, as OAuth authentication will fail while these environment variables are active.
-              </Callout.Text>
-            </Callout.Root>
           </OnboardingStep>
         )}
 
@@ -232,59 +226,59 @@ print(message.content)`
 
               {sdkType === 'typescript' && (
                 <>
-                <Text size="2">
-                  The TypeScript SDK provides seamless integration with Node.js and JavaScript applications.
-                  Perfect for web apps, APIs, and server-side applications.
-                </Text>
-                <Tabs.Root defaultValue="npm">
-                <Tabs.List>
-                  <Tabs.Trigger value="npm" style={{ cursor: 'pointer' }}>npm</Tabs.Trigger>
-                  <Tabs.Trigger value="pnpm" style={{ cursor: 'pointer' }}>pnpm</Tabs.Trigger>
-                  <Tabs.Trigger value="yarn" style={{ cursor: 'pointer' }}>yarn</Tabs.Trigger>
-                </Tabs.List>
+                  <Text size="2">
+                    The TypeScript SDK provides seamless integration with Node.js and JavaScript applications.
+                    Perfect for web apps, APIs, and server-side applications.
+                  </Text>
+                  <Tabs.Root defaultValue="npm">
+                    <Tabs.List>
+                      <Tabs.Trigger value="npm" style={{ cursor: 'pointer' }}>npm</Tabs.Trigger>
+                      <Tabs.Trigger value="pnpm" style={{ cursor: 'pointer' }}>pnpm</Tabs.Trigger>
+                      <Tabs.Trigger value="yarn" style={{ cursor: 'pointer' }}>yarn</Tabs.Trigger>
+                    </Tabs.List>
 
-                <Flex direction="column" gap="3" style={{ marginTop: '16px' }}>
-                  <Tabs.Content value="npm">
-                    <CodeSnippet
-                      code="npm install @anthropic-ai/sdk"
-                      copyId="npm-install"
-                      inline
-                    />
-                  </Tabs.Content>
+                    <Flex direction="column" gap="3" style={{ marginTop: '16px' }}>
+                      <Tabs.Content value="npm">
+                        <CodeSnippet
+                          code="npm install @anthropic-ai/sdk"
+                          copyId="npm-install"
+                          inline
+                        />
+                      </Tabs.Content>
 
-                  <Tabs.Content value="pnpm">
-                    <CodeSnippet
-                      code="pnpm add @anthropic-ai/sdk"
-                      copyId="pnpm-install"
-                      inline
-                    />
-                  </Tabs.Content>
+                      <Tabs.Content value="pnpm">
+                        <CodeSnippet
+                          code="pnpm add @anthropic-ai/sdk"
+                          copyId="pnpm-install"
+                          inline
+                        />
+                      </Tabs.Content>
 
-                  <Tabs.Content value="yarn">
-                    <CodeSnippet
-                      code="yarn add @anthropic-ai/sdk"
-                      copyId="yarn-install"
-                      inline
-                    />
-                  </Tabs.Content>
-                </Flex>
-              </Tabs.Root>
-              </>
-                
+                      <Tabs.Content value="yarn">
+                        <CodeSnippet
+                          code="yarn add @anthropic-ai/sdk"
+                          copyId="yarn-install"
+                          inline
+                        />
+                      </Tabs.Content>
+                    </Flex>
+                  </Tabs.Root>
+                </>
+
               )}
 
               {sdkType === 'python' && (
                 <>
-                <Text size="2">
-                  The Python SDK provides native integration with Python applications.
-                  Great for data science, automation, and backend services.
-                </Text>
-                <CodeSnippet
-                code="pip install anthropic"
-                copyId="python-install"
-                inline
-              />
-              </>
+                  <Text size="2">
+                    The Python SDK provides native integration with Python applications.
+                    Great for data science, automation, and backend services.
+                  </Text>
+                  <CodeSnippet
+                    code="pip install anthropic"
+                    copyId="python-install"
+                    inline
+                  />
+                </>
               )}
             </OnboardingStep>
 
