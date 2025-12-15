@@ -369,7 +369,7 @@ print(message.content)`
                 variant="solid"
                 size="3"
                 color="green"
-                onClick={() => window.location.href = '/spotlight'}
+                onClick={() => window.location.href = '/spotlight/token-analytics'}
                 style={{ alignSelf: 'flex-start', cursor: 'pointer' }}
               >
                 <Icons.DashboardIcon />
