@@ -13,8 +13,10 @@ export const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
+  const [verificationToken, setVerificationToken] = useState('')
+  const [verifyLoading, setVerifyLoading] = useState(false)
 
-  const { register, resendVerification } = useAuth()
+  const { register, resendVerification, verify } = useAuth()
   const navigate = useNavigate()
 
   const getPasswordStrength = (password: string) => {
@@ -83,6 +85,30 @@ export const RegisterPage: React.FC = () => {
     }
   }
 
+  const handleVerification = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!verificationToken) {
+      setError('Please enter your verification token')
+      return
+    }
+
+    setError('')
+    setVerifyLoading(true)
+
+    try {
+      await verify(email, verificationToken)
+      // Auto-redirect after successful verification
+      setTimeout(() => {
+        navigate('/')
+      }, 2000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed')
+    } finally {
+      setVerifyLoading(false)
+    }
+  }
+
   if (success) {
     return (
       <div className="auth-page">
@@ -106,7 +132,7 @@ export const RegisterPage: React.FC = () => {
           />
         </a>
         <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
-          <Flex direction="column" gap="2" align="center">
+          <Flex direction="column" gap="6">
             <Flex justify="center" align="center" style={{ width: '100%' }}>
               <a
                 href="https://www.shinzo.ai"
@@ -127,38 +153,61 @@ export const RegisterPage: React.FC = () => {
               <div />
             </Flex>
 
-            <Flex
-              justify="center"
-              align="center"
-              style={{
-                width: '64px',
-                height: '64px',
-                backgroundColor: 'var(--green-3)',
-                borderRadius: '50%',
-                color: 'var(--green-9)'
-              }}
-            >
-              <CheckIcon width="32" height="32" />
-            </Flex>
-
             <Flex direction="column" gap="2" align="center">
+              <Flex
+                justify="center"
+                align="center"
+                style={{
+                  width: '64px',
+                  height: '64px',
+                  backgroundColor: 'var(--green-3)',
+                  borderRadius: '50%',
+                  color: 'var(--green-9)'
+                }}
+              >
+                <CheckIcon width="32" height="32" />
+              </Flex>
               <Heading size="6">Account Created!</Heading>
               <Text size="2" color="gray" align="center">
                 We've sent a verification email to <Text weight="bold">{email}</Text>.
-                Please check your inbox and click the verification link.
+                Please enter the verification token below to complete your account setup.
               </Text>
             </Flex>
 
+            <form onSubmit={handleVerification}>
+              <Flex direction="column" gap="4">
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium">Verification Token</Text>
+                  <TextField.Root
+                    type="text"
+                    value={verificationToken}
+                    onChange={(e) => setVerificationToken(e.target.value)}
+                    placeholder="Enter verification token"
+                    required
+                  />
+                </Flex>
 
-            <Flex direction="column" gap="4" style={{ width: '100%' }}>
-              <Button
-                size="3"
-                style={{ width: '100%' }}
-                onClick={() => navigate('/verify', { state: { email } })}
-              >
-                Verify Email Now
-              </Button>
+                {error && (
+                  <Callout.Root color="red">
+                    <Callout.Icon>
+                      <ExclamationTriangleIcon />
+                    </Callout.Icon>
+                    <Callout.Text>{error}</Callout.Text>
+                  </Callout.Root>
+                )}
 
+                <Button
+                  type="submit"
+                  size="3"
+                  style={{ width: '100%' }}
+                  disabled={verifyLoading}
+                >
+                  {verifyLoading ? 'Verifying...' : 'Verify Email'}
+                </Button>
+              </Flex>
+            </form>
+
+            <Flex direction="column" gap="3" align="center">
               <Text size="2" color="gray" align="center">
                 Didn't receive the email?{' '}
                 <Text
@@ -169,14 +218,12 @@ export const RegisterPage: React.FC = () => {
                 </Text>
               </Text>
 
-              {error && (
-                <Callout.Root color="red">
-                  <Callout.Icon>
-                    <ExclamationTriangleIcon />
-                  </Callout.Icon>
-                  <Callout.Text>{error}</Callout.Text>
-                </Callout.Root>
-              )}
+              <Text size="2" color="gray" align="center">
+                Need help?{' '}
+                <Link to="/support" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
+                  Contact support
+                </Link>
+              </Text>
             </Flex>
           </Flex>
         </Card>
