@@ -49,29 +49,49 @@ export const SpotlightGettingStartedPage: React.FC = () => {
     }
   }, [token])
 
-  const claudeCodeSetupCode = `echo 'export ANTHROPIC_BASE_URL=https://api.app.shinzo.ai/spotlight/anthropic
-export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.zshrc;
-source ~/.zshrc`
+  const claudeCodeSetupCode = `echo 'export ANTHROPIC_BASE_URL=https://api.app.shinzo.ai/spotlight/anthropic; export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.zshrc && source ~/.zshrc`
 
   const anthropicSdkSetupCodeTypescript = `import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
+const anthropic = new Anthropic({
   baseURL: "https://api.app.shinzo.ai/spotlight/anthropic",
   defaultHeaders: {
     "x-shinzo-api-key": "${shinzoApiKey}"
   }
-});`
+});
 
-  const anthropicSdkSetupCodePython = `from anthropic import Anthropic
+const msg = await anthropic.messages.create({
+  model: "claude-sonnet-4-5",
+  max_tokens: 1000,
+  messages: [
+    {
+      role: "user",
+      content: "Hello, Claude"
+    }
+  ]
+});
+console.log(msg);`
 
-client = Anthropic(
-    api_key="your-anthropic-api-key",
+  const anthropicSdkSetupCodePython = `import anthropic
+
+client = anthropic.Anthropic(
     base_url="https://api.app.shinzo.ai/spotlight/anthropic",
     default_headers={
         "x-shinzo-api-key": "${shinzoApiKey}"
     }
-)`
+)
+
+message = client.messages.create(
+    model="claude-sonnet-4-5",
+    max_tokens=1000,
+    messages=[
+        {
+            "role": "user",
+            "content": "Hello, Claude"
+        }
+    ]
+)
+print(message.content)`
 
   if (loading) {
     return (
@@ -157,7 +177,7 @@ client = Anthropic(
             >
               <Tabs.Root value={sdkType} onValueChange={(value) => setSdkType(value as SdkType)}>
                 <Tabs.List>
-                  <Tabs.Trigger value="typescript" style={{ cursor: 'pointer' }}>TypeScript / JavaScript</Tabs.Trigger>
+                  <Tabs.Trigger value="typescript" style={{ cursor: 'pointer' }}>TypeScript</Tabs.Trigger>
                   <Tabs.Trigger value="python" style={{ cursor: 'pointer' }}>Python</Tabs.Trigger>
                 </Tabs.List>
               </Tabs.Root>
@@ -179,6 +199,28 @@ client = Anthropic(
 
             <OnboardingStep
               stepNumber={3}
+              title="Set Your Anthropic API Key"
+              description="Get your API key from the Anthropic Console and set it as an environment variable"
+            >
+              <CodeSnippet
+                code="export ANTHROPIC_API_KEY='your-api-key-here'"
+                copyId="set-api-key"
+                inline
+              />
+
+              <Callout.Root color="blue">
+                <Callout.Icon>
+                  <Icons.InfoCircledIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  Get your API key from the <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue-11)', textDecoration: 'underline' }}>Anthropic Console</a>.
+                  The SDK will automatically read this environment variable.
+                </Callout.Text>
+              </Callout.Root>
+            </OnboardingStep>
+
+            <OnboardingStep
+              stepNumber={4}
               title="Install the Anthropic SDK"
               description={sdkType === 'typescript'
                 ? 'Add the Anthropic SDK to your project using your preferred package manager'
@@ -228,9 +270,9 @@ client = Anthropic(
             </OnboardingStep>
 
             <OnboardingStep
-              stepNumber={4}
+              stepNumber={5}
               title="Configure Your Client"
-              description="Update your Anthropic client initialization to route through Shinzo"
+              description="Initialize the Anthropic client with Shinzo routing"
             >
               <CodeSnippet
                 code={sdkType === 'typescript' ? anthropicSdkSetupCodeTypescript : anthropicSdkSetupCodePython}
@@ -242,16 +284,17 @@ client = Anthropic(
                   <Icons.InfoCircledIcon />
                 </Callout.Icon>
                 <Callout.Text>
-                  Make sure you have your Anthropic API key {sdkType === 'typescript' ? 'set as an environment variable or pass it directly to the client' : 'available to pass to the client'}.
+                  The SDK automatically reads your Anthropic API key from the <Text style={{ fontFamily: 'monospace' }}>ANTHROPIC_API_KEY</Text> environment variable.
+                  The <Text style={{ fontFamily: 'monospace' }}>baseURL</Text> routes requests through Shinzo for analytics.
                 </Callout.Text>
               </Callout.Root>
             </OnboardingStep>
           </>
         )}
 
-        {/* Step 3/5: Run and Verify */}
+        {/* Step 3/6: Run and Verify */}
         <OnboardingStep
-          stepNumber={selectedIntegration === 'anthropic-sdk' ? 5 : 3}
+          stepNumber={selectedIntegration === 'anthropic-sdk' ? 6 : 3}
           title="Run Your Application & Verify"
           description="Start making AI requests and your analytics will appear automatically"
         >
@@ -280,13 +323,13 @@ client = Anthropic(
           </Callout.Root>
         </OnboardingStep>
 
-        {/* Step 4/6: Success State */}
+        {/* Step 4/7: Success State */}
         <OnboardingStep
           stepNumber={
             hasSpotlightData ? (
               <Icons.CheckIcon width="20" height="20" />
             ) : (
-              selectedIntegration === 'anthropic-sdk' ? 6 : 4
+              selectedIntegration === 'anthropic-sdk' ? 7 : 4
             )
           }
           title="See Live Analytics via the Dashboard"
