@@ -7,61 +7,79 @@ import { useHasSpotlightData } from '../../hooks/useHasSpotlightData'
 import { spotlightService } from '../../backendService'
 import { CLIPBOARD_TIMEOUT } from '../../config'
 
-// App integration types
-type AppCategory = 'cli-agents' | 'code-ides' | 'ai-sdks' | 'ai-gateways' | 'direct-api' | 'custom'
-
 interface AppIntegration {
   id: string
   name: string
-  category: AppCategory
   icon: React.ReactNode
   requiresApiKey: boolean
   comingSoon?: boolean
   description?: string
 }
 
-const APP_INTEGRATIONS: AppIntegration[] = [
-  // CLI Agents
-  { id: 'claude-code', name: 'Claude Code', category: 'cli-agents', icon: <Icons.CodeIcon />, requiresApiKey: false },
-  { id: 'codex', name: 'Codex', category: 'cli-agents', icon: <Icons.CodeIcon />, requiresApiKey: true, comingSoon: true },
-  { id: 'gemini-cli', name: 'Gemini CLI', category: 'cli-agents', icon: <Icons.StarIcon />, requiresApiKey: true, comingSoon: true },
-
-  // Code IDEs
-  { id: 'cursor', name: 'Cursor', category: 'code-ides', icon: <Icons.CursorArrowIcon />, requiresApiKey: true, comingSoon: true },
-  { id: 'windsurf', name: 'Windsurf', category: 'code-ides', icon: <Icons.Component1Icon />, requiresApiKey: true, comingSoon: true },
-  { id: 'vscode', name: 'VS Code', category: 'code-ides', icon: <Icons.CodeIcon />, requiresApiKey: true, comingSoon: true },
-
-  // AI SDKs
-  { id: 'anthropic-sdk', name: 'Anthropic SDK', category: 'ai-sdks', icon: <Icons.CodeIcon />, requiresApiKey: true },
-  { id: 'openai-sdk', name: 'OpenAI SDK', category: 'ai-sdks', icon: <Icons.CodeIcon />, requiresApiKey: true, comingSoon: true },
-  { id: 'langchain', name: 'LangChain', category: 'ai-sdks', icon: <Icons.Link2Icon />, requiresApiKey: true, comingSoon: true },
-
-  // AI Gateways
-  { id: 'litellm', name: 'LiteLLM', category: 'ai-gateways', icon: <Icons.LayersIcon />, requiresApiKey: true, comingSoon: true },
-  { id: 'openrouter', name: 'OpenRouter', category: 'ai-gateways', icon: <Icons.MixIcon />, requiresApiKey: true, comingSoon: true },
-  { id: 'portkey', name: 'Portkey', category: 'ai-gateways', icon: <Icons.LockClosedIcon />, requiresApiKey: true, comingSoon: true },
-
-  // Direct API
-  { id: 'anthropic-api', name: 'Anthropic', category: 'direct-api', icon: <Icons.GlobeIcon />, requiresApiKey: true },
-  { id: 'openai-api', name: 'OpenAI', category: 'direct-api', icon: <Icons.GlobeIcon />, requiresApiKey: true, comingSoon: true },
-  { id: 'gemini-api', name: 'Gemini', category: 'direct-api', icon: <Icons.GlobeIcon />, requiresApiKey: true, comingSoon: true },
-
-  // Custom
-  { id: 'custom', name: 'Custom Integration', category: 'custom', icon: <Icons.MixerHorizontalIcon />, requiresApiKey: true }
-]
-
-const CATEGORY_LABELS: Record<AppCategory, string> = {
-  'cli-agents': 'CLI Agents',
-  'code-ides': 'Code IDEs',
-  'ai-sdks': 'AI SDKs',
-  'ai-gateways': 'AI Gateways',
-  'direct-api': 'Direct API',
-  'custom': 'Custom'
+interface AppCategory {
+  id: string
+  name: string
+  items: AppIntegration[]
 }
+
+const APP_INTEGRATIONS: AppCategory[] = [
+  {
+    id: 'cli-agents',
+    name: 'CLI Agents',
+    items: [
+      { id: 'claude-code', name: 'Claude Code', icon: <Icons.CodeIcon />, requiresApiKey: false },
+      { id: 'codex', name: 'Codex', icon: <Icons.CodeIcon />, requiresApiKey: true, comingSoon: true },
+      { id: 'gemini-cli', name: 'Gemini CLI', icon: <Icons.StarIcon />, requiresApiKey: true, comingSoon: true },
+    ]
+  },
+  {
+    id: 'code-ides',
+    name: 'Code IDEs',
+    items: [
+      { id: 'cursor', name: 'Cursor', icon: <Icons.CursorArrowIcon />, requiresApiKey: true, comingSoon: true },
+      { id: 'windsurf', name: 'Windsurf', icon: <Icons.Component1Icon />, requiresApiKey: true, comingSoon: true },
+      { id: 'vscode', name: 'VS Code', icon: <Icons.CodeIcon />, requiresApiKey: true, comingSoon: true },
+    ]
+  },
+  {
+    id: 'ai-sdks',
+    name: 'AI SDKs',
+    items: [
+      { id: 'anthropic-sdk', name: 'Anthropic SDK', icon: <Icons.CodeIcon />, requiresApiKey: true },
+      { id: 'openai-sdk', name: 'OpenAI SDK', icon: <Icons.CodeIcon />, requiresApiKey: true, comingSoon: true },
+      { id: 'langchain', name: 'LangChain', icon: <Icons.Link2Icon />, requiresApiKey: true, comingSoon: true },
+    ]
+  },
+  {
+    id: 'ai-gateways',
+    name: 'AI Gateways',
+    items: [
+      { id: 'litellm', name: 'LiteLLM', icon: <Icons.LayersIcon />, requiresApiKey: true, comingSoon: true },
+      { id: 'openrouter', name: 'OpenRouter', icon: <Icons.MixIcon />, requiresApiKey: true, comingSoon: true },
+      { id: 'portkey', name: 'Portkey', icon: <Icons.LockClosedIcon />, requiresApiKey: true, comingSoon: true },
+    ]
+  },
+  {
+    id: 'direct-api',
+    name: 'Direct API',
+    items: [
+      { id: 'anthropic-api', name: 'Anthropic', icon: <Icons.GlobeIcon />, requiresApiKey: true },
+      { id: 'openai-api', name: 'OpenAI', icon: <Icons.GlobeIcon />, requiresApiKey: true, comingSoon: true },
+      { id: 'gemini-api', name: 'Gemini', icon: <Icons.GlobeIcon />, requiresApiKey: true, comingSoon: true },
+    ]
+  },
+  {
+    id: 'custom',
+    name: 'Custom Integration',
+    items: [
+      { id: 'custom', name: 'Custom Integration', icon: <Icons.MixerHorizontalIcon />, requiresApiKey: true },
+    ]
+  }
+]
 
 export const SpotlightGettingStartedPage: React.FC = () => {
   const { token } = useAuth()
-  const [selectedApp, setSelectedApp] = useState<string | null>(null)
+  const [selectedApp, setSelectedApp] = useState<AppIntegration | null>(null)
   const [shinzoApiKey, setShinzoApiKey] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
@@ -105,15 +123,6 @@ export const SpotlightGettingStartedPage: React.FC = () => {
     }, CLIPBOARD_TIMEOUT)
   }
 
-  const selectedAppConfig = APP_INTEGRATIONS.find(app => app.id === selectedApp)
-
-  // Group apps by category
-  const appsByCategory = APP_INTEGRATIONS.reduce((acc, app) => {
-    if (!acc[app.category]) acc[app.category] = []
-    acc[app.category].push(app)
-    return acc
-  }, {} as Record<AppCategory, AppIntegration[]>)
-
   const renderAppSelection = () => (
     <Card>
       <Flex direction="column" gap="6">
@@ -124,21 +133,21 @@ export const SpotlightGettingStartedPage: React.FC = () => {
           </Text>
         </Flex>
 
-        {(Object.keys(appsByCategory) as AppCategory[]).map(category => (
-          <Flex key={category} direction="column" gap="3">
+        {APP_INTEGRATIONS.map(app => (
+          <Flex key={app.id} direction="column" gap="3">
             <Text size="3" weight="medium" color="gray">
-              {CATEGORY_LABELS[category]}
+              {app.name}
             </Text>
             <Flex direction="column" gap="2">
-              {appsByCategory[category].map(app => (
+              {app.items.map((item: AppIntegration) => (
                 <Card
-                  key={app.id}
-                  onClick={() => !app.comingSoon && setSelectedApp(app.id)}
+                  key={item.id}
+                  onClick={() => !item.comingSoon && setSelectedApp(item)}
                   style={{
-                    cursor: app.comingSoon ? 'not-allowed' : 'pointer',
-                    backgroundColor: selectedApp === app.id ? 'var(--blue-2)' : undefined,
-                    borderColor: selectedApp === app.id ? 'var(--blue-6)' : undefined,
-                    opacity: app.comingSoon ? 0.6 : 1
+                    cursor: item.comingSoon ? 'not-allowed' : 'pointer',
+                    backgroundColor: selectedApp?.id === item.id ? 'var(--blue-2)' : undefined,
+                    borderColor: selectedApp?.id === item.id ? 'var(--blue-6)' : undefined,
+                    opacity: item.comingSoon ? 0.6 : 1
                   }}
                 >
                   <Flex align="center" justify="between" style={{ padding: '12px' }}>
@@ -153,16 +162,16 @@ export const SpotlightGettingStartedPage: React.FC = () => {
                           borderRadius: '8px'
                         }}
                       >
-                        {app.icon}
+                        {item.icon}
                       </Flex>
                       <Flex direction="column" gap="1">
-                        <Text weight="medium">{app.name}</Text>
-                        {app.description && (
-                          <Text size="2" color="gray">{app.description}</Text>
+                        <Text weight="medium">{item.name}</Text>
+                        {item.description && (
+                          <Text size="2" color="gray">{item.description}</Text>
                         )}
                       </Flex>
                     </Flex>
-                    {app.comingSoon && (
+                    {item.comingSoon && (
                       <Badge color="gray">Coming Soon</Badge>
                     )}
                   </Flex>
@@ -176,17 +185,17 @@ export const SpotlightGettingStartedPage: React.FC = () => {
   )
 
   const renderSetupInstructions = () => {
-    if (!selectedAppConfig) return null
+    if (!selectedApp) return null
 
     // Claude Code special case - no API key setup needed
-    if (selectedAppConfig.id === 'claude-code') {
+    if (selectedApp.id === 'claude-code') {
       return (
         <Card>
           <Flex direction="column" gap="6">
             <Flex direction="column" gap="2">
-              <Heading size="5">Setup Claude Code</Heading>
+              <Heading size="5">Setup {selectedApp.name}</Heading>
               <Text color="gray">
-                Configure Claude Code to send analytics to Shinzo using custom headers.
+                Configure {selectedApp.name} to send analytics to Shinzo using custom headers.
               </Text>
             </Flex>
 
@@ -230,7 +239,7 @@ export const SpotlightGettingStartedPage: React.FC = () => {
                   source ~/.zshrc  # or source ~/.bashrc
                 </Code>
                 <Text size="2" color="gray">
-                  Now use Claude Code normally and your analytics will appear below!
+                  Now use {selectedApp.name} normally and your analytics will appear below!
                 </Text>
               </Flex>
 
@@ -239,7 +248,7 @@ export const SpotlightGettingStartedPage: React.FC = () => {
                   <Icons.InfoCircledIcon />
                 </Callout.Icon>
                 <Callout.Text>
-                  Note: OAuth authentication flows will bypass Shinzo routing. Use API key authentication for full analytics coverage.
+                  Note: OAuth authentication flows will bypass Shinzo routing. Use API key authentication for full {selectedApp.name} analytics coverage.
                 </Callout.Text>
               </Callout.Root>
             </Flex>
@@ -249,12 +258,12 @@ export const SpotlightGettingStartedPage: React.FC = () => {
     }
 
     // Generic integration with API key requirement
-    if (selectedAppConfig.requiresApiKey) {
+    if (selectedApp.requiresApiKey) {
       return (
         <Card>
           <Flex direction="column" gap="6">
             <Flex direction="column" gap="2">
-              <Heading size="5">Setup {selectedAppConfig.name}</Heading>
+              <Heading size="5">Setup {selectedApp.name}</Heading>
               <Text color="gray">
                 Configure your integration to route requests through Shinzo.
               </Text>
@@ -264,7 +273,7 @@ export const SpotlightGettingStartedPage: React.FC = () => {
               <Flex direction="column" gap="2">
                 <Text weight="medium">1. Add your provider API key</Text>
                 <Text size="2" color="gray">
-                  First, add your {selectedAppConfig.name} API key in{' '}
+                  First, add your {selectedApp.name} API key in{' '}
                   <Text style={{ color: 'var(--accent-9)', cursor: 'pointer' }}>
                     Settings → API Keys
                   </Text>
