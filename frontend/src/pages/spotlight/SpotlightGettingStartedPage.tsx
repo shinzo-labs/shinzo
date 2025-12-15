@@ -49,16 +49,25 @@ export const SpotlightGettingStartedPage: React.FC = () => {
     }
   }, [token])
 
-  const claudeCodeSetupCode = `echo 'export ANTHROPIC_BASE_URL=https://api.app.shinzo.ai/spotlight/anthropic; export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.zshrc && source ~/.zshrc`
+  const claudeCodeSetupMacOS = `# Add to ~/.zshrc (for zsh) or ~/.bash_profile (for bash)
+echo 'export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"' >> ~/.zshrc
+echo 'export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.zshrc
+source ~/.zshrc`
+
+  const claudeCodeSetupLinux = `# Add to ~/.bashrc
+echo 'export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"' >> ~/.bashrc
+echo 'export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.bashrc
+source ~/.bashrc`
+
+  const claudeCodeSetupWindows = `# PowerShell - Set environment variables permanently
+[System.Environment]::SetEnvironmentVariable('ANTHROPIC_BASE_URL', 'https://api.app.shinzo.ai/spotlight/anthropic', 'User')
+[System.Environment]::SetEnvironmentVariable('ANTHROPIC_CUSTOM_HEADERS', 'x-shinzo-api-key: ${shinzoApiKey}', 'User')
+
+# Restart your terminal for changes to take effect`
 
   const anthropicSdkSetupCodeTypescript = `import Anthropic from "@anthropic-ai/sdk";
 
-const anthropic = new Anthropic({
-  baseURL: "https://api.app.shinzo.ai/spotlight/anthropic",
-  defaultHeaders: {
-    "x-shinzo-api-key": "${shinzoApiKey}"
-  }
-});
+const anthropic = new Anthropic();
 
 const msg = await anthropic.messages.create({
   model: "claude-sonnet-4-5",
@@ -74,12 +83,7 @@ console.log(msg);`
 
   const anthropicSdkSetupCodePython = `import anthropic
 
-client = anthropic.Anthropic(
-    base_url="https://api.app.shinzo.ai/spotlight/anthropic",
-    default_headers={
-        "x-shinzo-api-key": "${shinzoApiKey}"
-    }
-)
+client = anthropic.Anthropic()
 
 message = client.messages.create(
     model="claude-sonnet-4-5",
@@ -150,19 +154,63 @@ print(message.content)`
           <OnboardingStep
             stepNumber={2}
             title="Configure Environment Variables"
-            description="Add these to your shell configuration (~/.zshrc or ~/.bashrc)"
+            description="Set environment variables for your operating system"
           >
-            <CodeSnippet
-              code={claudeCodeSetupCode}
-              copyId="claude-code-setup"
-            />
+            <Tabs.Root defaultValue="macos">
+              <Tabs.List>
+                <Tabs.Trigger value="macos" style={{ cursor: 'pointer' }}>macOS</Tabs.Trigger>
+                <Tabs.Trigger value="linux" style={{ cursor: 'pointer' }}>Linux</Tabs.Trigger>
+                <Tabs.Trigger value="windows" style={{ cursor: 'pointer' }}>Windows</Tabs.Trigger>
+              </Tabs.List>
+
+              <Flex direction="column" gap="3" style={{ marginTop: '16px' }}>
+                <Tabs.Content value="macos">
+                  <CodeSnippet
+                    code={claudeCodeSetupMacOS}
+                    copyId="claude-code-macos"
+                  />
+                  <Text size="2" color="gray" style={{ marginTop: '8px' }}>
+                    For bash users, replace <Text style={{ fontFamily: 'monospace' }}>~/.zshrc</Text> with <Text style={{ fontFamily: 'monospace' }}>~/.bash_profile</Text>
+                  </Text>
+                </Tabs.Content>
+
+                <Tabs.Content value="linux">
+                  <CodeSnippet
+                    code={claudeCodeSetupLinux}
+                    copyId="claude-code-linux"
+                  />
+                  <Text size="2" color="gray" style={{ marginTop: '8px' }}>
+                    If using zsh, replace <Text style={{ fontFamily: 'monospace' }}>~/.bashrc</Text> with <Text style={{ fontFamily: 'monospace' }}>~/.zshrc</Text>
+                  </Text>
+                </Tabs.Content>
+
+                <Tabs.Content value="windows">
+                  <CodeSnippet
+                    code={claudeCodeSetupWindows}
+                    copyId="claude-code-windows"
+                  />
+                  <Text size="2" color="gray" style={{ marginTop: '8px' }}>
+                    Run these commands in PowerShell as Administrator for best results
+                  </Text>
+                </Tabs.Content>
+              </Flex>
+            </Tabs.Root>
 
             <Callout.Root color="blue">
               <Callout.Icon>
                 <Icons.InfoCircledIcon />
               </Callout.Icon>
               <Callout.Text>
-                After adding these variables, reload your shell with: <Text weight="bold" style={{ fontFamily: 'monospace' }}>source ~/.zshrc</Text>
+                After setting environment variables, restart your terminal or IDE for changes to take effect.
+              </Callout.Text>
+            </Callout.Root>
+
+            <Callout.Root color="amber">
+              <Callout.Icon>
+                <Icons.ExclamationTriangleIcon />
+              </Callout.Icon>
+              <Callout.Text>
+                Note: Make sure you're logged in to Claude Code first, as OAuth authentication will fail while these environment variables are active.
               </Callout.Text>
             </Callout.Root>
           </OnboardingStep>
@@ -183,94 +231,77 @@ print(message.content)`
               </Tabs.Root>
 
               {sdkType === 'typescript' && (
+                <>
                 <Text size="2">
                   The TypeScript SDK provides seamless integration with Node.js and JavaScript applications.
                   Perfect for web apps, APIs, and server-side applications.
                 </Text>
+                <Tabs.Root defaultValue="npm">
+                <Tabs.List>
+                  <Tabs.Trigger value="npm" style={{ cursor: 'pointer' }}>npm</Tabs.Trigger>
+                  <Tabs.Trigger value="pnpm" style={{ cursor: 'pointer' }}>pnpm</Tabs.Trigger>
+                  <Tabs.Trigger value="yarn" style={{ cursor: 'pointer' }}>yarn</Tabs.Trigger>
+                </Tabs.List>
+
+                <Flex direction="column" gap="3" style={{ marginTop: '16px' }}>
+                  <Tabs.Content value="npm">
+                    <CodeSnippet
+                      code="npm install @anthropic-ai/sdk"
+                      copyId="npm-install"
+                      inline
+                    />
+                  </Tabs.Content>
+
+                  <Tabs.Content value="pnpm">
+                    <CodeSnippet
+                      code="pnpm add @anthropic-ai/sdk"
+                      copyId="pnpm-install"
+                      inline
+                    />
+                  </Tabs.Content>
+
+                  <Tabs.Content value="yarn">
+                    <CodeSnippet
+                      code="yarn add @anthropic-ai/sdk"
+                      copyId="yarn-install"
+                      inline
+                    />
+                  </Tabs.Content>
+                </Flex>
+              </Tabs.Root>
+              </>
+                
               )}
 
               {sdkType === 'python' && (
+                <>
                 <Text size="2">
                   The Python SDK provides native integration with Python applications.
                   Great for data science, automation, and backend services.
                 </Text>
+                <CodeSnippet
+                code="pip install anthropic"
+                copyId="python-install"
+                inline
+              />
+              </>
               )}
             </OnboardingStep>
 
             <OnboardingStep
               stepNumber={3}
-              title="Set Your Anthropic API Key"
-              description="Get your API key from the Anthropic Console and set it as an environment variable"
+              title="Configure Your Environment"
+              description="Set the environment variables for your application. You can add or update API keys later in the settings page."
             >
               <CodeSnippet
-                code="export ANTHROPIC_API_KEY='your-api-key-here'"
-                copyId="set-api-key"
+                code={`export ANTHROPIC_API_KEY="${shinzoApiKey}" && export ANTHROPIC_BASE_URL="https://api.app.shinzo.ai/spotlight/anthropic"`}
+                copyId="set-environment-variables"
                 inline
               />
-
-              <Callout.Root color="blue">
-                <Callout.Icon>
-                  <Icons.InfoCircledIcon />
-                </Callout.Icon>
-                <Callout.Text>
-                  Get your API key from the <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue-11)', textDecoration: 'underline' }}>Anthropic Console</a>.
-                  The SDK will automatically read this environment variable.
-                </Callout.Text>
-              </Callout.Root>
             </OnboardingStep>
 
             <OnboardingStep
               stepNumber={4}
-              title="Install the Anthropic SDK"
-              description={sdkType === 'typescript'
-                ? 'Add the Anthropic SDK to your project using your preferred package manager'
-                : 'Install the Anthropic SDK using pip'}
-            >
-              {sdkType === 'typescript' ? (
-                <Tabs.Root defaultValue="npm">
-                  <Tabs.List>
-                    <Tabs.Trigger value="npm" style={{ cursor: 'pointer' }}>npm</Tabs.Trigger>
-                    <Tabs.Trigger value="pnpm" style={{ cursor: 'pointer' }}>pnpm</Tabs.Trigger>
-                    <Tabs.Trigger value="yarn" style={{ cursor: 'pointer' }}>yarn</Tabs.Trigger>
-                  </Tabs.List>
-
-                  <Flex direction="column" gap="3" style={{ marginTop: '16px' }}>
-                    <Tabs.Content value="npm">
-                      <CodeSnippet
-                        code="npm install @anthropic-ai/sdk"
-                        copyId="npm-install"
-                        inline
-                      />
-                    </Tabs.Content>
-
-                    <Tabs.Content value="pnpm">
-                      <CodeSnippet
-                        code="pnpm add @anthropic-ai/sdk"
-                        copyId="pnpm-install"
-                        inline
-                      />
-                    </Tabs.Content>
-
-                    <Tabs.Content value="yarn">
-                      <CodeSnippet
-                        code="yarn add @anthropic-ai/sdk"
-                        copyId="yarn-install"
-                        inline
-                      />
-                    </Tabs.Content>
-                  </Flex>
-                </Tabs.Root>
-              ) : (
-                <CodeSnippet
-                  code="pip install anthropic"
-                  copyId="python-install"
-                  inline
-                />
-              )}
-            </OnboardingStep>
-
-            <OnboardingStep
-              stepNumber={5}
               title="Configure Your Client"
               description="Initialize the Anthropic client with Shinzo routing"
             >
@@ -294,7 +325,7 @@ print(message.content)`
 
         {/* Step 3/6: Run and Verify */}
         <OnboardingStep
-          stepNumber={selectedIntegration === 'anthropic-sdk' ? 6 : 3}
+          stepNumber={selectedIntegration === 'anthropic-sdk' ? 5 : 3}
           title="Run Your Application & Verify"
           description="Start making AI requests and your analytics will appear automatically"
         >
@@ -312,15 +343,6 @@ print(message.content)`
               <Text size="2">Data appears in your dashboard within seconds</Text>
             </Flex>
           </Flex>
-
-          <Callout.Root>
-            <Callout.Icon>
-              <Icons.InfoCircledIcon />
-            </Callout.Icon>
-            <Callout.Text>
-              Note: OAuth authentication flows will bypass Shinzo routing. Use API key authentication for full analytics coverage.
-            </Callout.Text>
-          </Callout.Root>
         </OnboardingStep>
 
         {/* Step 4/7: Success State */}
@@ -329,7 +351,7 @@ print(message.content)`
             hasSpotlightData ? (
               <Icons.CheckIcon width="20" height="20" />
             ) : (
-              selectedIntegration === 'anthropic-sdk' ? 7 : 4
+              selectedIntegration === 'anthropic-sdk' ? 6 : 4
             )
           }
           title="See Live Analytics via the Dashboard"
