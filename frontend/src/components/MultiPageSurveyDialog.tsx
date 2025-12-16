@@ -275,8 +275,8 @@ export const MultiPageSurveyDialog: React.FC<MultiPageSurveyDialogProps> = ({ op
           {isFirstPage && (
             <Flex direction="column" gap="2" align="center">
               {config.icon}
-              <Dialog.Title>
-                <Heading size="6" align="center">{config.title}</Heading>
+              <Dialog.Title align="center" size="6">
+                {config.title}
               </Dialog.Title>
               <Dialog.Description>
                 <Text color="gray" align="center">{config.description}</Text>

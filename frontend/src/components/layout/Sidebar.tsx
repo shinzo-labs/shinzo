@@ -124,7 +124,7 @@ export const Sidebar: React.FC = () => {
       {/* Navigation */}
       <Flex direction="column" style={{ flex: 1, padding: '16px', gap: '4px', overflowY: 'auto' }}>
         {sidebarConfig.map((section) => (
-          <>
+          <React.Fragment key={section.section}>
             <div style={{ margin: '16px 0 8px 0', paddingLeft: '12px' }}>
               <Text size="1" weight="bold" color="gray" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 {section.section}
@@ -140,8 +140,8 @@ export const Sidebar: React.FC = () => {
                   <Text size="2" weight="medium" style={{ flex: 1 }}>{item.name}</Text>
                 </Link>
               )
-            })} 
-          </>
+            })}
+          </React.Fragment>
         ))}
       </Flex>
     </Flex>
