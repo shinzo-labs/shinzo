@@ -58,6 +58,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
   const { token } = useAuth()
   const [selectedSessionUuid, setSelectedSessionUuid] = useState<string | null>(null)
   const [expandedInteractionUuid, setExpandedInteractionUuid] = useState<string | null>(null)
+  const [expandedMessageView, setExpandedMessageView] = useState(false)
   const [sortColumn, setSortColumn] = useState<SortColumn>('start_time')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
@@ -245,34 +246,76 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
     return inputTokens > maxTokens
   }
 
+  const parseSystemReminders = (text: string) => {
+    const parts: Array<{ type: 'text' | 'system-reminder'; content: string }> = []
+    const regex = /<system-reminder>([\s\S]*?)<\/system-reminder>/g
+    let lastIndex = 0
+    let match
+
+    while ((match = regex.exec(text)) !== null) {
+      // Add text before the match
+      if (match.index > lastIndex) {
+        parts.push({ type: 'text', content: text.slice(lastIndex, match.index) })
+      }
+      // Add the system-reminder
+      parts.push({ type: 'system-reminder', content: match[1] })
+      lastIndex = regex.lastIndex
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.push({ type: 'text', content: text.slice(lastIndex) })
+    }
+
+    return parts.length > 0 ? parts : [{ type: 'text', content: text }]
+  }
+
+  const renderTextWithSystemReminders = (text: string) => {
+    const parts = parseSystemReminders(text)
+    return parts.map((part, idx) => {
+      if (part.type === 'system-reminder') {
+        return (
+          <Flex key={idx} gap="2" align="start" p="2" style={{ background: 'var(--blue-3)', borderRadius: '6px', border: '1px solid var(--blue-6)' }} mb="2">
+            <InfoCircledIcon style={{ color: 'var(--blue-9)', marginTop: '2px', flexShrink: 0 }} />
+            <Text size="1" style={{ whiteSpace: 'pre-wrap', flex: 1 }}>{part.content}</Text>
+          </Flex>
+        )
+      }
+      return <Text key={idx} size="1" style={{ whiteSpace: 'pre-wrap' }}>{part.content}</Text>
+    })
+  }
+
   const formatMessages = (messages: any[]) => {
     if (!Array.isArray(messages)) return 'N/A'
 
     return messages.map((msg, idx) => {
+      const isEvenMessage = idx % 2 === 0
+      const bgColor = isEvenMessage ? 'var(--gray-4)' : 'var(--gray-3)'
+
       if (typeof msg.content === 'string') {
         return (
-          <Box key={idx} mb="2">
-            <Text size="1" weight="bold" color="gray">{msg.role}:</Text>
-            <Text size="1" style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</Text>
+          <Box key={idx} mb="3" p="3" style={{ background: bgColor, borderRadius: '6px' }}>
+            <Text size="1" weight="bold" color="gray" mb="2" style={{ display: 'block' }}>{msg.role}</Text>
+            {renderTextWithSystemReminders(msg.content)}
           </Box>
         )
       } else if (Array.isArray(msg.content)) {
         return (
-          <Box key={idx} mb="2">
-            <Text size="1" weight="bold" color="gray">{msg.role}:</Text>
+          <Box key={idx} mb="3" p="3" style={{ background: bgColor, borderRadius: '6px' }}>
+            <Text size="1" weight="bold" color="gray" mb="2" style={{ display: 'block' }}>{msg.role}</Text>
             {msg.content.map((block: any, blockIdx: number) => (
-              <Box key={blockIdx} ml="2">
-                {block.type === 'text' && <Text size="1" style={{ whiteSpace: 'pre-wrap' }}>{block.text}</Text>}
+              <Box key={blockIdx} ml="2" mb="2">
+                {block.type === 'text' && renderTextWithSystemReminders(block.text)}
                 {block.type === 'tool_use' && (
-                  <Box>
-                    <Text size="1" color="blue">Tool: {block.name}</Text>
-                    <Code size="1">{JSON.stringify(block.input, null, 2)}</Code>
+                  <Box p="2" style={{ background: 'var(--blue-2)', borderRadius: '4px', border: '1px solid var(--blue-6)' }}>
+                    <Text size="1" color="blue" weight="bold">Tool: {block.name}</Text>
+                    <Code size="1" style={{ display: 'block', marginTop: '4px' }}>{JSON.stringify(block.input, null, 2)}</Code>
                   </Box>
                 )}
                 {block.type === 'tool_result' && (
-                  <Box>
-                    <Text size="1" color="green">Tool Result: {block.tool_use_id}</Text>
-                    <Code size="1">{JSON.stringify(block.content, null, 2)}</Code>
+                  <Box p="2" style={{ background: 'var(--green-2)', borderRadius: '4px', border: '1px solid var(--green-6)' }}>
+                    <Text size="1" color="green" weight="bold">Tool Result: {block.tool_use_id}</Text>
+                    <Code size="1" style={{ display: 'block', marginTop: '4px' }}>{JSON.stringify(block.content, null, 2)}</Code>
                   </Box>
                 )}
               </Box>
@@ -481,89 +524,116 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                           <Table.Cell colSpan={9} style={{ maxWidth: '0', width: '100%' }}>
                             <Card style={{ background: 'var(--gray-2)', maxWidth: '100%', overflow: 'hidden' }}>
                               <Flex direction="column" gap="3" p="3">
-                                {/* Request Data */}
+                                {/* Request Metadata Table */}
                                 <Box>
-                                  <Text size="3" weight="bold" mb="2">Request</Text>
-                                  <Flex direction="column" gap="2">
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Model:</Text>
-                                      <Badge>{interaction.model}</Badge>
-                                    </Flex>
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Provider:</Text>
-                                      <Badge>{interaction.provider}</Badge>
-                                    </Flex>
-                                    {interaction.request_data?.max_tokens && (
-                                      <Flex justify="between">
-                                        <Text size="2" color="gray">Max Tokens:</Text>
-                                        <Text size="2">{interaction.request_data.max_tokens}</Text>
-                                      </Flex>
-                                    )}
-                                    {interaction.request_data?.temperature !== undefined && (
-                                      <Flex justify="between">
-                                        <Text size="2" color="gray">Temperature:</Text>
-                                        <Text size="2">{interaction.request_data.temperature}</Text>
-                                      </Flex>
-                                    )}
-                                  </Flex>
+                                  <Text size="3" weight="bold" mb="2">Request Metadata</Text>
+                                  <Table.Root variant="surface">
+                                    <Table.Header>
+                                      <Table.Row>
+                                        <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
+                                        <Table.ColumnHeaderCell>Provider</Table.ColumnHeaderCell>
+                                        <Table.ColumnHeaderCell>Max Tokens</Table.ColumnHeaderCell>
+                                        <Table.ColumnHeaderCell>Temperature</Table.ColumnHeaderCell>
+                                      </Table.Row>
+                                    </Table.Header>
+                                    <Table.Body>
+                                      <Table.Row>
+                                        <Table.Cell><Badge>{interaction.model}</Badge></Table.Cell>
+                                        <Table.Cell><Badge>{interaction.provider}</Badge></Table.Cell>
+                                        <Table.Cell>{interaction.request_data?.max_tokens || 'N/A'}</Table.Cell>
+                                        <Table.Cell>{interaction.request_data?.temperature !== undefined ? interaction.request_data.temperature : 'N/A'}</Table.Cell>
+                                      </Table.Row>
+                                    </Table.Body>
+                                  </Table.Root>
+                                </Box>
 
-                                  {/* Messages */}
-                                  <Box mt="3">
-                                    <Text size="2" weight="bold" mb="2">Messages:</Text>
-                                    <Box style={{ background: 'var(--gray-3)', maxHeight: '300px', width: '100%', maxWidth: '100%', minWidth: '0', overflow: 'auto', padding: '8px', borderRadius: '6px', boxSizing: 'border-box', wordBreak: 'break-word' }}>
-                                      {interaction.request_data?.messages?.length > 1 ? (
-                                        <details>
-                                          <summary style={{ cursor: 'pointer', marginBottom: '8px' }}>
-                                            <Text size="2" color="blue">Show full conversation ({interaction.request_data.messages.length} messages)</Text>
-                                          </summary>
-                                          {formatMessages(interaction.request_data.messages)}
-                                        </details>
-                                      ) : (
-                                        formatMessages(interaction.request_data?.messages || [])
-                                      )}
-                                    </Box>
+                                {/* Response Metadata Table */}
+                                <Box>
+                                  <Text size="3" weight="bold" mb="2">Response Metadata</Text>
+                                  <Table.Root variant="surface">
+                                    <Table.Header>
+                                      <Table.Row>
+                                        <Table.ColumnHeaderCell>Stop Reason</Table.ColumnHeaderCell>
+                                        <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
+                                        <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
+                                        <Table.ColumnHeaderCell>Cache Read</Table.ColumnHeaderCell>
+                                        <Table.ColumnHeaderCell>Cache Creation</Table.ColumnHeaderCell>
+                                        <Table.ColumnHeaderCell>Latency</Table.ColumnHeaderCell>
+                                      </Table.Row>
+                                    </Table.Header>
+                                    <Table.Body>
+                                      <Table.Row>
+                                        <Table.Cell>{interaction.response_data?.stop_reason || 'N/A'}</Table.Cell>
+                                        <Table.Cell>{formatTokenDisplay(interaction.input_tokens, JSON.stringify(interaction.request_data?.messages || ''))}</Table.Cell>
+                                        <Table.Cell>{formatTokenDisplay(interaction.output_tokens, interaction.response_data?.content || '')}</Table.Cell>
+                                        <Table.Cell>{formatTokenDisplay(interaction.cache_read_input_tokens)}</Table.Cell>
+                                        <Table.Cell>{formatTokenDisplay(interaction.cache_creation_input_tokens)}</Table.Cell>
+                                        <Table.Cell>{interaction.latency_ms} ms</Table.Cell>
+                                      </Table.Row>
+                                    </Table.Body>
+                                  </Table.Root>
+                                </Box>
+
+                                {/* Messages */}
+                                <Box>
+                                  <Flex justify="between" align="center" mb="2">
+                                    <Text size="3" weight="bold">Messages</Text>
+                                    <Text
+                                      size="2"
+                                      color="blue"
+                                      style={{ cursor: 'pointer', userSelect: 'none' }}
+                                      onClick={() => setExpandedMessageView(!expandedMessageView)}
+                                    >
+                                      {expandedMessageView ? '↙ Reduce' : '↗ Expand'}
+                                    </Text>
+                                  </Flex>
+                                  <Box style={{
+                                    background: 'var(--gray-3)',
+                                    maxHeight: expandedMessageView ? '80vh' : '400px',
+                                    width: '100%',
+                                    maxWidth: '100%',
+                                    minWidth: '0',
+                                    overflow: 'auto',
+                                    padding: '8px',
+                                    borderRadius: '6px',
+                                    boxSizing: 'border-box',
+                                    wordBreak: 'break-word',
+                                    transition: 'max-height 0.3s ease-in-out'
+                                  }}>
+                                    {interaction.request_data?.messages?.length > 1 ? (
+                                      <details>
+                                        <summary style={{ cursor: 'pointer', marginBottom: '8px' }}>
+                                          <Text size="2" color="blue">Show full conversation ({interaction.request_data.messages.length} messages)</Text>
+                                        </summary>
+                                        {formatMessages(interaction.request_data.messages)}
+                                      </details>
+                                    ) : (
+                                      formatMessages(interaction.request_data?.messages || [])
+                                    )}
                                   </Box>
                                 </Box>
 
-                                {/* Response Data */}
+                                {/* Response */}
                                 {interaction.response_data && (
                                   <Box>
                                     <Text size="3" weight="bold" mb="2">Response</Text>
-                                    <Box style={{ background: 'var(--gray-3)', maxHeight: '300px', width: '100%', maxWidth: '100%', minWidth: '0', overflow: 'auto', padding: '8px', borderRadius: '6px', boxSizing: 'border-box', wordBreak: 'break-word' }}>
+                                    <Box style={{
+                                      background: 'var(--gray-3)',
+                                      maxHeight: expandedMessageView ? '80vh' : '400px',
+                                      width: '100%',
+                                      maxWidth: '100%',
+                                      minWidth: '0',
+                                      overflow: 'auto',
+                                      padding: '8px',
+                                      borderRadius: '6px',
+                                      boxSizing: 'border-box',
+                                      wordBreak: 'break-word',
+                                      transition: 'max-height 0.3s ease-in-out'
+                                    }}>
                                       {interaction.response_data.content && formatMessages([{ role: 'assistant', content: interaction.response_data.content }])}
-                                      {interaction.response_data.stop_reason && (
-                                        <Text size="1" color="gray" mt="2">Stop reason: {interaction.response_data.stop_reason}</Text>
-                                      )}
                                     </Box>
                                   </Box>
                                 )}
-
-                                {/* Token Counts */}
-                                <Box>
-                                  <Text size="3" weight="bold" mb="2">Token Usage</Text>
-                                  <Flex direction="column" gap="1">
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Input Tokens:</Text>
-                                      <Text size="2">{formatTokenDisplay(interaction.input_tokens, JSON.stringify(interaction.request_data?.messages || ''))}</Text>
-                                    </Flex>
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Output Tokens:</Text>
-                                      <Text size="2">{formatTokenDisplay(interaction.output_tokens, interaction.response_data?.content || '')}</Text>
-                                    </Flex>
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Cache Read Tokens:</Text>
-                                      <Text size="2">{formatTokenDisplay(interaction.cache_read_input_tokens)}</Text>
-                                    </Flex>
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Cache Creation Tokens:</Text>
-                                      <Text size="2">{formatTokenDisplay(interaction.cache_creation_input_tokens)}</Text>
-                                    </Flex>
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Latency:</Text>
-                                      <Text size="2">{interaction.latency_ms} ms</Text>
-                                    </Flex>
-                                  </Flex>
-                                </Box>
 
                                 {/* Tool Usages */}
                                 {interaction.tool_usages && interaction.tool_usages.length > 0 && (
