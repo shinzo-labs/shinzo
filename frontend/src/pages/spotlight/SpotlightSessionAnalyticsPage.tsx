@@ -315,7 +315,23 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                 {block.type === 'tool_result' && (
                   <Box p="2" style={{ background: 'var(--green-2)', borderRadius: '4px', border: '1px solid var(--green-6)' }}>
                     <Text size="1" color="green" weight="bold">Tool Result: {block.tool_use_id}</Text>
-                    <Code size="1" style={{ display: 'block', marginTop: '4px' }}>{JSON.stringify(block.content, null, 2)}</Code>
+                    <Box style={{ marginTop: '4px' }}>
+                      {typeof block.content === 'string' ? (
+                        <Text size="1" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>{block.content}</Text>
+                      ) : Array.isArray(block.content) ? (
+                        block.content.map((item: any, idx: number) => {
+                          if (typeof item === 'string') {
+                            return <Text key={idx} size="1" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', display: 'block' }}>{item}</Text>
+                          } else if (item.type === 'text') {
+                            return <Text key={idx} size="1" style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', display: 'block' }}>{item.text}</Text>
+                          } else {
+                            return <Code key={idx} size="1" style={{ display: 'block' }}>{JSON.stringify(item, null, 2)}</Code>
+                          }
+                        })
+                      ) : (
+                        <Code size="1" style={{ display: 'block', whiteSpace: 'pre-wrap' }}>{JSON.stringify(block.content, null, 2)}</Code>
+                      )}
+                    </Box>
                   </Box>
                 )}
               </Box>
