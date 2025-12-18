@@ -1,6 +1,6 @@
-\restrict 83LoOq5IynA7xboMF5SVmZjW0o7K87ZyCreNaEBmEoBdD9CnOJyhsEe9FJfaW73
+\restrict SLydAwJHmyNGe4zsmCJkjrIePyeopFw5LrRpxPbTzFp5uVZiiGIXJPTrMrwLppc
 
--- Dumped from database version 15.14 (Homebrew)
+-- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
 
 SET statement_timeout = 0;
@@ -77,15 +77,18 @@ CREATE TABLE main."user" (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     email text NOT NULL,
-    password_hash text NOT NULL,
-    password_salt text NOT NULL,
+    password_hash text,
+    password_salt text,
     email_token text NOT NULL,
     email_token_expiry timestamp without time zone NOT NULL,
     verified boolean DEFAULT false NOT NULL,
     monthly_counter integer DEFAULT 0 NOT NULL,
     last_counter_reset timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     subscription_tier_uuid uuid NOT NULL,
-    subscribed_on timestamp without time zone
+    subscribed_on timestamp without time zone,
+    oauth_provider text,
+    oauth_id text,
+    oauth_profile_data jsonb
 );
 
 
@@ -691,22 +694,6 @@ ALTER TABLE ONLY main."user"
 
 
 --
--- Name: user user_password_hash_key; Type: CONSTRAINT; Schema: main; Owner: -
---
-
-ALTER TABLE ONLY main."user"
-    ADD CONSTRAINT user_password_hash_key UNIQUE (password_hash);
-
-
---
--- Name: user user_password_salt_key; Type: CONSTRAINT; Schema: main; Owner: -
---
-
-ALTER TABLE ONLY main."user"
-    ADD CONSTRAINT user_password_salt_key UNIQUE (password_salt);
-
-
---
 -- Name: user user_pkey; Type: CONSTRAINT; Schema: main; Owner: -
 --
 
@@ -1015,6 +1002,13 @@ ALTER TABLE ONLY spotlight.user_analytics
 --
 
 CREATE INDEX idx_user_last_counter_reset ON main."user" USING btree (last_counter_reset);
+
+
+--
+-- Name: idx_user_oauth_provider_id; Type: INDEX; Schema: main; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_user_oauth_provider_id ON main."user" USING btree (oauth_provider, oauth_id) WHERE ((oauth_provider IS NOT NULL) AND (oauth_id IS NOT NULL));
 
 
 --
@@ -2068,7 +2062,7 @@ ALTER TABLE ONLY spotlight.user_analytics
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 83LoOq5IynA7xboMF5SVmZjW0o7K87ZyCreNaEBmEoBdD9CnOJyhsEe9FJfaW73
+\unrestrict SLydAwJHmyNGe4zsmCJkjrIePyeopFw5LrRpxPbTzFp5uVZiiGIXJPTrMrwLppc
 
 
 --
@@ -2077,9 +2071,7 @@ ALTER TABLE ONLY spotlight.user_analytics
 
 INSERT INTO public.schema_migrations (version) VALUES
     ('20250914000000'),
-    ('20250918000000'),
     ('20250919000000'),
-    ('20250930000000'),
     ('20251001000000'),
     ('20251002000000'),
     ('20251120000000'),
@@ -2091,4 +2083,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20251213000000'),
     ('20251217000000'),
     ('20251218000000'),
-    ('20251218100000');
+    ('20251218100000'),
+    ('20251218100001'),
+    ('20251218100002');

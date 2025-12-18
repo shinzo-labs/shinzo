@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useQuery } from 'react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Flex, Text, Card, Table, Badge, Box, Tooltip, Spinner, Button, Dialog, Code, Switch } from '@radix-ui/themes'
@@ -96,40 +96,40 @@ export const SpotlightSessionDetailPage: React.FC = () => {
     else return actualTokens.toLocaleString()
   }
 
-  const countToolsInMessages = (messages: any[], toolType: 'tool_use' | 'tool_result'): number => {
-    if (!Array.isArray(messages)) return 0
+  // const countToolsInMessages = (messages: any[], toolType: 'tool_use' | 'tool_result'): number => {
+  //   if (!Array.isArray(messages)) return 0
 
-    return messages.reduce((total, msg) => {
-      if (Array.isArray(msg.content)) {
-        return total + msg.content.filter((block: any) => block.type === toolType).length
-      }
-      return total
-    }, 0)
-  }
+  //   return messages.reduce((total, msg) => {
+  //     if (Array.isArray(msg.content)) {
+  //       return total + msg.content.filter((block: any) => block.type === toolType).length
+  //     }
+  //     return total
+  //   }, 0)
+  // }
 
-  const getToolCount = (
-    source: any,
-    type: 'tool_use' | 'tool_result'
-  ) =>
-    countToolsInMessages(source?.request_data?.messages || [], type) +
-    countToolsInMessages(
-      source?.response_data?.content ? [{ content: source.response_data.content }] : [],
-      type
-    )
+  // const getToolCount = (
+  //   source: any,
+  //   type: 'tool_use' | 'tool_result'
+  // ) =>
+  //   countToolsInMessages(source?.request_data?.messages || [], type) +
+  //   countToolsInMessages(
+  //     source?.response_data?.content ? [{ content: source.response_data.content }] : [],
+  //     type
+  //   )
 
-  const getSessionToolUses = (sessionDetail: SessionDetail): number =>
-    sessionDetail?.interactions
-      ? sessionDetail.interactions
-          .filter(i => i.status === 'success')
-          .reduce((sum, i) => sum + getToolCount(i, 'tool_use'), 0)
-      : 0
+  // const getSessionToolUses = (sessionDetail: SessionDetail): number =>
+  //   sessionDetail?.interactions
+  //     ? sessionDetail.interactions
+  //         .filter(i => i.status === 'success')
+  //         .reduce((sum, i) => sum + getToolCount(i, 'tool_use'), 0)
+  //     : 0
 
-  const getSessionToolResults = (sessionDetail: SessionDetail): number =>
-    sessionDetail?.interactions
-      ? sessionDetail.interactions
-          .filter(i => i.status === 'success')
-          .reduce((sum, i) => sum + getToolCount(i, 'tool_result'), 0)
-      : 0
+  // const getSessionToolResults = (sessionDetail: SessionDetail): number =>
+  //   sessionDetail?.interactions
+  //     ? sessionDetail.interactions
+  //         .filter(i => i.status === 'success')
+  //         .reduce((sum, i) => sum + getToolCount(i, 'tool_result'), 0)
+  //     : 0
 
   const formatLatency = (latencyMs: number): string => {
     if (latencyMs >= 1000) {
@@ -373,22 +373,24 @@ export const SpotlightSessionDetailPage: React.FC = () => {
                   <Table.Row>
                     <Table.ColumnHeaderCell>Total Requests</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Tool Uses</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Tool Results</Table.ColumnHeaderCell>
+                    {/* <Table.ColumnHeaderCell>Tool Uses</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Tool Results</Table.ColumnHeaderCell> */}
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
                   <Table.Row>
                     <Table.Cell>{sessionDetail.session.total_requests}</Table.Cell>
                     <Table.Cell>{sessionDetail.session.total_input_tokens.toLocaleString()}</Table.Cell>
+                    <Table.Cell>{sessionDetail.session.total_cache_read_input_tokens.toLocaleString()}</Table.Cell>
                     <Table.Cell>{sessionDetail.session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Table.Cell>
                     <Table.Cell>{sessionDetail.session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Table.Cell>
                     <Table.Cell>{sessionDetail.session.total_output_tokens.toLocaleString()}</Table.Cell>
-                    <Table.Cell>{getSessionToolUses(sessionDetail)}</Table.Cell>
-                    <Table.Cell>{getSessionToolResults(sessionDetail)}</Table.Cell>
+                    {/* <Table.Cell>{getSessionToolUses(sessionDetail)}</Table.Cell>
+                    <Table.Cell>{getSessionToolResults(sessionDetail)}</Table.Cell> */}
                   </Table.Row>
                 </Table.Body>
               </Table.Root>

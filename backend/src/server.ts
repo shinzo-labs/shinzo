@@ -27,6 +27,14 @@ import {
 } from './handlers/auth'
 
 import {
+  handleGoogleOAuthUrl,
+  handleGoogleOAuthCallback,
+  handleGithubOAuthUrl,
+  handleGithubOAuthCallback,
+  oauthCallbackSchema
+} from './handlers/oauth'
+
+import {
   handleFetchResources,
   handleFetchTraces,
   handleFetchSpans,
@@ -93,6 +101,8 @@ import {
   handleGetSessionShareStatus,
   handleFetchSharedSessionDetail,
 } from './handlers/spotlight'
+
+logger.info('STARTUP: server.ts - All imports loaded, creating Fastify instance')
 
 // Create Fastify instance
 const app = fastify({
@@ -234,6 +244,65 @@ app.get('/auth/fetch_user_quota', async (request: AuthenticatedRequest, reply: F
   } catch (error: any) {
     logger.error({ message: 'Fetch user quota error', error })
     reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// OAuth endpoints
+app.get('/auth/oauth/google', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const result = await handleGoogleOAuthUrl()
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Google OAuth URL error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.post('/auth/oauth/google/callback', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const validatedBody = await oauthCallbackSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleGoogleOAuthCallback(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Google OAuth callback error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/auth/oauth/github', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const result = await handleGithubOAuthUrl()
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'GitHub OAuth URL error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.post('/auth/oauth/github/callback', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const validatedBody = await oauthCallbackSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleGithubOAuthCallback(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'GitHub OAuth callback error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
   }
 })
 
@@ -956,15 +1025,23 @@ app.setErrorHandler((error, request, reply) => {
 // Start server
 const start = async () => {
   try {
-    // Test database connection
-    await sequelize.authenticate()
-    logger.info('Database connection established successfully')
+    logger.info('STARTUP: Entering start() function')
+
+    // Test database connection with timeout
+    logger.info('STARTUP: About to call sequelize.authenticate()')
+    const authenticatePromise = sequelize.authenticate()
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Database authentication timed out after 10 seconds')), 10000)
+    )
+    await Promise.race([authenticatePromise, timeoutPromise])
+    logger.info('STARTUP: Database connection established successfully')
 
     // Start server
-    logger.info({ msg: `Starting service on port ${PORT}` })
+    logger.info({ msg: `STARTUP: Starting Fastify server on port ${PORT}` })
     await app.listen({ port: parseInt(PORT), host: '0.0.0.0' })
+    logger.info({ msg: `STARTUP: Server successfully listening on port ${PORT}` })
   } catch (error) {
-    logger.error({ message: 'Failed to start server', error })
+    logger.error({ message: 'STARTUP ERROR: Failed to start server', error })
     process.exit(1)
   }
 }
@@ -984,4 +1061,5 @@ process.on('SIGINT', async () => {
   process.exit(0)
 })
 
+logger.info('STARTUP: Server module loaded, about to call start()')
 start()
