@@ -960,9 +960,13 @@ const start = async () => {
   try {
     logger.info('STARTUP: Entering start() function')
 
-    // Test database connection
+    // Test database connection with timeout
     logger.info('STARTUP: About to call sequelize.authenticate()')
-    await sequelize.authenticate()
+    const authenticatePromise = sequelize.authenticate()
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Database authentication timed out after 10 seconds')), 10000)
+    )
+    await Promise.race([authenticatePromise, timeoutPromise])
     logger.info('STARTUP: Database connection established successfully')
 
     // Start server
