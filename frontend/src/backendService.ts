@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './config'
+import { streamClaudeRequest, SSEEventHandler, MessageCompleteHandler, SSEErrorHandler, MessageState } from './utils/sseClient'
 
 interface User {
   uuid: string
@@ -374,3 +375,82 @@ export const surveyService = {
     return handleResponse(response)
   }
 }
+
+// Streaming API service for Claude/Anthropic model proxy
+export interface StreamingMessageRequest {
+  model: string
+  max_tokens: number
+  messages: Array<{
+    role: 'user' | 'assistant'
+    content: string | Array<{ type: string; text?: string; [key: string]: any }>
+  }>
+  system?: string
+  temperature?: number
+  tools?: any[]
+  stream: true
+  metadata?: {
+    user_id?: string
+  }
+}
+
+export const streamingService = {
+  /**
+   * Stream a message request to Claude via the Spotlight proxy
+   *
+   * @param shinzoApiKey - Your Shinzo API key (starts with "sk-shinzo-...")
+   * @param provider - Provider name (e.g., "anthropic")
+   * @param request - The Claude API request body with stream: true
+   * @param handlers - Event handlers for SSE events, message completion, and errors
+   * @returns Promise that resolves with the final complete message
+   */
+  async streamMessage(
+    shinzoApiKey: string,
+    provider: string,
+    request: StreamingMessageRequest,
+    handlers: {
+      onEvent?: SSEEventHandler
+      onMessageComplete?: MessageCompleteHandler
+      onError?: SSEErrorHandler
+    }
+  ): Promise<MessageState> {
+    const url = `${API_BASE_URL}/spotlight/${provider}/v1/messages`
+
+    return streamClaudeRequest(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${shinzoApiKey}`,
+      },
+      body: JSON.stringify(request)
+    }, handlers)
+  },
+
+  /**
+   * Make a non-streaming request to Claude via the Spotlight proxy
+   *
+   * @param shinzoApiKey - Your Shinzo API key
+   * @param provider - Provider name (e.g., "anthropic")
+   * @param request - The Claude API request body (stream should be false or omitted)
+   * @returns Promise that resolves with the complete message
+   */
+  async sendMessage(
+    shinzoApiKey: string,
+    provider: string,
+    request: Omit<StreamingMessageRequest, 'stream'> & { stream?: false }
+  ): Promise<any> {
+    const url = `${API_BASE_URL}/spotlight/${provider}/v1/messages`
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${shinzoApiKey}`,
+      },
+      body: JSON.stringify({ ...request, stream: false })
+    })
+
+    return handleResponse(response)
+  }
+}
+
+export type { MessageState } from './utils/sseClient'

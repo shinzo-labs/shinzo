@@ -13,7 +13,9 @@ interface UserAnalytics {
     total_requests: number
     total_input_tokens: number
     total_output_tokens: number
-    total_cached_tokens: number
+    total_cache_read_tokens: number
+    total_cache_creation_5m_tokens: number
+    total_cache_creation_1h_tokens: number
     first_request: string | null
     last_request: string | null
   }>
@@ -85,7 +87,9 @@ export const SpotlightUserAnalyticsPage: React.FC = () => {
                       <Table.ColumnHeaderCell>Requests</Table.ColumnHeaderCell>
                       <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
                       <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell>Cached Tokens</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
                       <Table.ColumnHeaderCell>First Request</Table.ColumnHeaderCell>
                       <Table.ColumnHeaderCell>Last Request</Table.ColumnHeaderCell>
                     </Table.Row>
@@ -97,7 +101,9 @@ export const SpotlightUserAnalyticsPage: React.FC = () => {
                         <Table.Cell>{user.total_requests.toLocaleString()}</Table.Cell>
                         <Table.Cell>{user.total_input_tokens.toLocaleString()}</Table.Cell>
                         <Table.Cell>{user.total_output_tokens.toLocaleString()}</Table.Cell>
-                        <Table.Cell>{user.total_cached_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{user.total_cache_read_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{user.total_cache_creation_5m_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{user.total_cache_creation_1h_tokens.toLocaleString()}</Table.Cell>
                         <Table.Cell>
                           {user.first_request ? new Date(user.first_request).toLocaleString() : '-'}
                         </Table.Cell>

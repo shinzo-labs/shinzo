@@ -12,14 +12,16 @@ interface TokenAnalytics {
     total_input_tokens: number
     total_output_tokens: number
     total_cached_tokens: number
-    total_cache_creation_tokens: number
+    total_cache_creation_5m_tokens: number
+    total_cache_creation_1h_tokens: number
     total_requests: number
   }
   by_model: Record<string, {
     input_tokens: number
     output_tokens: number
     cached_tokens: number
-    cache_creation_tokens: number
+    cache_creation_5m_tokens: number
+    cache_creation_1h_tokens: number
     request_count: number
   }>
 }
@@ -62,7 +64,7 @@ export const SpotlightTokenAnalyticsPage: React.FC = () => {
           </Card>
         ) : (
           <>
-            <Grid columns="4" gap="4">
+            <Grid columns="3" gap="4">
               <Card>
                 <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Total Requests</Text>
                 <Text size="6" weight="bold">{analytics?.summary.total_requests.toLocaleString()}</Text>
@@ -75,9 +77,20 @@ export const SpotlightTokenAnalyticsPage: React.FC = () => {
                 <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Output Tokens</Text>
                 <Text size="6" weight="bold">{analytics?.summary.total_output_tokens.toLocaleString()}</Text>
               </Card>
+            </Grid>
+
+            <Grid columns="3" gap="4">
               <Card>
-                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Cached Tokens</Text>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Cache Reads</Text>
                 <Text size="6" weight="bold">{analytics?.summary.total_cached_tokens.toLocaleString()}</Text>
+              </Card>
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>5m Cache Writes</Text>
+                <Text size="6" weight="bold">{analytics?.summary.total_cache_creation_5m_tokens.toLocaleString()}</Text>
+              </Card>
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>1h Cache Writes</Text>
+                <Text size="6" weight="bold">{analytics?.summary.total_cache_creation_1h_tokens.toLocaleString()}</Text>
               </Card>
             </Grid>
 
@@ -96,7 +109,9 @@ export const SpotlightTokenAnalyticsPage: React.FC = () => {
                       <Table.ColumnHeaderCell>Requests</Table.ColumnHeaderCell>
                       <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
                       <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell>Cached Tokens</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
@@ -107,6 +122,8 @@ export const SpotlightTokenAnalyticsPage: React.FC = () => {
                         <Table.Cell>{stats.input_tokens.toLocaleString()}</Table.Cell>
                         <Table.Cell>{stats.output_tokens.toLocaleString()}</Table.Cell>
                         <Table.Cell>{stats.cached_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.cache_creation_5m_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.cache_creation_1h_tokens.toLocaleString()}</Table.Cell>
                       </Table.Row>
                     ))}
                   </Table.Body>

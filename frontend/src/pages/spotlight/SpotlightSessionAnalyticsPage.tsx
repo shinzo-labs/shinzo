@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery } from 'react-query'
-import { Flex, Text, Card, Table, Badge, Dialog, Code, Box, Tooltip } from '@radix-ui/themes'
+import { Flex, Text, Card, Table, Badge, Dialog, Code, Box, Tooltip, Spinner } from '@radix-ui/themes'
 import { AppLayout } from '../../components/layout/AppLayout'
 import { useAuth } from '../../contexts/AuthContext'
 import { ChevronDownIcon, ChevronUpIcon, InfoCircledIcon } from '@radix-ui/react-icons'
@@ -16,8 +16,10 @@ interface Session {
   total_requests: number
   total_input_tokens: number
   total_output_tokens: number
-  total_cached_tokens: number
+  total_cache_creation_ephemeral_5m_input_tokens: number
+  total_cache_creation_ephemeral_1h_input_tokens: number
   interaction_count: number
+  last_message_preview: string
 }
 
 interface SessionAnalytics {
@@ -39,9 +41,12 @@ interface Interaction {
   input_tokens: number
   output_tokens: number
   cache_read_input_tokens: number
-  cache_creation_input_tokens: number
+  cache_creation_ephemeral_5m_input_tokens: number
+  cache_creation_ephemeral_1h_input_tokens: number
   latency_ms: number
   status: string
+  error_type: string | null
+  error_message: string | null
   request_data: any
   response_data: any
   tool_usages: Array<{
@@ -51,7 +56,7 @@ interface Interaction {
   }>
 }
 
-type SortColumn = 'start_time' | 'total_requests' | 'total_input_tokens' | 'total_output_tokens' | 'total_cached_tokens' | 'tool_uses' | 'tool_results'
+type SortColumn = 'start_time' | 'end_time' | 'total_requests' | 'total_input_tokens' | 'total_output_tokens' | 'total_cache_creation_ephemeral_5m_input_tokens' | 'total_cache_creation_ephemeral_1h_input_tokens'
 type SortDirection = 'asc' | 'desc'
 
 export const SpotlightSessionAnalyticsPage: React.FC = () => {
@@ -101,6 +106,10 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
           aVal = new Date(a.start_time).getTime()
           bVal = new Date(b.start_time).getTime()
           break
+        case 'end_time':
+          aVal = a.end_time ? new Date(a.end_time).getTime() : 0
+          bVal = b.end_time ? new Date(b.end_time).getTime() : 0
+          break
         case 'total_requests':
           aVal = a.total_requests
           bVal = b.total_requests
@@ -113,23 +122,13 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
           aVal = a.total_output_tokens
           bVal = b.total_output_tokens
           break
-        case 'total_cached_tokens':
-          aVal = a.total_cached_tokens
-          bVal = b.total_cached_tokens
+        case 'total_cache_creation_ephemeral_5m_input_tokens':
+          aVal = a.total_cache_creation_ephemeral_5m_input_tokens
+          bVal = b.total_cache_creation_ephemeral_5m_input_tokens
           break
-        case 'tool_uses':
-          // For session-level sorting, we need to calculate tool uses from sessionDetail
-          // Since we don't have access to sessionDetail here, we'll use 0 for now
-          // This will be handled differently in the UI
-          aVal = 0
-          bVal = 0
-          break
-        case 'tool_results':
-          // For session-level sorting, we need to calculate tool results from sessionDetail
-          // Since we don't have access to sessionDetail here, we'll use 0 for now
-          // This will be handled differently in the UI
-          aVal = 0
-          bVal = 0
+        case 'total_cache_creation_ephemeral_1h_input_tokens':
+          aVal = a.total_cache_creation_ephemeral_1h_input_tokens
+          bVal = b.total_cache_creation_ephemeral_1h_input_tokens
           break
         default:
           return 0
@@ -232,18 +231,32 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
   const getInteractionToolResults = (interaction: Interaction): number =>
     interaction.status === 'success' ? getToolCount(interaction, 'tool_result') : 0
 
-  const isLikelyMaxTokenError = (interaction: Interaction): boolean => {
-    if (interaction.status !== 'error') return false
-    
-    const maxTokens = interaction.request_data?.max_tokens
-    if (!maxTokens) return false
-    
-    const { count: inputTokens } = getTokenCount(
-      interaction.input_tokens, 
-      JSON.stringify(interaction.request_data?.messages || '')
-    )
-    
-    return inputTokens > maxTokens
+  const formatLatency = (latencyMs: number): string => {
+    if (latencyMs >= 1000) {
+      const seconds = latencyMs / 1000
+      const minutes = Math.floor(seconds / 60)
+      const remainingSeconds = seconds % 60
+      if (minutes > 0) {
+        return `${minutes}m${remainingSeconds.toFixed(3)}s`
+      }
+      return `${remainingSeconds.toFixed(3)}s`
+    }
+    return `${latencyMs}ms`
+  }
+
+  const getMessagePreview = (messages: any[]): string => {
+    if (!Array.isArray(messages) || messages.length === 0) return 'N/A'
+
+    const lastMessage = messages[messages.length - 1]
+    if (typeof lastMessage.content === 'string') {
+      return lastMessage.content.substring(0, 50) + (lastMessage.content.length > 50 ? '...' : '')
+    } else if (Array.isArray(lastMessage.content)) {
+      const textBlock = lastMessage.content.find((block: any) => block.type === 'text')
+      if (textBlock?.text) {
+        return textBlock.text.substring(0, 50) + (textBlock.text.length > 50 ? '...' : '')
+      }
+    }
+    return 'N/A'
   }
 
   const parseSystemReminders = (text: string) => {
@@ -353,8 +366,9 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
 
         {isLoading ? (
           <Card>
-            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
-              <Text>Loading...</Text>
+            <Flex direction="column" align="center" justify="center" gap="3" style={{ padding: '48px' }}>
+              <Spinner size="3" />
+              <Text size="2" color="gray">Loading session analytics...</Text>
             </Flex>
           </Card>
         ) : error ? (
@@ -383,15 +397,14 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                   <Table.Root>
                     <Table.Header>
                       <Table.Row>
-                        <Table.ColumnHeaderCell>Session ID</Table.ColumnHeaderCell>
-                        <SortableHeader column="start_time">Start Time</SortableHeader>
-                        <SortableHeader column="total_requests">Requests</SortableHeader>
+                        <Table.ColumnHeaderCell>Last Message</Table.ColumnHeaderCell>
+                        <SortableHeader column="start_time">Started</SortableHeader>
+                        <SortableHeader column="end_time">Last Updated</SortableHeader>
+                        <SortableHeader column="total_requests">Messages</SortableHeader>
                         <SortableHeader column="total_input_tokens">Input Tokens</SortableHeader>
+                        <SortableHeader column="total_cache_creation_ephemeral_5m_input_tokens">5m Cache Writes</SortableHeader>
+                        <SortableHeader column="total_cache_creation_ephemeral_1h_input_tokens">1h Cache Writes</SortableHeader>
                         <SortableHeader column="total_output_tokens">Output Tokens</SortableHeader>
-                        <SortableHeader column="total_cached_tokens">Cached Tokens</SortableHeader>
-                        <Table.ColumnHeaderCell>Tool Uses</Table.ColumnHeaderCell>
-                        <Table.ColumnHeaderCell>Tool Results</Table.ColumnHeaderCell>
-                        <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
                       </Table.Row>
                     </Table.Header>
                     <Table.Body>
@@ -402,24 +415,17 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                           onClick={() => setSelectedSessionUuid(session.uuid)}
                         >
                           <Table.Cell>
-                            <code style={{ fontSize: '12px' }}>{session.session_id}</code>
+                            <Text size="2" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {session.last_message_preview}
+                            </Text>
                           </Table.Cell>
                           <Table.Cell>{new Date(session.start_time).toLocaleString()}</Table.Cell>
-                          <Table.Cell>{session.total_requests}</Table.Cell>
+                          <Table.Cell>{session.end_time ? new Date(session.end_time).toLocaleString() : 'Active'}</Table.Cell>
+                          <Table.Cell>{session.interaction_count}</Table.Cell>
                           <Table.Cell>{session.total_input_tokens.toLocaleString()}</Table.Cell>
+                          <Table.Cell>{session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Table.Cell>
+                          <Table.Cell>{session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Table.Cell>
                           <Table.Cell>{session.total_output_tokens.toLocaleString()}</Table.Cell>
-                          <Table.Cell>{session.total_cached_tokens.toLocaleString()}</Table.Cell>
-                          <Table.Cell>
-                            <Text size="2" color="gray">-</Text>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Text size="2" color="gray">-</Text>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Badge color={session.end_time ? 'gray' : 'green'}>
-                              {session.end_time ? 'Ended' : 'Active'}
-                            </Badge>
-                          </Table.Cell>
                         </Table.Row>
                       ))}
                     </Table.Body>
@@ -444,8 +450,9 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
 
           <Box style={{ maxHeight: 'calc(90vh - 120px)', overflowY: 'auto' }}>
             {loadingDetail ? (
-              <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
-                <Text>Loading session details...</Text>
+              <Flex direction="column" align="center" justify="center" gap="3" style={{ padding: '48px' }}>
+                <Spinner size="3" />
+                <Text size="2" color="gray">Loading session details...</Text>
               </Flex>
             ) : sessionDetail ? (
               <Flex direction="column" gap="4">
@@ -461,12 +468,16 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                     <Text size="2" weight="bold">{sessionDetail.session.total_input_tokens.toLocaleString()}</Text>
                   </Flex>
                   <Flex justify="between">
-                    <Text size="2" color="gray">Output Tokens</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_output_tokens.toLocaleString()}</Text>
+                    <Text size="2" color="gray">5m Cache Writes</Text>
+                    <Text size="2" weight="bold">{sessionDetail.session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Text>
                   </Flex>
                   <Flex justify="between">
-                    <Text size="2" color="gray">Cached Tokens</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_cached_tokens.toLocaleString()}</Text>
+                    <Text size="2" color="gray">1h Cache Writes</Text>
+                    <Text size="2" weight="bold">{sessionDetail.session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Text>
+                  </Flex>
+                  <Flex justify="between">
+                    <Text size="2" color="gray">Output Tokens</Text>
+                    <Text size="2" weight="bold">{sessionDetail.session.total_output_tokens.toLocaleString()}</Text>
                   </Flex>
                   <Flex justify="between">
                     <Text size="2" color="gray">Tool Uses</Text>
@@ -487,15 +498,16 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
               <Table.Root>
                 <Table.Header>
                   <Table.Row>
-                    <Table.ColumnHeaderCell>Timestamp</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Request</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Response</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Sent</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Latency</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Cached Tokens</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Tool Uses</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Tool Results</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -510,34 +522,45 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                         <Table.Cell>
                           <Flex align="center" gap="1">
                             {expandedInteractionUuid === interaction.uuid ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                            {new Date(interaction.request_timestamp).toLocaleTimeString()}
+                            <Text size="1" style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {getMessagePreview(interaction.request_data?.messages || [])}
+                            </Text>
                           </Flex>
                         </Table.Cell>
-                        <Table.Cell><Badge>{interaction.model}</Badge></Table.Cell>
-                        <Table.Cell>{interaction.latency_ms.toLocaleString()} ms</Table.Cell>
-                        <Table.Cell>{formatTokenDisplay(interaction.input_tokens, JSON.stringify(interaction.request_data?.messages || ''))}</Table.Cell>
-                        <Table.Cell>{formatTokenDisplay(interaction.output_tokens, interaction.response_data?.content || '')}</Table.Cell>
-                        <Table.Cell>{formatTokenDisplay(interaction.cache_read_input_tokens)}</Table.Cell>
-                        <Table.Cell>{getInteractionToolUses(interaction)}</Table.Cell>
-                        <Table.Cell>{getInteractionToolResults(interaction)}</Table.Cell>
+                        <Table.Cell>
+                          <Text size="1" style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {interaction.response_data?.content
+                              ? (typeof interaction.response_data.content === 'string'
+                                  ? interaction.response_data.content.substring(0, 50) + (interaction.response_data.content.length > 50 ? '...' : '')
+                                  : getMessagePreview([{ role: 'assistant', content: interaction.response_data.content }]))
+                              : 'N/A'}
+                          </Text>
+                        </Table.Cell>
+                        <Table.Cell>{new Date(interaction.request_timestamp).toLocaleString()}</Table.Cell>
+                        <Table.Cell>{formatLatency(interaction.latency_ms)}</Table.Cell>
                         <Table.Cell>
                           <Flex align="center" gap="2">
                             <Badge color={interaction.status === 'success' ? 'green' : 'red'}>
                               {interaction.status}
                             </Badge>
-                            {isLikelyMaxTokenError(interaction) && (
-                              <Tooltip content="This error was likely caused by exceeding the max token limit">
-                                <InfoCircledIcon style={{ color: 'var(--orange-9)', cursor: 'help' }} />
+                            {interaction.status === 'error' && interaction.error_message && (
+                              <Tooltip content={`${interaction.error_type || 'Error'}: ${interaction.error_message}`}>
+                                <InfoCircledIcon style={{ color: 'var(--red-9)', cursor: 'help' }} />
                               </Tooltip>
                             )}
                           </Flex>
                         </Table.Cell>
+                        <Table.Cell><Badge>{interaction.model}</Badge></Table.Cell>
+                        <Table.Cell>{formatTokenDisplay(interaction.input_tokens, JSON.stringify(interaction.request_data?.messages || ''))}</Table.Cell>
+                        <Table.Cell>{formatTokenDisplay(interaction.cache_creation_ephemeral_5m_input_tokens)}</Table.Cell>
+                        <Table.Cell>{formatTokenDisplay(interaction.cache_creation_ephemeral_1h_input_tokens)}</Table.Cell>
+                        <Table.Cell>{formatTokenDisplay(interaction.output_tokens, interaction.response_data?.content || '')}</Table.Cell>
                       </Table.Row>
 
                       {/* Expanded Row */}
                       {expandedInteractionUuid === interaction.uuid && (
                         <Table.Row>
-                          <Table.Cell colSpan={9} style={{ maxWidth: '0', width: '100%' }}>
+                          <Table.Cell colSpan={10} style={{ maxWidth: '0', width: '100%' }}>
                             <Card style={{ background: 'var(--gray-2)', maxWidth: '100%', overflow: 'hidden' }}>
                               <Flex direction="column" gap="3" p="3">
                                 {/* Request Metadata Table */}

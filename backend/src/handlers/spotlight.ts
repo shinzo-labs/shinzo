@@ -11,6 +11,8 @@ import {
 } from '../utils'
 import { sequelize } from '../dbClient'
 import { ShinzoCredentials, ProviderCredentials, constructModelAPIHeaders } from '../middleware/auth'
+import { parseSSEStream, processSSEEvent, MessageState } from '../utils/sseParser'
+import { PassThrough } from 'stream'
 
 const TEST_TIMEOUT = 10 * 1000 // 10 seconds
 const COUNT_TOKENS_TIMEOUT = 30 * 1000 // 30 seconds
@@ -478,6 +480,7 @@ export const handleModelProxy = async (
 ) => {
   try {
     const requestTimestamp = new Date()
+    const isStreaming = requestBody.stream === true
 
     const { apiKeyUuid, userUuid } = shinzoCredentials
     const { providerKeyUuid, authType } = providerCredentials
@@ -485,27 +488,17 @@ export const handleModelProxy = async (
     let session: any = null
     const sessionId = requestBody.metadata?.user_id || 'default-session'
 
-    // Future TODO: divorce provider credentials and API key from session, since they can change mid-session
-
-    let [sessionResults] = await sequelize.query(
-      `SELECT uuid, total_requests, total_input_tokens, total_output_tokens, total_cached_tokens
-        FROM spotlight.session
-        WHERE user_uuid = $1 AND shinzo_api_key_uuid = $2 AND session_id = $3 AND end_time IS NULL
-        LIMIT 1`,
-      { bind: [userUuid, apiKeyUuid, sessionId] }
+    // Use INSERT ... ON CONFLICT to prevent race conditions when creating sessions
+    const [sessionResults] = await sequelize.query(
+      `INSERT INTO spotlight.session (user_uuid, api_key_uuid, shinzo_api_key_uuid, session_id, start_time)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (user_uuid, shinzo_api_key_uuid, session_id)
+        WHERE end_time IS NULL
+        DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+        RETURNING uuid, total_requests, total_input_tokens, total_output_tokens, total_cache_creation_ephemeral_5m_input_tokens, total_cache_creation_ephemeral_1h_input_tokens`,
+      { bind: [userUuid, providerKeyUuid, apiKeyUuid, sessionId, requestTimestamp] }
     )
-
-    if (sessionResults?.length) {
-      session = sessionResults[0] as any
-    } else {
-      const [newSessionResults] = await sequelize.query(
-        `INSERT INTO spotlight.session (user_uuid, api_key_uuid, shinzo_api_key_uuid, session_id, start_time)
-          VALUES ($1, $2, $3, $4, $5)
-          RETURNING uuid, total_requests, total_input_tokens, total_output_tokens, total_cached_tokens`,
-        { bind: [userUuid, providerKeyUuid, apiKeyUuid, sessionId, requestTimestamp] }
-      )
-      session = newSessionResults[0] as any
-    }
+    session = sessionResults[0] as any
 
     const [interactionResults] = await sequelize.query(
       `INSERT INTO spotlight.interaction
@@ -532,9 +525,23 @@ export const handleModelProxy = async (
 
     try {
       const url = `${modelProviderBaseURL[provider]}${modelAPISpec[provider].modelProxy}`
-
       const headers = constructModelAPIHeaders(requestHeaders)
 
+      // Handle streaming requests
+      if (isStreaming) {
+        return await handleStreamingRequest(
+          url,
+          headers,
+          requestBody,
+          provider,
+          userUuid,
+          interaction,
+          session,
+          requestTimestamp
+        )
+      }
+
+      // Handle non-streaming requests (original logic)
       const providerResponse = await axios.post(url, requestBody, { headers, timeout: REQUEST_TIMEOUT })
 
       const responseTimestamp = new Date()
@@ -544,15 +551,18 @@ export const handleModelProxy = async (
       const usage = providerResponse.data.usage || {}
       const inputTokens = usage.input_tokens || 0
       const outputTokens = usage.output_tokens || 0
-      const cacheCreationTokens = usage.cache_creation_input_tokens || 0
+      const cacheCreation = usage.cache_creation || {}
+      const cacheCreation5m = cacheCreation.ephemeral_5m_input_tokens || 0
+      const cacheCreation1h = cacheCreation.ephemeral_1h_input_tokens || 0
       const cacheReadTokens = usage.cache_read_input_tokens || 0
 
       await sequelize.query(
         `UPDATE spotlight.interaction
          SET response_timestamp = $1, response_id = $2, stop_reason = $3, latency_ms = $4,
-             input_tokens = $5, output_tokens = $6, cache_creation_input_tokens = $7, cache_read_input_tokens = $8,
-             response_data = $9, status = 'success', updated_at = CURRENT_TIMESTAMP
-         WHERE uuid = $10`,
+             input_tokens = $5, output_tokens = $6, cache_creation_ephemeral_5m_input_tokens = $7,
+             cache_creation_ephemeral_1h_input_tokens = $8, cache_read_input_tokens = $9,
+             response_data = $10, status = 'success', updated_at = CURRENT_TIMESTAMP
+         WHERE uuid = $11`,
         { bind: [
           responseTimestamp,
           providerResponse.data.id || null,
@@ -560,7 +570,8 @@ export const handleModelProxy = async (
           latencyMs,
           inputTokens,
           outputTokens,
-          cacheCreationTokens,
+          cacheCreation5m,
+          cacheCreation1h,
           cacheReadTokens,
           JSON.stringify(providerResponse.data),
           interaction.uuid
@@ -571,10 +582,11 @@ export const handleModelProxy = async (
          SET total_requests = total_requests + 1,
              total_input_tokens = total_input_tokens + $1,
              total_output_tokens = total_output_tokens + $2,
-             total_cached_tokens = total_cached_tokens + $3,
+             total_cache_creation_ephemeral_5m_input_tokens = total_cache_creation_ephemeral_5m_input_tokens + $3,
+             total_cache_creation_ephemeral_1h_input_tokens = total_cache_creation_ephemeral_1h_input_tokens + $4,
              updated_at = CURRENT_TIMESTAMP
-         WHERE uuid = $4`,
-        { bind: [inputTokens, outputTokens, cacheReadTokens, session.uuid] })
+         WHERE uuid = $5`,
+        { bind: [inputTokens, outputTokens, cacheCreation5m, cacheCreation1h, session.uuid] })
 
       return {
         response: providerResponse.data,
@@ -616,6 +628,155 @@ export const handleModelProxy = async (
       response: { error: { type: 'internal_error', message: 'Internal server error' } },
       error: true,
       status: 500
+    }
+  }
+}
+
+async function handleStreamingRequest(
+  url: string,
+  headers: Record<string, string>,
+  requestBody: any,
+  provider: string,
+  userUuid: string,
+  interaction: any,
+  session: any,
+  requestTimestamp: Date
+) {
+  try {
+    // Make streaming request to provider
+    const providerResponse = await axios.post(url, requestBody, {
+      headers,
+      timeout: REQUEST_TIMEOUT,
+      responseType: 'stream'
+    })
+
+    // Create a PassThrough stream to proxy events to the client
+    const clientStream = new PassThrough()
+
+    // Initialize message state for accumulation
+    let messageState: MessageState = {
+      content: [],
+      usage: {}
+    }
+
+    // Process the SSE stream
+    ;(async () => {
+      try {
+        for await (const event of parseSSEStream(providerResponse.data)) {
+          // Update accumulated message state
+          messageState = processSSEEvent(event, messageState)
+
+          // Proxy the event to the client (re-serialize the parsed data)
+          const eventString = `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`
+          clientStream.write(eventString)
+        }
+
+        // Stream complete - save to database
+        const responseTimestamp = new Date()
+        const latencyMs = responseTimestamp.getTime() - requestTimestamp.getTime()
+
+        const usage = messageState.usage || {}
+        const inputTokens = usage.input_tokens || 0
+        const outputTokens = usage.output_tokens || 0
+        const cacheCreation = usage.cache_creation || {}
+        const cacheCreation5m = cacheCreation.ephemeral_5m_input_tokens || 0
+        const cacheCreation1h = cacheCreation.ephemeral_1h_input_tokens || 0
+        const cacheReadTokens = usage.cache_read_input_tokens || 0
+
+        await sequelize.query(
+          `UPDATE spotlight.interaction
+           SET response_timestamp = $1, response_id = $2, stop_reason = $3, latency_ms = $4,
+               input_tokens = $5, output_tokens = $6, cache_creation_ephemeral_5m_input_tokens = $7,
+               cache_creation_ephemeral_1h_input_tokens = $8, cache_read_input_tokens = $9,
+               response_data = $10, status = 'success', updated_at = CURRENT_TIMESTAMP
+           WHERE uuid = $11`,
+          { bind: [
+            responseTimestamp,
+            messageState.id || null,
+            messageState.stop_reason || null,
+            latencyMs,
+            inputTokens,
+            outputTokens,
+            cacheCreation5m,
+            cacheCreation1h,
+            cacheReadTokens,
+            JSON.stringify(messageState),
+            interaction.uuid
+          ] })
+
+        await sequelize.query(
+          `UPDATE spotlight.session
+           SET total_requests = total_requests + 1,
+               total_input_tokens = total_input_tokens + $1,
+               total_output_tokens = total_output_tokens + $2,
+               total_cache_creation_ephemeral_5m_input_tokens = total_cache_creation_ephemeral_5m_input_tokens + $3,
+               total_cache_creation_ephemeral_1h_input_tokens = total_cache_creation_ephemeral_1h_input_tokens + $4,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE uuid = $5`,
+          { bind: [inputTokens, outputTokens, cacheCreation5m, cacheCreation1h, session.uuid] })
+
+        logger.info({
+          message: 'Streaming response completed',
+          interactionUuid: interaction.uuid,
+          messageId: messageState.id
+        })
+
+        clientStream.end()
+      } catch (streamError: any) {
+        logger.error({
+          message: 'Error processing SSE stream',
+          error: streamError,
+          provider,
+          userUuid
+        })
+
+        await sequelize.query(
+          `UPDATE spotlight.interaction
+           SET error_message = $1, error_type = $2, status = 'error', updated_at = CURRENT_TIMESTAMP
+           WHERE uuid = $3`,
+          { bind: [
+            streamError.message,
+            'stream_processing_error',
+            interaction.uuid
+          ] })
+
+        clientStream.destroy(streamError)
+      }
+    })()
+
+    return {
+      stream: clientStream,
+      responseHeaders: providerResponse.headers,
+      status: providerResponse.status,
+      isStreaming: true
+    }
+  } catch (error: any) {
+    logger.error({
+      message: 'Error initiating streaming request',
+      error,
+      provider,
+      userUuid
+    })
+
+    await sequelize.query(
+      `UPDATE spotlight.interaction
+       SET error_message = $1, error_type = $2, status = 'error', updated_at = CURRENT_TIMESTAMP
+       WHERE uuid = $3`,
+      { bind: [
+        error.message,
+        error.response?.data?.error?.type || 'unknown',
+        interaction.uuid
+      ] })
+
+    return {
+      response: {
+        error: {
+          type: 'provider_error',
+          message: error.response?.data?.error?.message || error.message,
+        }
+      },
+      error: true,
+      status: error.response?.status || 500
     }
   }
 }
@@ -811,7 +972,8 @@ export const handleFetchTokenAnalytics = async (
         'input_tokens',
         'output_tokens',
         'cache_read_input_tokens',
-        'cache_creation_input_tokens',
+        'cache_creation_ephemeral_5m_input_tokens',
+        'cache_creation_ephemeral_1h_input_tokens',
       ],
       raw: true,
     })
@@ -820,7 +982,8 @@ export const handleFetchTokenAnalytics = async (
     const totalInputTokens = interactions.reduce((sum, i: any) => sum + (i.input_tokens || 0), 0)
     const totalOutputTokens = interactions.reduce((sum, i: any) => sum + (i.output_tokens || 0), 0)
     const totalCachedTokens = interactions.reduce((sum, i: any) => sum + (i.cache_read_input_tokens || 0), 0)
-    const totalCacheCreationTokens = interactions.reduce((sum, i: any) => sum + (i.cache_creation_input_tokens || 0), 0)
+    const totalCacheCreation5mTokens = interactions.reduce((sum, i: any) => sum + (i.cache_creation_ephemeral_5m_input_tokens || 0), 0)
+    const totalCacheCreation1hTokens = interactions.reduce((sum, i: any) => sum + (i.cache_creation_ephemeral_1h_input_tokens || 0), 0)
 
     // Group by model
     const byModel: Record<string, any> = {}
@@ -831,14 +994,16 @@ export const handleFetchTokenAnalytics = async (
           input_tokens: 0,
           output_tokens: 0,
           cached_tokens: 0,
-          cache_creation_tokens: 0,
+          cache_creation_5m_tokens: 0,
+          cache_creation_1h_tokens: 0,
           request_count: 0,
         }
       }
       byModel[model].input_tokens += interaction.input_tokens || 0
       byModel[model].output_tokens += interaction.output_tokens || 0
       byModel[model].cached_tokens += interaction.cache_read_input_tokens || 0
-      byModel[model].cache_creation_tokens += interaction.cache_creation_input_tokens || 0
+      byModel[model].cache_creation_5m_tokens += interaction.cache_creation_ephemeral_5m_input_tokens || 0
+      byModel[model].cache_creation_1h_tokens += interaction.cache_creation_ephemeral_1h_input_tokens || 0
       byModel[model].request_count += 1
     }
 
@@ -848,7 +1013,8 @@ export const handleFetchTokenAnalytics = async (
           total_input_tokens: totalInputTokens,
           total_output_tokens: totalOutputTokens,
           total_cached_tokens: totalCachedTokens,
-          total_cache_creation_tokens: totalCacheCreationTokens,
+          total_cache_creation_5m_tokens: totalCacheCreation5mTokens,
+          total_cache_creation_1h_tokens: totalCacheCreation1hTokens,
           total_requests: interactions.length,
         },
         by_model: byModel,
@@ -890,6 +1056,53 @@ export const handleFetchSessionAnalytics = async (
       limit: 100,
     })
 
+    const getLastMessagePreview = (interactions: any[]): string => {
+      if (!interactions || interactions.length === 0) return 'No messages'
+
+      // Sort by request_timestamp to get the last interaction
+      const sortedInteractions = [...interactions].sort((a, b) =>
+        new Date(b.request_timestamp).getTime() - new Date(a.request_timestamp).getTime()
+      )
+      const lastInteraction = sortedInteractions[0]
+
+      // Try to get response content first, fallback to request
+      let messageContent = ''
+
+      if (lastInteraction.response_data?.content) {
+        const content = lastInteraction.response_data.content
+        if (typeof content === 'string') {
+          messageContent = content
+        } else if (Array.isArray(content)) {
+          const textBlock = content.find((block: any) => block.type === 'text')
+          if (textBlock?.text) {
+            messageContent = textBlock.text
+          }
+        }
+      }
+
+      // Fallback to request if no response
+      if (!messageContent && lastInteraction.request_data?.messages) {
+        const messages = lastInteraction.request_data.messages
+        if (Array.isArray(messages) && messages.length > 0) {
+          const lastMessage = messages[messages.length - 1]
+          if (typeof lastMessage.content === 'string') {
+            messageContent = lastMessage.content
+          } else if (Array.isArray(lastMessage.content)) {
+            const textBlock = lastMessage.content.find((block: any) => block.type === 'text')
+            if (textBlock?.text) {
+              messageContent = textBlock.text
+            }
+          }
+        }
+      }
+
+      // Truncate to 100 characters
+      if (messageContent.length > 100) {
+        return messageContent.substring(0, 100) + '...'
+      }
+      return messageContent || 'No text content'
+    }
+
     return {
       response: {
         sessions: sessions.map(session => ({
@@ -900,8 +1113,10 @@ export const handleFetchSessionAnalytics = async (
           total_requests: session.total_requests,
           total_input_tokens: session.total_input_tokens,
           total_output_tokens: session.total_output_tokens,
-          total_cached_tokens: session.total_cached_tokens,
+          total_cache_creation_ephemeral_5m_input_tokens: session.total_cache_creation_ephemeral_5m_input_tokens,
+          total_cache_creation_ephemeral_1h_input_tokens: session.total_cache_creation_ephemeral_1h_input_tokens,
           interaction_count: (session as any).interactions?.length || 0,
+          last_message_preview: getLastMessagePreview((session as any).interactions || []),
         })),
         total_sessions: sessions.length,
       },
@@ -959,7 +1174,8 @@ export const handleFetchSessionDetail = async (userUuid: string, sessionUuid: st
         total_requests: session.total_requests,
         total_input_tokens: session.total_input_tokens,
         total_output_tokens: session.total_output_tokens,
-        total_cached_tokens: session.total_cached_tokens,
+        total_cache_creation_ephemeral_5m_input_tokens: session.total_cache_creation_ephemeral_5m_input_tokens,
+        total_cache_creation_ephemeral_1h_input_tokens: session.total_cache_creation_ephemeral_1h_input_tokens,
       },
       interactions: (session as any).interactions?.map((interaction: any) => ({
         uuid: interaction.uuid,
@@ -970,9 +1186,12 @@ export const handleFetchSessionDetail = async (userUuid: string, sessionUuid: st
         input_tokens: interaction.input_tokens || 0,
         output_tokens: interaction.output_tokens || 0,
         cache_read_input_tokens: interaction.cache_read_input_tokens || 0,
-        cache_creation_input_tokens: interaction.cache_creation_input_tokens || 0,
+        cache_creation_ephemeral_5m_input_tokens: interaction.cache_creation_ephemeral_5m_input_tokens || 0,
+        cache_creation_ephemeral_1h_input_tokens: interaction.cache_creation_ephemeral_1h_input_tokens || 0,
         latency_ms: interaction.latency_ms || 0,
         status: interaction.status,
+        error_type: interaction.error_type,
+        error_message: interaction.error_message,
         request_data: interaction.request_data,
         response_data: interaction.response_data,
         tool_usages: interaction.toolUsages?.map((tu: any) => ({

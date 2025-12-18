@@ -18,7 +18,8 @@ export class Interaction extends CommonModel {
   public latency_ms!: number | null
   public input_tokens!: number | null
   public output_tokens!: number | null
-  public cache_creation_input_tokens!: number
+  public cache_creation_ephemeral_5m_input_tokens!: number
+  public cache_creation_ephemeral_1h_input_tokens!: number
   public cache_read_input_tokens!: number
   public request_data!: object
   public response_data!: object | null
@@ -95,7 +96,12 @@ export class Interaction extends CommonModel {
           type: DataTypes.INTEGER,
           allowNull: true,
         },
-        cache_creation_input_tokens: {
+        cache_creation_ephemeral_5m_input_tokens: {
+          type: DataTypes.INTEGER,
+          allowNull: false,
+          defaultValue: 0,
+        },
+        cache_creation_ephemeral_1h_input_tokens: {
           type: DataTypes.INTEGER,
           allowNull: false,
           defaultValue: 0,
