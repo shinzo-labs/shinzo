@@ -1,4 +1,4 @@
-\restrict lxlhUWfl6NOD5HSKhZbBALH43MxdJInPHgh2rmvQBFKEsEcctRwLSzrrx4q09LB
+\restrict PEshDDVzRxeAfr0n3QKZQUlOu7suiZvwVfSdRyEHzyjWeVGuQChqsvmoayMttcz
 
 -- Dumped from database version 15.14 (Homebrew)
 -- Dumped by pg_dump version 17.6
@@ -431,7 +431,6 @@ CREATE TABLE spotlight.interaction (
     latency_ms integer,
     input_tokens integer,
     output_tokens integer,
-    cache_creation_input_tokens integer DEFAULT 0,
     cache_read_input_tokens integer DEFAULT 0,
     request_data jsonb NOT NULL,
     response_data jsonb,
@@ -440,6 +439,8 @@ CREATE TABLE spotlight.interaction (
     status text DEFAULT 'pending'::text NOT NULL,
     shinzo_api_key_uuid uuid,
     auth_type text,
+    cache_creation_ephemeral_5m_input_tokens integer DEFAULT 0 NOT NULL,
+    cache_creation_ephemeral_1h_input_tokens integer DEFAULT 0 NOT NULL,
     CONSTRAINT interaction_auth_type_check CHECK ((auth_type = ANY (ARRAY['api_key'::text, 'subscription'::text, 'unknown'::text]))),
     CONSTRAINT interaction_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'success'::text, 'error'::text])))
 );
@@ -516,8 +517,9 @@ CREATE TABLE spotlight.session (
     total_requests integer DEFAULT 0,
     total_input_tokens integer DEFAULT 0,
     total_output_tokens integer DEFAULT 0,
-    total_cached_tokens integer DEFAULT 0,
-    shinzo_api_key_uuid uuid
+    shinzo_api_key_uuid uuid,
+    total_cache_creation_ephemeral_5m_input_tokens integer DEFAULT 0 NOT NULL,
+    total_cache_creation_ephemeral_1h_input_tokens integer DEFAULT 0 NOT NULL
 );
 
 
@@ -1333,6 +1335,13 @@ CREATE INDEX idx_provider_key_user ON spotlight.provider_key USING btree (user_u
 
 
 --
+-- Name: idx_session_active_unique; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_session_active_unique ON spotlight.session USING btree (user_uuid, shinzo_api_key_uuid, session_id) WHERE (end_time IS NULL);
+
+
+--
 -- Name: idx_session_api_key; Type: INDEX; Schema: spotlight; Owner: -
 --
 
@@ -1344,6 +1353,13 @@ CREATE INDEX idx_session_api_key ON spotlight.session USING btree (api_key_uuid)
 --
 
 CREATE INDEX idx_session_id ON spotlight.session USING btree (session_id);
+
+
+--
+-- Name: idx_session_lookup; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_session_lookup ON spotlight.session USING btree (user_uuid, shinzo_api_key_uuid, session_id, end_time);
 
 
 --
@@ -1961,7 +1977,7 @@ ALTER TABLE ONLY spotlight.user_analytics
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lxlhUWfl6NOD5HSKhZbBALH43MxdJInPHgh2rmvQBFKEsEcctRwLSzrrx4q09LB
+\unrestrict PEshDDVzRxeAfr0n3QKZQUlOu7suiZvwVfSdRyEHzyjWeVGuQChqsvmoayMttcz
 
 
 --
@@ -1981,4 +1997,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20251204000000'),
     ('20251204000001'),
     ('20251210000000'),
-    ('20251213000000');
+    ('20251213000000'),
+    ('20251217000000'),
+    ('20251218000000');

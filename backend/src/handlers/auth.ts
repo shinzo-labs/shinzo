@@ -52,16 +52,6 @@ function generateJWT(user: User): string {
 
 export const handleCreateUser = async (request: yup.InferType<typeof createUserSchema>) => {
   try {
-    const existingUser = await User.findOne({ where: { email: request.email } })
-
-    if (existingUser) {
-      return {
-        response: 'Email already exists',
-        error: true,
-        status: 409
-      }
-    }
-
     // Get the free tier for new users
     const freeTier = await SubscriptionTier.findOne({ where: { tier: 'free' } })
     if (!freeTier) {
@@ -78,15 +68,29 @@ export const handleCreateUser = async (request: yup.InferType<typeof createUserS
     const emailToken = generateEmailToken()
     const emailTokenExpiry = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
-    const user = await User.create({
-      email: request.email,
-      password_hash: passwordHash,
-      password_salt: salt,
-      email_token: emailToken,
-      email_token_expiry: emailTokenExpiry,
-      verified: false,
-      subscription_tier_uuid: freeTier.uuid,
+    // Use findOrCreate to prevent race conditions on concurrent user registrations
+    // The unique constraint on email will be enforced at the database level
+    const [user, created] = await User.findOrCreate({
+      where: { email: request.email },
+      defaults: {
+        email: request.email,
+        password_hash: passwordHash,
+        password_salt: salt,
+        email_token: emailToken,
+        email_token_expiry: emailTokenExpiry,
+        verified: false,
+        subscription_tier_uuid: freeTier.uuid,
+      }
     })
+
+    if (!created) {
+      // User already exists
+      return {
+        response: 'Email already exists',
+        error: true,
+        status: 409
+      }
+    }
 
     logger.info({ message: 'User created successfully', email: request.email, uuid: user.uuid })
 
@@ -362,16 +366,19 @@ export const verifyJWT = (token: string): { uuid: string; email: string; verifie
 }
 
 export const handleFetchUserQuota = async (userUuid: string) => {
+  const transaction = await User.sequelize!.transaction()
+
   try {
+    // Use SELECT FOR UPDATE to prevent race conditions on counter reset
+    // Note: We lock only the user table, not the join, to avoid PostgreSQL limitations
     const user = await User.findOne({
       where: { uuid: userUuid },
-      include: [{
-        model: SubscriptionTier,
-        as: 'subscriptionTier'
-      }]
+      lock: transaction.LOCK.UPDATE,
+      transaction
     })
 
     if (!user) {
+      await transaction.rollback()
       return {
         response: 'User not found',
         error: true,
@@ -389,24 +396,28 @@ export const handleFetchUserQuota = async (userUuid: string) => {
       await user.update({
         monthly_counter: 0,
         last_counter_reset: now
-      })
+      }, { transaction })
       currentCounter = 0
     }
 
-    const subscriptionTier = (user as any).subscriptionTier
+    await transaction.commit()
+
+    // Fetch subscription tier separately (after transaction commits)
+    const subscriptionTier = await SubscriptionTier.findByPk(user.subscription_tier_uuid)
 
     return {
       response: {
         currentUsage: currentCounter,
         monthlyQuota: subscriptionTier?.monthly_quota,
         tier: subscriptionTier?.tier,
-        lastCounterReset: user.last_counter_reset,
+        lastCounterReset: now,
         subscribedOn: user.subscribed_on
       },
       status: 200
     }
 
   } catch (error) {
+    await transaction.rollback()
     logger.error({ message: 'Error fetching user quota', error })
     return {
       response: 'Error fetching user quota',

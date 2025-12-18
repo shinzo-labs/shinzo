@@ -86,13 +86,15 @@ const mcpTelemetryItems = {
 
 export const Sidebar: React.FC = () => {
   const location = useLocation()
-  const { hasTelemetry } = useHasTelemetry()
-  const { hasSpotlightData } = useHasSpotlightData()
+  const { hasTelemetry, loading: telemetryLoading } = useHasTelemetry()
+  const { hasSpotlightData, loading: spotlightLoading } = useHasSpotlightData()
 
   // Filter navigation items based on whether user has telemetry data
+  // While loading, default to showing normal buttons to avoid whiplash
+  // Only show "Getting Started" if we've confirmed there's no data (!loading && !hasData)
   const sidebarConfig = [
-    hasSpotlightData ? aiAnalyticsItems : aiAnalyticsGettingStarted,
-    hasTelemetry ? mcpTelemetryItems : mcpTelemetryOnboarding,
+    (spotlightLoading || hasSpotlightData) ? aiAnalyticsItems : aiAnalyticsGettingStarted,
+    (telemetryLoading || hasTelemetry) ? mcpTelemetryItems : mcpTelemetryOnboarding,
   ]
 
   return (
