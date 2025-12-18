@@ -75,13 +75,19 @@ export const AppRoute: React.FC<AppRouteProps> = ({
   if (requireOnboarding) {
     const isGettingStartedPage = location.pathname === '/getting-started' || location.pathname === '/spotlight/getting-started'
 
+    // Pages that should always be accessible (analytics pages, settings, etc.)
+    const isAlwaysAccessiblePage = location.pathname.startsWith('/spotlight/session-analytics') ||
+                                   location.pathname.startsWith('/spotlight/api-keys') ||
+                                   location.pathname.startsWith('/settings') ||
+                                   location.pathname === '/dashboard'
+
     // Getting-started pages require a completed survey
     if (isGettingStartedPage && !survey) {
       return <Navigate to="/dashboard" replace />
     }
 
     // For non-getting-started pages, check survey completion
-    if (!isGettingStartedPage) {
+    if (!isGettingStartedPage && !isAlwaysAccessiblePage) {
       // Pages that are allowed when survey is not completed
       const allowedPagesWithoutSurvey = ['/dashboard', '/login', '/register']
       const isOnAllowedPage = allowedPagesWithoutSurvey.includes(location.pathname)

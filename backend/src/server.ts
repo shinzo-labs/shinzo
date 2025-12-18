@@ -86,6 +86,11 @@ import {
   handleFetchSessionAnalytics,
   handleFetchSessionDetail,
   fetchAnalyticsSchema,
+  // Session sharing handlers
+  handleCreateSessionShare,
+  handleDeleteSessionShare,
+  handleGetSessionShareStatus,
+  handleFetchSharedSessionDetail,
 } from './handlers/spotlight'
 
 // Create Fastify instance
@@ -867,6 +872,61 @@ app.get('/spotlight/analytics/sessions/:sessionUuid', async (request: Authentica
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Fetch session detail error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// Session sharing endpoints
+app.post('/spotlight/analytics/sessions/:sessionUuid/share', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { sessionUuid } = request.params as { sessionUuid: string }
+    const result = await handleCreateSessionShare(request.user!.uuid, sessionUuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Create session share error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.delete('/spotlight/analytics/sessions/:sessionUuid/share', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { sessionUuid } = request.params as { sessionUuid: string }
+    const result = await handleDeleteSessionShare(request.user!.uuid, sessionUuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Delete session share error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.get('/spotlight/analytics/sessions/:sessionUuid/share', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { sessionUuid } = request.params as { sessionUuid: string }
+    const result = await handleGetSessionShareStatus(request.user!.uuid, sessionUuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Get session share status error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// Public shared session endpoint (no authentication required)
+app.get('/spotlight/analytics/sessions/shared/:shareToken', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const { shareToken } = request.params as { shareToken: string }
+    const result = await handleFetchSharedSessionDetail(shareToken)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch shared session detail error', error })
     reply.status(500).send({ error: 'Internal server error' })
   }
 })
