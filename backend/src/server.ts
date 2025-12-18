@@ -5,6 +5,12 @@ import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE, LOG_LEVEL } 
 import { logger, pinoConfig } from './logger'
 import { sequelize } from './dbClient'
 import { authenticateJWT, AuthenticatedRequest, authenticatedShinzoCredentials, getProviderCredentials, constructModelAPIResponseHeaders } from './middleware/auth'
+import { PassThrough } from 'stream'
+
+// Type guard for streaming responses
+function isStreamingResponse(result: any): result is { stream: PassThrough; isStreaming: true; status: number; responseHeaders: any } {
+  return result.isStreaming === true && result.stream instanceof PassThrough
+}
 
 // Import handlers
 import {
@@ -787,6 +793,17 @@ app.all('/spotlight/:provider/v1/*', async (request: FastifyRequest, reply: Fast
 
     constructModelAPIResponseHeaders(result, reply)
 
+    // Handle streaming responses
+    if (isStreamingResponse(result)) {
+      reply.status(result.status || 200)
+      reply.header('Content-Type', 'text/event-stream')
+      reply.header('Cache-Control', 'no-cache')
+      reply.header('Connection', 'keep-alive')
+      reply.header('X-Accel-Buffering', 'no') // Disable buffering for nginx
+      return reply.send(result.stream)
+    }
+
+    // Handle normal responses
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Model provider proxy error', error })

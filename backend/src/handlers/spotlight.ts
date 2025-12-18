@@ -11,6 +11,8 @@ import {
 } from '../utils'
 import { sequelize } from '../dbClient'
 import { ShinzoCredentials, ProviderCredentials, constructModelAPIHeaders } from '../middleware/auth'
+import { parseSSEStream, processSSEEvent, MessageState } from '../utils/sseParser'
+import { PassThrough } from 'stream'
 
 const TEST_TIMEOUT = 10 * 1000 // 10 seconds
 const COUNT_TOKENS_TIMEOUT = 30 * 1000 // 30 seconds
@@ -478,6 +480,7 @@ export const handleModelProxy = async (
 ) => {
   try {
     const requestTimestamp = new Date()
+    const isStreaming = requestBody.stream === true
 
     const { apiKeyUuid, userUuid } = shinzoCredentials
     const { providerKeyUuid, authType } = providerCredentials
@@ -485,11 +488,7 @@ export const handleModelProxy = async (
     let session: any = null
     const sessionId = requestBody.metadata?.user_id || 'default-session'
 
-    // Future TODO: divorce provider credentials and API key from session, since they can change mid-session
-
     // Use INSERT ... ON CONFLICT to prevent race conditions when creating sessions
-    // This relies on the partial unique index: idx_session_active_unique
-    // The index ensures only one active session (end_time IS NULL) can exist per (user_uuid, shinzo_api_key_uuid, session_id)
     const [sessionResults] = await sequelize.query(
       `INSERT INTO spotlight.session (user_uuid, api_key_uuid, shinzo_api_key_uuid, session_id, start_time)
         VALUES ($1, $2, $3, $4, $5)
@@ -526,49 +525,27 @@ export const handleModelProxy = async (
 
     try {
       const url = `${modelProviderBaseURL[provider]}${modelAPISpec[provider].modelProxy}`
-
       const headers = constructModelAPIHeaders(requestHeaders)
 
+      // Handle streaming requests
+      if (isStreaming) {
+        return await handleStreamingRequest(
+          url,
+          headers,
+          requestBody,
+          provider,
+          userUuid,
+          interaction,
+          session,
+          requestTimestamp
+        )
+      }
+
+      // Handle non-streaming requests (original logic)
       const providerResponse = await axios.post(url, requestBody, { headers, timeout: REQUEST_TIMEOUT })
 
       const responseTimestamp = new Date()
       const latencyMs = responseTimestamp.getTime() - requestTimestamp.getTime()
-
-      // Example providerResponse.data:
-      /*
-      {
-          "id": "msg_01M22yKge2ke1bswd5xC78UV",
-          "role": "assistant",
-          "type": "message",
-          "model": "claude-sonnet-4-5-20250929",
-          "usage": {
-              "input_tokens": 5,
-              "service_tier": "standard",
-              "output_tokens": 124,
-              "cache_creation": {
-                  "ephemeral_1h_input_tokens": 0,
-                  "ephemeral_5m_input_tokens": 163
-              },
-              "cache_read_input_tokens": 48551,
-              "cache_creation_input_tokens": 163
-          },
-          "content": [
-              {
-                  "id": "toolu_01JyJacJDi6ZL6zp3Nst9ciQ",
-                  "name": "Grep",
-                  "type": "tool_use",
-                  "input": {
-                      "-C": 3,
-                      "path": "shinzo-platform-v1/backend/src/server.ts",
-                      "pattern": "spotlight/analytics/users",
-                      "output_mode": "content"
-                  }
-              }
-          ],
-          "stop_reason": "tool_use",
-          "stop_sequence": null
-      }
-      */
 
       // Extract usage data
       const usage = providerResponse.data.usage || {}
@@ -651,6 +628,155 @@ export const handleModelProxy = async (
       response: { error: { type: 'internal_error', message: 'Internal server error' } },
       error: true,
       status: 500
+    }
+  }
+}
+
+async function handleStreamingRequest(
+  url: string,
+  headers: Record<string, string>,
+  requestBody: any,
+  provider: string,
+  userUuid: string,
+  interaction: any,
+  session: any,
+  requestTimestamp: Date
+) {
+  try {
+    // Make streaming request to provider
+    const providerResponse = await axios.post(url, requestBody, {
+      headers,
+      timeout: REQUEST_TIMEOUT,
+      responseType: 'stream'
+    })
+
+    // Create a PassThrough stream to proxy events to the client
+    const clientStream = new PassThrough()
+
+    // Initialize message state for accumulation
+    let messageState: MessageState = {
+      content: [],
+      usage: {}
+    }
+
+    // Process the SSE stream
+    ;(async () => {
+      try {
+        for await (const event of parseSSEStream(providerResponse.data)) {
+          // Update accumulated message state
+          messageState = processSSEEvent(event, messageState)
+
+          // Proxy the event to the client (re-serialize the parsed data)
+          const eventString = `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`
+          clientStream.write(eventString)
+        }
+
+        // Stream complete - save to database
+        const responseTimestamp = new Date()
+        const latencyMs = responseTimestamp.getTime() - requestTimestamp.getTime()
+
+        const usage = messageState.usage || {}
+        const inputTokens = usage.input_tokens || 0
+        const outputTokens = usage.output_tokens || 0
+        const cacheCreation = usage.cache_creation || {}
+        const cacheCreation5m = cacheCreation.ephemeral_5m_input_tokens || 0
+        const cacheCreation1h = cacheCreation.ephemeral_1h_input_tokens || 0
+        const cacheReadTokens = usage.cache_read_input_tokens || 0
+
+        await sequelize.query(
+          `UPDATE spotlight.interaction
+           SET response_timestamp = $1, response_id = $2, stop_reason = $3, latency_ms = $4,
+               input_tokens = $5, output_tokens = $6, cache_creation_ephemeral_5m_input_tokens = $7,
+               cache_creation_ephemeral_1h_input_tokens = $8, cache_read_input_tokens = $9,
+               response_data = $10, status = 'success', updated_at = CURRENT_TIMESTAMP
+           WHERE uuid = $11`,
+          { bind: [
+            responseTimestamp,
+            messageState.id || null,
+            messageState.stop_reason || null,
+            latencyMs,
+            inputTokens,
+            outputTokens,
+            cacheCreation5m,
+            cacheCreation1h,
+            cacheReadTokens,
+            JSON.stringify(messageState),
+            interaction.uuid
+          ] })
+
+        await sequelize.query(
+          `UPDATE spotlight.session
+           SET total_requests = total_requests + 1,
+               total_input_tokens = total_input_tokens + $1,
+               total_output_tokens = total_output_tokens + $2,
+               total_cache_creation_ephemeral_5m_input_tokens = total_cache_creation_ephemeral_5m_input_tokens + $3,
+               total_cache_creation_ephemeral_1h_input_tokens = total_cache_creation_ephemeral_1h_input_tokens + $4,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE uuid = $5`,
+          { bind: [inputTokens, outputTokens, cacheCreation5m, cacheCreation1h, session.uuid] })
+
+        logger.info({
+          message: 'Streaming response completed',
+          interactionUuid: interaction.uuid,
+          messageId: messageState.id
+        })
+
+        clientStream.end()
+      } catch (streamError: any) {
+        logger.error({
+          message: 'Error processing SSE stream',
+          error: streamError,
+          provider,
+          userUuid
+        })
+
+        await sequelize.query(
+          `UPDATE spotlight.interaction
+           SET error_message = $1, error_type = $2, status = 'error', updated_at = CURRENT_TIMESTAMP
+           WHERE uuid = $3`,
+          { bind: [
+            streamError.message,
+            'stream_processing_error',
+            interaction.uuid
+          ] })
+
+        clientStream.destroy(streamError)
+      }
+    })()
+
+    return {
+      stream: clientStream,
+      responseHeaders: providerResponse.headers,
+      status: providerResponse.status,
+      isStreaming: true
+    }
+  } catch (error: any) {
+    logger.error({
+      message: 'Error initiating streaming request',
+      error,
+      provider,
+      userUuid
+    })
+
+    await sequelize.query(
+      `UPDATE spotlight.interaction
+       SET error_message = $1, error_type = $2, status = 'error', updated_at = CURRENT_TIMESTAMP
+       WHERE uuid = $3`,
+      { bind: [
+        error.message,
+        error.response?.data?.error?.type || 'unknown',
+        interaction.uuid
+      ] })
+
+    return {
+      response: {
+        error: {
+          type: 'provider_error',
+          message: error.response?.data?.error?.message || error.message,
+        }
+      },
+      error: true,
+      status: error.response?.status || 500
     }
   }
 }
