@@ -1103,9 +1103,39 @@ export const handleFetchSessionAnalytics = async (
       return messageContent || 'No text content'
     }
 
-    return {
-      response: {
-        sessions: sessions.map(session => ({
+    // Fetch or create shareToken for each session
+    const sessionsWithShareTokens = await Promise.all(
+      sessions.map(async (session) => {
+        // Check if shareToken exists
+        const [shareResults] = await sequelize.query(
+          `SELECT share_token FROM spotlight.session_share WHERE session_uuid = $1`,
+          { bind: [session.uuid] }
+        )
+
+        let shareToken: string
+        if (shareResults && (shareResults as any).length > 0) {
+          shareToken = (shareResults as any)[0].share_token
+        } else {
+          // Create new shareToken with sharing disabled by default
+          shareToken = generateShareToken()
+          await sequelize.query(
+            `INSERT INTO spotlight.session_share (session_uuid, user_uuid, share_token, is_active)
+             VALUES ($1, $2, $3, false)
+             ON CONFLICT (session_uuid) DO NOTHING`,
+            { bind: [session.uuid, userUuid, shareToken] }
+          )
+
+          // Re-query to get the actual shareToken (in case of conflict)
+          const [refetchResults] = await sequelize.query(
+            `SELECT share_token FROM spotlight.session_share WHERE session_uuid = $1`,
+            { bind: [session.uuid] }
+          )
+          if (refetchResults && (refetchResults as any).length > 0) {
+            shareToken = (refetchResults as any)[0].share_token
+          }
+        }
+
+        return {
           uuid: session.uuid,
           session_id: session.session_id,
           start_time: session.start_time,
@@ -1113,11 +1143,19 @@ export const handleFetchSessionAnalytics = async (
           total_requests: session.total_requests,
           total_input_tokens: session.total_input_tokens,
           total_output_tokens: session.total_output_tokens,
+          total_cache_read_input_tokens: (session as any).interactions?.reduce((sum: number, interaction: any) => sum + (interaction.cache_read_input_tokens || 0), 0) || 0,
           total_cache_creation_ephemeral_5m_input_tokens: session.total_cache_creation_ephemeral_5m_input_tokens,
           total_cache_creation_ephemeral_1h_input_tokens: session.total_cache_creation_ephemeral_1h_input_tokens,
           interaction_count: (session as any).interactions?.length || 0,
           last_message_preview: getLastMessagePreview((session as any).interactions || []),
-        })),
+          share_token: shareToken,
+        }
+      })
+    )
+
+    return {
+      response: {
+        sessions: sessionsWithShareTokens,
         total_sessions: sessions.length,
       },
       status: 200
@@ -1135,7 +1173,7 @@ export const handleFetchSessionAnalytics = async (
 export const handleFetchSessionDetail = async (userUuid: string, sessionUuid: string) => {
   try {
     logger.debug({ message: 'Fetching session detail', userUuid, sessionUuid })
-    
+
     const session = await Session.findOne({
       where: { uuid: sessionUuid, user_uuid: userUuid },
       include: [
@@ -1174,6 +1212,7 @@ export const handleFetchSessionDetail = async (userUuid: string, sessionUuid: st
         total_requests: session.total_requests,
         total_input_tokens: session.total_input_tokens,
         total_output_tokens: session.total_output_tokens,
+        total_cache_read_input_tokens: (session as any).interactions?.reduce((sum: number, interaction: any) => sum + (interaction.cache_read_input_tokens || 0), 0) || 0,
         total_cache_creation_ephemeral_5m_input_tokens: session.total_cache_creation_ephemeral_5m_input_tokens,
         total_cache_creation_ephemeral_1h_input_tokens: session.total_cache_creation_ephemeral_1h_input_tokens,
       },
@@ -1212,6 +1251,412 @@ export const handleFetchSessionDetail = async (userUuid: string, sessionUuid: st
     logger.error({ message: 'Error fetching session detail', error, userUuid, sessionUuid })
     return {
       response: 'Error fetching session detail',
+      error: true,
+      status: 500
+    }
+  }
+}
+
+export const handleFetchSessionDetailByShareToken = async (userUuid: string, shareToken: string) => {
+  try {
+    logger.debug({ message: 'Fetching session detail by share token', userUuid, shareToken })
+
+    // Get session UUID from share token
+    const [shareResults] = await sequelize.query(
+      `SELECT session_uuid, is_active, user_uuid as owner_uuid
+       FROM spotlight.session_share
+       WHERE share_token = $1`,
+      { bind: [shareToken] }
+    )
+
+    if (!shareResults || (shareResults as any).length === 0) {
+      return {
+        response: 'Session not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    const share = (shareResults as any)[0]
+
+    // Fetch session details
+    const session = await Session.findOne({
+      where: { uuid: share.session_uuid },
+      include: [
+        {
+          model: Interaction,
+          as: 'interactions',
+          include: [
+            {
+              model: ToolUsage,
+              as: 'toolUsages',
+            }
+          ],
+          separate: true,
+          order: [['request_timestamp', 'DESC']],
+        }
+      ]
+    })
+
+    if (!session) {
+      return {
+        response: 'Session not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    const isOwner = session.user_uuid === userUuid
+
+    // Non-owners can only access if sharing is active
+    if (!isOwner && !share.is_active) {
+      return {
+        response: 'This shared session is no longer available',
+        error: true,
+        status: 403
+      }
+    }
+
+    const response = {
+      session: {
+        uuid: session.uuid,
+        session_id: session.session_id,
+        start_time: session.start_time,
+        end_time: session.end_time,
+        total_requests: session.total_requests,
+        total_input_tokens: session.total_input_tokens,
+        total_output_tokens: session.total_output_tokens,
+        total_cache_read_input_tokens: (session as any).interactions?.reduce((sum: number, interaction: any) => sum + (interaction.cache_read_input_tokens || 0), 0) || 0,
+        total_cache_creation_ephemeral_5m_input_tokens: session.total_cache_creation_ephemeral_5m_input_tokens,
+        total_cache_creation_ephemeral_1h_input_tokens: session.total_cache_creation_ephemeral_1h_input_tokens,
+      },
+      interactions: (session as any).interactions?.map((interaction: any) => ({
+        uuid: interaction.uuid,
+        request_timestamp: interaction.request_timestamp,
+        response_timestamp: interaction.response_timestamp,
+        model: interaction.model,
+        provider: interaction.provider,
+        input_tokens: interaction.input_tokens || 0,
+        output_tokens: interaction.output_tokens || 0,
+        cache_read_input_tokens: interaction.cache_read_input_tokens || 0,
+        cache_creation_ephemeral_5m_input_tokens: interaction.cache_creation_ephemeral_5m_input_tokens || 0,
+        cache_creation_ephemeral_1h_input_tokens: interaction.cache_creation_ephemeral_1h_input_tokens || 0,
+        latency_ms: interaction.latency_ms || 0,
+        status: interaction.status,
+        error_type: interaction.error_type,
+        error_message: interaction.error_message,
+        request_data: interaction.request_data,
+        response_data: interaction.response_data,
+        tool_usages: interaction.toolUsages?.map((tu: any) => ({
+          tool_name: tu.tool_name,
+          tool_input: tu.tool_input,
+          tool_output: tu.tool_output,
+        })) || [],
+      })) || [],
+      is_owner: isOwner,
+      share_token: shareToken,
+      is_share_active: share.is_active,
+    }
+
+    return {
+      response,
+      status: 200
+    }
+  } catch (error) {
+    logger.error({ message: 'Error fetching session detail by share token', error, userUuid, shareToken })
+    return {
+      response: 'Error fetching session detail',
+      error: true,
+      status: 500
+    }
+  }
+}
+
+// ============================================================================
+// Session Sharing Endpoints
+// ============================================================================
+
+const generateShareToken = (): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  let token = ''
+  for (let i = 0; i < 32; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return token
+}
+
+export const handleCreateSessionShare = async (userUuid: string, sessionUuid: string) => {
+  try {
+    // Verify session exists and belongs to user
+    const session = await Session.findOne({
+      where: { uuid: sessionUuid, user_uuid: userUuid }
+    })
+
+    if (!session) {
+      return {
+        response: 'Session not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    // Check if share already exists
+    const [existingShare] = await sequelize.query(
+      `SELECT uuid, share_token, is_active FROM spotlight.session_share
+       WHERE session_uuid = $1`,
+      { bind: [sessionUuid] }
+    )
+
+    if (existingShare && (existingShare as any).length > 0) {
+      const share = (existingShare as any)[0]
+      // If share exists but is inactive, reactivate it
+      if (!share.is_active) {
+        await sequelize.query(
+          `UPDATE spotlight.session_share
+           SET is_active = true, updated_at = CURRENT_TIMESTAMP
+           WHERE uuid = $1`,
+          { bind: [share.uuid] }
+        )
+      }
+      return {
+        response: {
+          share_token: share.share_token,
+          is_active: true
+        },
+        status: 200
+      }
+    }
+
+    // Create new share
+    const shareToken = generateShareToken()
+    const [results] = await sequelize.query(
+      `INSERT INTO spotlight.session_share (session_uuid, user_uuid, share_token, is_active)
+       VALUES ($1, $2, $3, true)
+       RETURNING uuid, share_token, is_active, created_at`,
+      { bind: [sessionUuid, userUuid, shareToken] }
+    )
+
+    const newShare = (results as any)[0]
+
+    logger.info({ message: 'Session share created', userUuid, sessionUuid, shareUuid: newShare.uuid })
+
+    return {
+      response: {
+        share_token: newShare.share_token,
+        is_active: newShare.is_active,
+        created_at: newShare.created_at
+      },
+      status: 201
+    }
+  } catch (error) {
+    logger.error({ message: 'Error creating session share', error, userUuid, sessionUuid })
+    return {
+      response: 'Error creating session share',
+      error: true,
+      status: 500
+    }
+  }
+}
+
+export const handleDeleteSessionShare = async (userUuid: string, sessionUuid: string) => {
+  try {
+    // Verify session exists and belongs to user
+    const session = await Session.findOne({
+      where: { uuid: sessionUuid, user_uuid: userUuid }
+    })
+
+    if (!session) {
+      return {
+        response: 'Session not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    // Deactivate the share
+    const [results] = await sequelize.query(
+      `UPDATE spotlight.session_share
+       SET is_active = false, updated_at = CURRENT_TIMESTAMP
+       WHERE session_uuid = $1 AND user_uuid = $2
+       RETURNING uuid`,
+      { bind: [sessionUuid, userUuid] }
+    )
+
+    if (!results || (results as any).length === 0) {
+      return {
+        response: 'Session share not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    logger.info({ message: 'Session share deactivated', userUuid, sessionUuid })
+
+    return {
+      response: { message: 'Session share deactivated' },
+      status: 200
+    }
+  } catch (error) {
+    logger.error({ message: 'Error deleting session share', error, userUuid, sessionUuid })
+    return {
+      response: 'Error deleting session share',
+      error: true,
+      status: 500
+    }
+  }
+}
+
+export const handleGetSessionShareStatus = async (userUuid: string, sessionUuid: string) => {
+  try {
+    // Verify session exists and belongs to user
+    const session = await Session.findOne({
+      where: { uuid: sessionUuid, user_uuid: userUuid }
+    })
+
+    if (!session) {
+      return {
+        response: 'Session not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    const [results] = await sequelize.query(
+      `SELECT share_token, is_active, created_at
+       FROM spotlight.session_share
+       WHERE session_uuid = $1`,
+      { bind: [sessionUuid] }
+    )
+
+    if (!results || (results as any).length === 0) {
+      return {
+        response: { is_shared: false },
+        status: 200
+      }
+    }
+
+    const share = (results as any)[0]
+
+    return {
+      response: {
+        is_shared: share.is_active,
+        share_token: share.is_active ? share.share_token : null,
+        created_at: share.created_at
+      },
+      status: 200
+    }
+  } catch (error) {
+    logger.error({ message: 'Error fetching session share status', error, userUuid, sessionUuid })
+    return {
+      response: 'Error fetching session share status',
+      error: true,
+      status: 500
+    }
+  }
+}
+
+export const handleFetchSharedSessionDetail = async (shareToken: string) => {
+  try {
+    // Get session UUID from share token
+    const [shareResults] = await sequelize.query(
+      `SELECT session_uuid, is_active
+       FROM spotlight.session_share
+       WHERE share_token = $1`,
+      { bind: [shareToken] }
+    )
+
+    if (!shareResults || (shareResults as any).length === 0) {
+      return {
+        response: 'Shared session not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    const share = (shareResults as any)[0]
+
+    if (!share.is_active) {
+      return {
+        response: 'This shared session is no longer available',
+        error: true,
+        status: 403
+      }
+    }
+
+    // Fetch session details (without user UUID check since it's a shared session)
+    const session = await Session.findOne({
+      where: { uuid: share.session_uuid },
+      include: [
+        {
+          model: Interaction,
+          as: 'interactions',
+          include: [
+            {
+              model: ToolUsage,
+              as: 'toolUsages',
+            }
+          ],
+          separate: true,
+          order: [['request_timestamp', 'DESC']],
+        }
+      ]
+    })
+
+    if (!session) {
+      return {
+        response: 'Session not found',
+        error: true,
+        status: 404
+      }
+    }
+
+    const response = {
+      session: {
+        uuid: session.uuid,
+        session_id: session.session_id,
+        start_time: session.start_time,
+        end_time: session.end_time,
+        total_requests: session.total_requests,
+        total_input_tokens: session.total_input_tokens,
+        total_output_tokens: session.total_output_tokens,
+        total_cache_read_input_tokens: (session as any).interactions?.reduce((sum: number, interaction: any) => sum + (interaction.cache_read_input_tokens || 0), 0) || 0,
+        total_cache_creation_ephemeral_5m_input_tokens: session.total_cache_creation_ephemeral_5m_input_tokens,
+        total_cache_creation_ephemeral_1h_input_tokens: session.total_cache_creation_ephemeral_1h_input_tokens,
+      },
+      interactions: (session as any).interactions?.map((interaction: any) => ({
+        uuid: interaction.uuid,
+        request_timestamp: interaction.request_timestamp,
+        response_timestamp: interaction.response_timestamp,
+        model: interaction.model,
+        provider: interaction.provider,
+        input_tokens: interaction.input_tokens || 0,
+        output_tokens: interaction.output_tokens || 0,
+        cache_read_input_tokens: interaction.cache_read_input_tokens || 0,
+        cache_creation_ephemeral_5m_input_tokens: interaction.cache_creation_ephemeral_5m_input_tokens || 0,
+        cache_creation_ephemeral_1h_input_tokens: interaction.cache_creation_ephemeral_1h_input_tokens || 0,
+        latency_ms: interaction.latency_ms || 0,
+        status: interaction.status,
+        error_type: interaction.error_type,
+        error_message: interaction.error_message,
+        request_data: interaction.request_data,
+        response_data: interaction.response_data,
+        tool_usages: interaction.toolUsages?.map((tu: any) => ({
+          tool_name: tu.tool_name,
+          tool_input: tu.tool_input,
+          tool_output: tu.tool_output,
+        })) || [],
+      })) || [],
+      is_shared: true
+    }
+
+    return {
+      response,
+      status: 200
+    }
+  } catch (error) {
+    logger.error({ message: 'Error fetching shared session detail', error, shareToken })
+    return {
+      response: 'Error fetching shared session detail',
       error: true,
       status: 500
     }

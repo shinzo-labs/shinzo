@@ -1,4 +1,4 @@
-\restrict PEshDDVzRxeAfr0n3QKZQUlOu7suiZvwVfSdRyEHzyjWeVGuQChqsvmoayMttcz
+\restrict 83LoOq5IynA7xboMF5SVmZjW0o7K87ZyCreNaEBmEoBdD9CnOJyhsEe9FJfaW73
 
 -- Dumped from database version 15.14 (Homebrew)
 -- Dumped by pg_dump version 17.6
@@ -531,6 +531,22 @@ COMMENT ON COLUMN spotlight.session.api_key_uuid IS 'Foreign key to provider_key
 
 
 --
+-- Name: session_share; Type: TABLE; Schema: spotlight; Owner: -
+--
+
+CREATE TABLE spotlight.session_share (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    session_uuid uuid NOT NULL,
+    user_uuid uuid NOT NULL,
+    share_token text NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    expires_at timestamp without time zone
+);
+
+
+--
 -- Name: shinzo_api_key; Type: TABLE; Schema: spotlight; Owner: -
 --
 
@@ -912,6 +928,30 @@ ALTER TABLE ONLY spotlight.provider_key
 
 ALTER TABLE ONLY spotlight.session
     ADD CONSTRAINT session_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: session_share session_share_pkey; Type: CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.session_share
+    ADD CONSTRAINT session_share_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: session_share session_share_session_uuid_key; Type: CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.session_share
+    ADD CONSTRAINT session_share_session_uuid_key UNIQUE (session_uuid);
+
+
+--
+-- Name: session_share session_share_share_token_key; Type: CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.session_share
+    ADD CONSTRAINT session_share_share_token_key UNIQUE (share_token);
 
 
 --
@@ -1363,6 +1403,34 @@ CREATE INDEX idx_session_lookup ON spotlight.session USING btree (user_uuid, shi
 
 
 --
+-- Name: idx_session_share_active; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_session_share_active ON spotlight.session_share USING btree (is_active);
+
+
+--
+-- Name: idx_session_share_session; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_session_share_session ON spotlight.session_share USING btree (session_uuid);
+
+
+--
+-- Name: idx_session_share_token; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_session_share_token ON spotlight.session_share USING btree (share_token);
+
+
+--
+-- Name: idx_session_share_user; Type: INDEX; Schema: spotlight; Owner: -
+--
+
+CREATE INDEX idx_session_share_user ON spotlight.session_share USING btree (user_uuid);
+
+
+--
 -- Name: idx_session_start_time; Type: INDEX; Schema: spotlight; Owner: -
 --
 
@@ -1650,6 +1718,13 @@ CREATE TRIGGER updated_at_session BEFORE UPDATE ON spotlight.session FOR EACH RO
 
 
 --
+-- Name: session_share updated_at_session_share; Type: TRIGGER; Schema: spotlight; Owner: -
+--
+
+CREATE TRIGGER updated_at_session_share BEFORE UPDATE ON spotlight.session_share FOR EACH ROW EXECUTE FUNCTION public.updated_at();
+
+
+--
 -- Name: shinzo_api_key updated_at_shinzo_api_key; Type: TRIGGER; Schema: spotlight; Owner: -
 --
 
@@ -1894,6 +1969,22 @@ ALTER TABLE ONLY spotlight.session
 
 
 --
+-- Name: session_share session_share_session_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.session_share
+    ADD CONSTRAINT session_share_session_uuid_fkey FOREIGN KEY (session_uuid) REFERENCES spotlight.session(uuid) ON DELETE CASCADE;
+
+
+--
+-- Name: session_share session_share_user_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
+--
+
+ALTER TABLE ONLY spotlight.session_share
+    ADD CONSTRAINT session_share_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid);
+
+
+--
 -- Name: session session_shinzo_api_key_uuid_fkey; Type: FK CONSTRAINT; Schema: spotlight; Owner: -
 --
 
@@ -1977,7 +2068,7 @@ ALTER TABLE ONLY spotlight.user_analytics
 -- PostgreSQL database dump complete
 --
 
-\unrestrict PEshDDVzRxeAfr0n3QKZQUlOu7suiZvwVfSdRyEHzyjWeVGuQChqsvmoayMttcz
+\unrestrict 83LoOq5IynA7xboMF5SVmZjW0o7K87ZyCreNaEBmEoBdD9CnOJyhsEe9FJfaW73
 
 
 --
@@ -1999,4 +2090,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20251210000000'),
     ('20251213000000'),
     ('20251217000000'),
-    ('20251218000000');
+    ('20251218000000'),
+    ('20251218100000');

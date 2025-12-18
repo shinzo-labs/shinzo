@@ -101,34 +101,50 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
   }
 
   const handleSubmit = async (answers: Record<string, string | string[]>) => {
-    // Transform answers to match API expectations
-    const usage_types = answers.usage_types as string[] || []
-    const role = answers.role as string || undefined
-    const referral_sources = answers.referral_sources as string[] || undefined
+    // Helper function to get display label for a value
+    const getLabel = (questionId: string, value: string): string => {
+      const question = surveyConfig.questions.find(q => q.id === questionId)
+      const option = question?.options.find(opt => opt.value === value)
+      return option?.label || value
+    }
 
-    // Include text inputs for custom answers
-    const enrichedData: any = {
+    // Transform usage_types to display text
+    const usage_types_values = answers.usage_types as string[] || []
+    const usage_types = usage_types_values.map(value => {
+      // If "Something Else" is selected and has custom text, use that instead
+      if (value === 'something-else' && answers['usage_types_text']) {
+        return answers['usage_types_text'] as string
+      }
+      return getLabel('usage_types', value)
+    })
+
+    // Transform role to display text
+    const role_value = answers.role as string
+    let role: string | undefined
+    if (role_value === 'other' && answers['role_other_text']) {
+      // If "Other" is selected and has custom text, use that instead
+      role = answers['role_other_text'] as string
+    } else if (role_value) {
+      role = getLabel('role', role_value)
+    }
+
+    // Transform referral_sources to display text
+    const referral_sources_values = answers.referral_sources as string[] || []
+    const referral_sources = referral_sources_values.length > 0
+      ? referral_sources_values.map(value => {
+          // If "Other" is selected and has custom text, use that instead
+          if (value === 'Other' && answers['referral_sources_text']) {
+            return answers['referral_sources_text'] as string
+          }
+          return getLabel('referral_sources', value)
+        })
+      : undefined
+
+    await surveyService.saveSurvey(token!, {
       usage_types,
       role,
-      referral_sources: referral_sources && referral_sources.length > 0 ? referral_sources : undefined
-    }
-
-    // Add custom text for "Something Else" if provided
-    if (answers['usage_types_something-else_text']) {
-      enrichedData.usage_types_custom = answers['usage_types_something-else_text']
-    }
-
-    // Add custom text for "Other" role if provided
-    if (answers['role_other_text']) {
-      enrichedData.role_custom = answers['role_other_text']
-    }
-
-    // Add custom text for "Other" referral source if provided
-    if (answers['referral_sources_Other_text']) {
-      enrichedData.referral_sources_custom = answers['referral_sources_Other_text']
-    }
-
-    await surveyService.saveSurvey(token!, enrichedData)
+      referral_sources
+    })
 
     // Trigger completion callback
     onComplete()

@@ -23,8 +23,9 @@ import { SettingsPage } from './pages/SettingsPage'
 
 // Spotlight pages
 import { SpotlightApiKeysPage } from './pages/spotlight/SpotlightApiKeysPage'
-import { SpotlightTokenAnalyticsPage } from './pages/spotlight/SpotlightTokenAnalyticsPage'
 import { SpotlightSessionAnalyticsPage } from './pages/spotlight/SpotlightSessionAnalyticsPage'
+import { SpotlightSessionDetailPage } from './pages/spotlight/SpotlightSessionDetailPage'
+import { SpotlightSharedSessionPage } from './pages/spotlight/SpotlightSharedSessionPage'
 import { SpotlightGettingStartedPage } from './pages/spotlight/SpotlightGettingStartedPage'
 
 import './App.css'
@@ -53,6 +54,7 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/verify" element={<VerifyPage />} />
+                <Route path="/spotlight/session-analytics/shared/:shareToken" element={<SpotlightSharedSessionPage />} />
 
                 {/* Protected routes with onboarding */}
                 <Route path="/dashboard" element={
@@ -92,14 +94,14 @@ function App() {
                     <SpotlightApiKeysPage />
                   </AppRoute>
                 } />
-                <Route path="/spotlight/token-analytics" element={
-                  <AppRoute protected requireOnboarding>
-                    <SpotlightTokenAnalyticsPage />
-                  </AppRoute>
-                } />
                 <Route path="/spotlight/session-analytics" element={
                   <AppRoute protected requireOnboarding>
                     <SpotlightSessionAnalyticsPage />
+                  </AppRoute>
+                } />
+                <Route path="/spotlight/session-analytics/:shareToken" element={
+                  <AppRoute protected requireOnboarding>
+                    <SpotlightSessionDetailPage />
                   </AppRoute>
                 } />
 

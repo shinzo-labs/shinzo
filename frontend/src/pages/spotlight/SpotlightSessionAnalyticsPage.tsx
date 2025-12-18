@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery } from 'react-query'
-import { Flex, Text, Card, Table, Badge, Dialog, Code, Box, Tooltip, Spinner } from '@radix-ui/themes'
+import { useNavigate } from 'react-router-dom'
+import { Flex, Text, Card, Table, Badge, Grid, Spinner } from '@radix-ui/themes'
 import { AppLayout } from '../../components/layout/AppLayout'
 import { useAuth } from '../../contexts/AuthContext'
-import { ChevronDownIcon, ChevronUpIcon, InfoCircledIcon } from '@radix-ui/react-icons'
+import { ChevronDownIcon, ChevronUpIcon } from '@radix-ui/react-icons'
 import axios from 'axios'
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000'
+const REFRESH_INTERVAL = 5000 // 5 seconds
 
 interface Session {
   uuid: string
@@ -16,10 +18,12 @@ interface Session {
   total_requests: number
   total_input_tokens: number
   total_output_tokens: number
+  total_cache_read_input_tokens: number
   total_cache_creation_ephemeral_5m_input_tokens: number
   total_cache_creation_ephemeral_1h_input_tokens: number
   interaction_count: number
   last_message_preview: string
+  share_token: string
 }
 
 interface SessionAnalytics {
@@ -27,46 +31,35 @@ interface SessionAnalytics {
   total_sessions: number
 }
 
-interface SessionDetail {
-  session: Session
-  interactions: Interaction[]
-}
-
-interface Interaction {
-  uuid: string
-  request_timestamp: string
-  response_timestamp: string
-  model: string
-  provider: string
-  input_tokens: number
-  output_tokens: number
-  cache_read_input_tokens: number
-  cache_creation_ephemeral_5m_input_tokens: number
-  cache_creation_ephemeral_1h_input_tokens: number
-  latency_ms: number
-  status: string
-  error_type: string | null
-  error_message: string | null
-  request_data: any
-  response_data: any
-  tool_usages: Array<{
-    tool_name: string
-    tool_input: any
-    tool_output: any
+interface TokenAnalytics {
+  summary: {
+    total_input_tokens: number
+    total_output_tokens: number
+    total_cached_tokens: number
+    total_cache_creation_5m_tokens: number
+    total_cache_creation_1h_tokens: number
+    total_requests: number
+  }
+  by_model: Record<string, {
+    input_tokens: number
+    output_tokens: number
+    cached_tokens: number
+    cache_creation_5m_tokens: number
+    cache_creation_1h_tokens: number
+    request_count: number
   }>
 }
 
-type SortColumn = 'start_time' | 'end_time' | 'total_requests' | 'total_input_tokens' | 'total_output_tokens' | 'total_cache_creation_ephemeral_5m_input_tokens' | 'total_cache_creation_ephemeral_1h_input_tokens'
+type SortColumn = 'start_time' | 'end_time' | 'total_requests' | 'total_input_tokens' | 'total_output_tokens' | 'total_cache_read_input_tokens' | 'total_cache_creation_ephemeral_5m_input_tokens' | 'total_cache_creation_ephemeral_1h_input_tokens'
 type SortDirection = 'asc' | 'desc'
 
 export const SpotlightSessionAnalyticsPage: React.FC = () => {
   const { token } = useAuth()
-  const [selectedSessionUuid, setSelectedSessionUuid] = useState<string | null>(null)
-  const [expandedInteractionUuid, setExpandedInteractionUuid] = useState<string | null>(null)
+  const navigate = useNavigate()
   const [sortColumn, setSortColumn] = useState<SortColumn>('start_time')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
-  const { data: analytics, isLoading, error } = useQuery<SessionAnalytics>(
+  const { data: sessionAnalytics, isLoading: isLoadingSessionAnalytics, error: errorSessionAnalytics } = useQuery<SessionAnalytics>(
     'spotlight-session-analytics',
     async () => {
       const response = await axios.get(`${BACKEND_URL}/spotlight/analytics/sessions`, {
@@ -75,29 +68,29 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
       return response.data
     },
     {
-      retry: false
+      retry: false,
+      refetchInterval: REFRESH_INTERVAL
     }
   )
 
-  const { data: sessionDetail, isLoading: loadingDetail } = useQuery<SessionDetail>(
-    ['spotlight-session-detail', selectedSessionUuid],
+  const { data: tokenAnalytics, isLoading: isLoadingTokenAnalytics, error: errorTokenAnalytics } = useQuery<TokenAnalytics>(
+    'spotlight-token-analytics',
     async () => {
-      const response = await axios.get(
-        `${BACKEND_URL}/spotlight/analytics/sessions/${selectedSessionUuid}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      const response = await axios.get(`${BACKEND_URL}/spotlight/analytics/tokens`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
       return response.data
     },
     {
-      enabled: !!selectedSessionUuid,
-      retry: false
+      retry: false,
+      refetchInterval: REFRESH_INTERVAL
     }
   )
 
   const sortedSessions = useMemo(() => {
-    if (!analytics?.sessions) return []
+    if (!sessionAnalytics?.sessions) return []
 
-    const sorted = [...analytics.sessions].sort((a, b) => {
+    const sorted = [...sessionAnalytics.sessions].sort((a, b) => {
       let aVal: any, bVal: any
 
       switch (sortColumn) {
@@ -141,7 +134,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
     })
 
     return sorted
-  }, [analytics?.sessions, sortColumn, sortDirection])
+  }, [sessionAnalytics?.sessions, sortColumn, sortDirection])
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -168,151 +161,114 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
     </Table.ColumnHeaderCell>
   )
 
-  const estimateTokens = (text: string): number => {
-    // Estimate tokens using 4 characters per token average
-    return Math.ceil(text.length / 4)
-  }
-
-  const getTokenCount = (actualTokens: number, fallbackText?: string): { count: number; isEstimated: boolean } => {
-    if (actualTokens && actualTokens > 0) {
-      return { count: actualTokens, isEstimated: false }
-    }
-    if (fallbackText) {
-      return { count: estimateTokens(fallbackText), isEstimated: true }
-    }
-    return { count: 0, isEstimated: false }
-  }
-
-  const formatTokenDisplay = (actualTokens: number, fallbackText?: string): string => {
-    const { count, isEstimated } = getTokenCount(actualTokens, fallbackText)
-    if (count === 0) return '0'
-    return isEstimated ? `~${count.toLocaleString()}` : count.toLocaleString()
-  }
-
-  const countToolsInMessages = (messages: any[], toolType: 'tool_use' | 'tool_result'): number => {
-    if (!Array.isArray(messages)) return 0
-    
-    return messages.reduce((total, msg) => {
-      if (Array.isArray(msg.content)) {
-        return total + msg.content.filter((block: any) => block.type === toolType).length
-      }
-      return total
-    }, 0)
-  }
-
-  const getToolCount = (
-    source: any,
-    type: 'tool_use' | 'tool_result'
-  ) =>
-    countToolsInMessages(source?.request_data?.messages || [], type) +
-    countToolsInMessages(
-      source?.response_data?.content ? [{ content: source.response_data.content }] : [],
-      type
-    )
-
-  const getSessionToolUses = (sessionDetail: SessionDetail): number =>
-    sessionDetail?.interactions
-      ? sessionDetail.interactions
-          .filter(i => i.status === 'success')
-          .reduce((sum, i) => sum + getToolCount(i, 'tool_use'), 0)
-      : 0
-
-  const getSessionToolResults = (sessionDetail: SessionDetail): number =>
-    sessionDetail?.interactions
-      ? sessionDetail.interactions
-          .filter(i => i.status === 'success')
-          .reduce((sum, i) => sum + getToolCount(i, 'tool_result'), 0)
-      : 0
-
-  const getInteractionToolUses = (interaction: Interaction): number =>
-    interaction.status === 'success' ? getToolCount(interaction, 'tool_use') : 0
-
-  const getInteractionToolResults = (interaction: Interaction): number =>
-    interaction.status === 'success' ? getToolCount(interaction, 'tool_result') : 0
-
-  const formatLatency = (latencyMs: number): string => {
-    if (latencyMs >= 1000) {
-      const seconds = latencyMs / 1000
-      const minutes = Math.floor(seconds / 60)
-      const remainingSeconds = seconds % 60
-      if (minutes > 0) {
-        return `${minutes}m${remainingSeconds.toFixed(3)}s`
-      }
-      return `${remainingSeconds.toFixed(3)}s`
-    }
-    return `${latencyMs}ms`
-  }
-
-  const getMessagePreview = (messages: any[]): string => {
-    if (!Array.isArray(messages) || messages.length === 0) return 'N/A'
-
-    const lastMessage = messages[messages.length - 1]
-    if (typeof lastMessage.content === 'string') {
-      return lastMessage.content.substring(0, 50) + (lastMessage.content.length > 50 ? '...' : '')
-    } else if (Array.isArray(lastMessage.content)) {
-      const textBlock = lastMessage.content.find((block: any) => block.type === 'text')
-      if (textBlock?.text) {
-        return textBlock.text.substring(0, 50) + (textBlock.text.length > 50 ? '...' : '')
-      }
-    }
-    return 'N/A'
-  }
-
-  const formatMessages = (messages: any[]) => {
-    if (!Array.isArray(messages)) return 'N/A'
-
-    return messages.map((msg, idx) => {
-      if (typeof msg.content === 'string') {
-        return (
-          <Box key={idx} mb="2">
-            <Text size="1" weight="bold" color="gray">{msg.role}:</Text>
-            <Text size="1" style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</Text>
-          </Box>
-        )
-      } else if (Array.isArray(msg.content)) {
-        return (
-          <Box key={idx} mb="2">
-            <Text size="1" weight="bold" color="gray">{msg.role}:</Text>
-            {msg.content.map((block: any, blockIdx: number) => (
-              <Box key={blockIdx} ml="2">
-                {block.type === 'text' && <Text size="1" style={{ whiteSpace: 'pre-wrap' }}>{block.text}</Text>}
-                {block.type === 'tool_use' && (
-                  <Box>
-                    <Text size="1" color="blue">Tool: {block.name}</Text>
-                    <Code size="1">{JSON.stringify(block.input, null, 2)}</Code>
-                  </Box>
-                )}
-                {block.type === 'tool_result' && (
-                  <Box>
-                    <Text size="1" color="green">Tool Result: {block.tool_use_id}</Text>
-                    <Code size="1">{JSON.stringify(block.content, null, 2)}</Code>
-                  </Box>
-                )}
-              </Box>
-            ))}
-          </Box>
-        )
-      }
-      return null
-    })
-  }
 
   return (
     <AppLayout>
+      <Flex direction="column" gap="4" style={{ padding: '24px' }}>
+        <Flex direction="column" gap="2">
+          <Text size="6" weight="bold">Token Analytics</Text>
+          <Text size="2" color="gray">Track token usage across models and sessions</Text>
+        </Flex>
+
+        {isLoadingTokenAnalytics ? (
+          <Card>
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Spinner size="3" />
+              <Text size="2" color="gray">Loading token analytics...</Text>
+            </Flex>
+          </Card>
+        ) : errorTokenAnalytics ? (
+          <Card>
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Text size="3" color="red">Failed to load token analytics</Text>
+              <Text size="2" color="gray">Please try refreshing the page</Text>
+            </Flex>
+          </Card>
+        ) : (
+          <>
+            <Grid columns="3" gap="4">
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Total Requests</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_requests.toLocaleString()}</Text>
+              </Card>
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Input Tokens</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_input_tokens.toLocaleString()}</Text>
+              </Card>
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Output Tokens</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_output_tokens.toLocaleString()}</Text>
+              </Card>
+            </Grid>
+
+            <Grid columns="3" gap="4">
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Cache Reads</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_cached_tokens.toLocaleString()}</Text>
+              </Card>
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>5m Cache Writes</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_cache_creation_5m_tokens.toLocaleString()}</Text>
+              </Card>
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>1h Cache Writes</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_cache_creation_1h_tokens.toLocaleString()}</Text>
+              </Card>
+            </Grid>
+
+            <Card>
+              <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Token Usage by Model</Text>
+              {!tokenAnalytics || Object.keys(tokenAnalytics?.by_model || {}).length === 0 ? (
+                <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+                  <Text size="3" color="gray">No data yet</Text>
+                  <Text size="2" color="gray">Start using Spotlight to see analytics</Text>
+                </Flex>
+              ) : (
+                <Table.Root>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Requests</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {Object.entries(tokenAnalytics?.by_model || {}).map(([model, stats]) => (
+                      <Table.Row key={model}>
+                        <Table.Cell><Badge>{model}</Badge></Table.Cell>
+                        <Table.Cell>{stats.request_count.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.input_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.output_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.cached_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.cache_creation_5m_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.cache_creation_1h_tokens.toLocaleString()}</Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              )}
+            </Card>
+          </>
+        )}
+      </Flex>
       <Flex direction="column" gap="4" style={{ padding: '24px' }}>
         <Flex direction="column" gap="2">
           <Text size="6" weight="bold">Session Analytics</Text>
           <Text size="2" color="gray">Review conversation sessions and interaction details</Text>
         </Flex>
 
-        {isLoading ? (
+        {isLoadingSessionAnalytics ? (
           <Card>
             <Flex direction="column" align="center" justify="center" gap="3" style={{ padding: '48px' }}>
               <Spinner size="3" />
-              <Text size="2" color="gray">Loading session analytics...</Text>
+              <Text size="2" color="gray">Loading recent sessions...</Text>
             </Flex>
           </Card>
-        ) : error ? (
+        ) : errorSessionAnalytics ? (
           <Card>
             <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
               <Text size="3" color="red">Failed to load analytics</Text>
@@ -321,13 +277,9 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
           </Card>
         ) : (
           <>
-            <Card>
-              <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Total Sessions</Text>
-              <Text size="6" weight="bold">{analytics?.total_sessions}</Text>
-            </Card>
 
             <Card>
-              <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Recent Sessions</Text>
+              <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Recent Sessions ({sessionAnalytics?.sessions?.length?.toLocaleString() || 0})</Text>
               {!sortedSessions || sortedSessions.length === 0 ? (
                 <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
                   <Text size="3" color="gray">No sessions yet</Text>
@@ -338,11 +290,12 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                   <Table.Root>
                     <Table.Header>
                       <Table.Row>
-                        <Table.ColumnHeaderCell>Last Message</Table.ColumnHeaderCell>
+                        <Table.ColumnHeaderCell>Last Completion</Table.ColumnHeaderCell>
                         <SortableHeader column="start_time">Started</SortableHeader>
                         <SortableHeader column="end_time">Last Updated</SortableHeader>
-                        <SortableHeader column="total_requests">Messages</SortableHeader>
+                        <SortableHeader column="total_requests">Completions</SortableHeader>
                         <SortableHeader column="total_input_tokens">Input Tokens</SortableHeader>
+                        <SortableHeader column="total_cache_read_input_tokens">Cache Reads</SortableHeader>
                         <SortableHeader column="total_cache_creation_ephemeral_5m_input_tokens">5m Cache Writes</SortableHeader>
                         <SortableHeader column="total_cache_creation_ephemeral_1h_input_tokens">1h Cache Writes</SortableHeader>
                         <SortableHeader column="total_output_tokens">Output Tokens</SortableHeader>
@@ -352,8 +305,13 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                       {sortedSessions.map((session) => (
                         <Table.Row
                           key={session.uuid}
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => setSelectedSessionUuid(session.uuid)}
+                          style={{
+                            cursor: 'pointer',
+                            transition: 'background-color 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray-3)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
+                          onClick={() => navigate(`/spotlight/session-analytics/${session.share_token}`)}
                         >
                           <Table.Cell>
                             <Text size="2" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -364,6 +322,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                           <Table.Cell>{session.end_time ? new Date(session.end_time).toLocaleString() : 'Active'}</Table.Cell>
                           <Table.Cell>{session.interaction_count}</Table.Cell>
                           <Table.Cell>{session.total_input_tokens.toLocaleString()}</Table.Cell>
+                          <Table.Cell>{session.total_cache_read_input_tokens.toLocaleString()}</Table.Cell>
                           <Table.Cell>{session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Table.Cell>
                           <Table.Cell>{session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Table.Cell>
                           <Table.Cell>{session.total_output_tokens.toLocaleString()}</Table.Cell>
@@ -371,264 +330,12 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                       ))}
                     </Table.Body>
                   </Table.Root>
-                  <Text size="1" color="gray" mt="2" style={{ fontStyle: 'italic' }}>
-                    * Token totals exclude estimated counts from error responses
-                  </Text>
                 </>
               )}
             </Card>
           </>
         )}
       </Flex>
-
-      {/* Session Detail Modal */}
-      <Dialog.Root open={!!selectedSessionUuid} onOpenChange={(open) => !open && setSelectedSessionUuid(null)}>
-        <Dialog.Content style={{ maxWidth: '90vw', maxHeight: '90vh' }}>
-          <Dialog.Title>Session Details</Dialog.Title>
-          <Dialog.Description size="2" mb="4">
-            {sessionDetail?.session.session_id}
-          </Dialog.Description>
-
-          <Box style={{ maxHeight: 'calc(90vh - 120px)', overflowY: 'auto' }}>
-            {loadingDetail ? (
-              <Flex direction="column" align="center" justify="center" gap="3" style={{ padding: '48px' }}>
-                <Spinner size="3" />
-                <Text size="2" color="gray">Loading session details...</Text>
-              </Flex>
-            ) : sessionDetail ? (
-              <Flex direction="column" gap="4">
-              {/* Session Summary */}
-              <Card>
-                <Flex direction="column" gap="2">
-                  <Flex justify="between">
-                    <Text size="2" color="gray">Total Requests</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_requests}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">Input Tokens</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_input_tokens.toLocaleString()}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">5m Cache Writes</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">1h Cache Writes</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">Output Tokens</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_output_tokens.toLocaleString()}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">Tool Uses</Text>
-                    <Text size="2" weight="bold">{getSessionToolUses(sessionDetail)}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">Tool Results</Text>
-                    <Text size="2" weight="bold">{getSessionToolResults(sessionDetail)}</Text>
-                  </Flex>
-                </Flex>
-                <Text size="1" color="gray" mt="2" style={{ fontStyle: 'italic' }}>
-                  * Estimated token counts from error responses are not included in these totals
-                </Text>
-              </Card>
-
-              {/* Interactions Table */}
-              <Text size="4" weight="bold">Interactions</Text>
-              <Table.Root>
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeaderCell>Request</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Response</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Sent</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Latency</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {sessionDetail.interactions.map((interaction) => (
-                    <React.Fragment key={interaction.uuid}>
-                      <Table.Row
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => setExpandedInteractionUuid(
-                          expandedInteractionUuid === interaction.uuid ? null : interaction.uuid
-                        )}
-                      >
-                        <Table.Cell>
-                          <Flex align="center" gap="1">
-                            {expandedInteractionUuid === interaction.uuid ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                            <Text size="1" style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {getMessagePreview(interaction.request_data?.messages || [])}
-                            </Text>
-                          </Flex>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text size="1" style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {interaction.response_data?.content
-                              ? (typeof interaction.response_data.content === 'string'
-                                  ? interaction.response_data.content.substring(0, 50) + (interaction.response_data.content.length > 50 ? '...' : '')
-                                  : getMessagePreview([{ role: 'assistant', content: interaction.response_data.content }]))
-                              : 'N/A'}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell>{new Date(interaction.request_timestamp).toLocaleString()}</Table.Cell>
-                        <Table.Cell>{formatLatency(interaction.latency_ms)}</Table.Cell>
-                        <Table.Cell>
-                          <Flex align="center" gap="2">
-                            <Badge color={interaction.status === 'success' ? 'green' : 'red'}>
-                              {interaction.status}
-                            </Badge>
-                            {interaction.status === 'error' && interaction.error_message && (
-                              <Tooltip content={`${interaction.error_type || 'Error'}: ${interaction.error_message}`}>
-                                <InfoCircledIcon style={{ color: 'var(--red-9)', cursor: 'help' }} />
-                              </Tooltip>
-                            )}
-                          </Flex>
-                        </Table.Cell>
-                        <Table.Cell><Badge>{interaction.model}</Badge></Table.Cell>
-                        <Table.Cell>{formatTokenDisplay(interaction.input_tokens, JSON.stringify(interaction.request_data?.messages || ''))}</Table.Cell>
-                        <Table.Cell>{formatTokenDisplay(interaction.cache_creation_ephemeral_5m_input_tokens)}</Table.Cell>
-                        <Table.Cell>{formatTokenDisplay(interaction.cache_creation_ephemeral_1h_input_tokens)}</Table.Cell>
-                        <Table.Cell>{formatTokenDisplay(interaction.output_tokens, interaction.response_data?.content || '')}</Table.Cell>
-                      </Table.Row>
-
-                      {/* Expanded Row */}
-                      {expandedInteractionUuid === interaction.uuid && (
-                        <Table.Row>
-                          <Table.Cell colSpan={10} style={{ maxWidth: '0', width: '100%' }}>
-                            <Card style={{ background: 'var(--gray-2)', maxWidth: '100%', overflow: 'hidden' }}>
-                              <Flex direction="column" gap="3" p="3">
-                                {/* Request Data */}
-                                <Box>
-                                  <Text size="3" weight="bold" mb="2">Request</Text>
-                                  <Flex direction="column" gap="2">
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Model:</Text>
-                                      <Badge>{interaction.model}</Badge>
-                                    </Flex>
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Provider:</Text>
-                                      <Badge>{interaction.provider}</Badge>
-                                    </Flex>
-                                    {interaction.request_data?.max_tokens && (
-                                      <Flex justify="between">
-                                        <Text size="2" color="gray">Max Tokens:</Text>
-                                        <Text size="2">{interaction.request_data.max_tokens}</Text>
-                                      </Flex>
-                                    )}
-                                    {interaction.request_data?.temperature !== undefined && (
-                                      <Flex justify="between">
-                                        <Text size="2" color="gray">Temperature:</Text>
-                                        <Text size="2">{interaction.request_data.temperature}</Text>
-                                      </Flex>
-                                    )}
-                                  </Flex>
-
-                                  {/* Messages */}
-                                  <Box mt="3">
-                                    <Text size="2" weight="bold" mb="2">Messages:</Text>
-                                    <Box style={{ background: 'var(--gray-3)', maxHeight: '300px', width: '100%', maxWidth: '100%', minWidth: '0', overflow: 'auto', padding: '8px', borderRadius: '6px', boxSizing: 'border-box', wordBreak: 'break-word' }}>
-                                      {interaction.request_data?.messages?.length > 1 ? (
-                                        <details>
-                                          <summary style={{ cursor: 'pointer', marginBottom: '8px' }}>
-                                            <Text size="2" color="blue">Show full conversation ({interaction.request_data.messages.length} messages)</Text>
-                                          </summary>
-                                          {formatMessages(interaction.request_data.messages)}
-                                        </details>
-                                      ) : (
-                                        formatMessages(interaction.request_data?.messages || [])
-                                      )}
-                                    </Box>
-                                  </Box>
-                                </Box>
-
-                                {/* Response Data */}
-                                {interaction.response_data && (
-                                  <Box>
-                                    <Text size="3" weight="bold" mb="2">Response</Text>
-                                    <Box style={{ background: 'var(--gray-3)', maxHeight: '300px', width: '100%', maxWidth: '100%', minWidth: '0', overflow: 'auto', padding: '8px', borderRadius: '6px', boxSizing: 'border-box', wordBreak: 'break-word' }}>
-                                      {interaction.response_data.content && formatMessages([{ role: 'assistant', content: interaction.response_data.content }])}
-                                      {interaction.response_data.stop_reason && (
-                                        <Text size="1" color="gray" mt="2">Stop reason: {interaction.response_data.stop_reason}</Text>
-                                      )}
-                                    </Box>
-                                  </Box>
-                                )}
-
-                                {/* Token Counts */}
-                                <Box>
-                                  <Text size="3" weight="bold" mb="2">Token Usage</Text>
-                                  <Flex direction="column" gap="1">
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Input Tokens:</Text>
-                                      <Text size="2">{formatTokenDisplay(interaction.input_tokens, JSON.stringify(interaction.request_data?.messages || ''))}</Text>
-                                    </Flex>
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Output Tokens:</Text>
-                                      <Text size="2">{formatTokenDisplay(interaction.output_tokens, interaction.response_data?.content || '')}</Text>
-                                    </Flex>
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Cache Read Tokens:</Text>
-                                      <Text size="2">{formatTokenDisplay(interaction.cache_read_input_tokens)}</Text>
-                                    </Flex>
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">5m Cache Creation Tokens:</Text>
-                                      <Text size="2">{formatTokenDisplay(interaction.cache_creation_ephemeral_5m_input_tokens)}</Text>
-                                    </Flex>
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">1h Cache Creation Tokens:</Text>
-                                      <Text size="2">{formatTokenDisplay(interaction.cache_creation_ephemeral_1h_input_tokens)}</Text>
-                                    </Flex>
-                                    <Flex justify="between">
-                                      <Text size="2" color="gray">Latency:</Text>
-                                      <Text size="2">{formatLatency(interaction.latency_ms)}</Text>
-                                    </Flex>
-                                  </Flex>
-                                </Box>
-
-                                {/* Tool Usages */}
-                                {interaction.tool_usages && interaction.tool_usages.length > 0 && (
-                                  <Box>
-                                    <Text size="3" weight="bold" mb="2">Tool Usage</Text>
-                                    {interaction.tool_usages.map((tool, idx) => (
-                                      <Card key={idx} mb="2" style={{ background: 'var(--gray-3)' }}>
-                                        <Flex direction="column" gap="2" p="2">
-                                          <Text size="2" weight="bold">{tool.tool_name}</Text>
-                                          <Box>
-                                            <Text size="1" color="gray">Input:</Text>
-                                            <Code size="1">{JSON.stringify(tool.tool_input, null, 2)}</Code>
-                                          </Box>
-                                          <Box>
-                                            <Text size="1" color="gray">Output:</Text>
-                                            <Code size="1">{JSON.stringify(tool.tool_output, null, 2)}</Code>
-                                          </Box>
-                                        </Flex>
-                                      </Card>
-                                    ))}
-                                  </Box>
-                                )}
-                              </Flex>
-                            </Card>
-                          </Table.Cell>
-                        </Table.Row>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </Table.Body>
-              </Table.Root>
-              </Flex>
-            ) : (
-              <Text>Failed to load session details</Text>
-            )}
-          </Box>
-        </Dialog.Content>
-      </Dialog.Root>
     </AppLayout>
   )
 }

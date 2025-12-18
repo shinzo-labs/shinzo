@@ -6,7 +6,7 @@ import { useHasTelemetry } from '../../hooks/useHasTelemetry'
 import { useHasSpotlightData } from '../../hooks/useHasSpotlightData'
 
 const aiAnalyticsGettingStarted = {
-  section: 'AI Analytics',
+  section: 'Agent Analytics',
   items: [
     {
       name: 'Getting Started',
@@ -17,17 +17,12 @@ const aiAnalyticsGettingStarted = {
 }
 
 const aiAnalyticsItems = {
-  section: 'AI Analytics',
+  section: 'Agent Analytics',
   items: [
     {
-      name: 'Token Analytics',
-      href: '/spotlight/token-analytics',
-      icon: Icons.BarChartIcon,
-    },
-    {
-      name: 'Session Analytics',
+      name: 'Dashboard',
       href: '/spotlight/session-analytics',
-      icon: Icons.ActivityLogIcon,
+      icon: Icons.DashboardIcon,
     },
     {
       name: 'API Keys',
@@ -110,23 +105,25 @@ export const Sidebar: React.FC = () => {
       }}
     >
       {/* Logo */}
-      <Flex align="center" gap="3" style={{ padding: '16px', height: '64px', borderBottom: '1px solid var(--gray-6)' }}>
-        <img
-          src="/images/ShinzoIcon512.png"
-          alt="Shinzo Logo"
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '6px'
-          }}
-        />
-        <Text size="4" weight="bold">Shinzo</Text>
-      </Flex>
+      <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Flex align="center" gap="3" style={{ padding: '16px', height: '64px', borderBottom: '1px solid var(--gray-6)', cursor: 'pointer' }}>
+          <img
+            src="/images/ShinzoIcon512.png"
+            alt="Shinzo Logo"
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px'
+            }}
+          />
+          <Text size="4" weight="bold">Shinzo</Text>
+        </Flex>
+      </Link>
 
       {/* Navigation */}
       <Flex direction="column" style={{ flex: 1, padding: '16px', gap: '4px', overflowY: 'auto' }}>
         {sidebarConfig.map((section) => (
-          <>
+          <React.Fragment key={section.section}>
             <div style={{ margin: '16px 0 8px 0', paddingLeft: '12px' }}>
               <Text size="1" weight="bold" color="gray" style={{ textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 {section.section}
@@ -142,8 +139,8 @@ export const Sidebar: React.FC = () => {
                   <Text size="2" weight="medium" style={{ flex: 1 }}>{item.name}</Text>
                 </Link>
               )
-            })} 
-          </>
+            })}
+          </React.Fragment>
         ))}
       </Flex>
     </Flex>

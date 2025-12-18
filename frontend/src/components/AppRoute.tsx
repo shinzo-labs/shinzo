@@ -68,12 +68,19 @@ export const AppRoute: React.FC<AppRouteProps> = ({
 
   // Authentication check
   if (isProtected && !isAuthenticated) {
-    return <Navigate to="/login" replace />
+    const returnTo = location.pathname + location.search
+    return <Navigate to={`/login?returnTo=${encodeURIComponent(returnTo)}`} replace />
   }
 
   // Onboarding checks (only if requireOnboarding is true)
   if (requireOnboarding) {
     const isGettingStartedPage = location.pathname === '/getting-started' || location.pathname === '/spotlight/getting-started'
+
+    // Pages that should always be accessible (analytics pages, settings, etc.)
+    const isAlwaysAccessiblePage = location.pathname.startsWith('/spotlight/session-analytics') ||
+                                   location.pathname.startsWith('/spotlight/api-keys') ||
+                                   location.pathname.startsWith('/settings') ||
+                                   location.pathname === '/dashboard'
 
     // Getting-started pages require a completed survey
     if (isGettingStartedPage && !survey) {
@@ -81,7 +88,7 @@ export const AppRoute: React.FC<AppRouteProps> = ({
     }
 
     // For non-getting-started pages, check survey completion
-    if (!isGettingStartedPage) {
+    if (!isGettingStartedPage && !isAlwaysAccessiblePage) {
       // Pages that are allowed when survey is not completed
       const allowedPagesWithoutSurvey = ['/dashboard', '/login', '/register']
       const isOnAllowedPage = allowedPagesWithoutSurvey.includes(location.pathname)
@@ -121,8 +128,11 @@ export const AppRoute: React.FC<AppRouteProps> = ({
               const response = await surveyService.fetchSurvey(token!)
               setSurvey(response.survey)
 
-              // Redirect to appropriate getting-started page based on survey response
-              if (response.survey) {
+              // If user is on a shared session page, keep them there
+              // Otherwise, redirect to appropriate getting-started page based on survey response
+              const isOnSessionPage = location.pathname.startsWith('/spotlight/session-analytics/')
+
+              if (!isOnSessionPage && response.survey) {
                 const usageTypes = response.survey.usage_types || []
                 if (usageTypes.includes('ai-agent')) {
                   navigate('/spotlight/getting-started', { replace: true })
