@@ -44,6 +44,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Check for stored token on app load (localStorage for persistent, sessionStorage for temporary)
     const persistentToken = localStorage.getItem('auth_token')
     const sessionToken = sessionStorage.getItem('auth_token')
+
+    // Migration: If token is in sessionStorage but not localStorage, move it to localStorage
+    // This ensures tokens work across tabs for sharing links
+    if (sessionToken && !persistentToken) {
+      localStorage.setItem('auth_token', sessionToken)
+      sessionStorage.removeItem('auth_token')
+    }
+
     const storedToken = persistentToken || sessionToken
 
     if (storedToken) {
@@ -81,7 +89,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
-  const login = async (email: string, password: string, rememberMe = false) => {
+  const login = async (email: string, password: string, rememberMe = true) => {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
@@ -99,6 +107,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const { token: authToken, user: userData } = data
 
     // Store token based on "Remember Me" preference
+    // Default to localStorage so tokens work across tabs (important for sharing links)
     if (rememberMe) {
       localStorage.setItem('auth_token', authToken)
       sessionStorage.removeItem('auth_token') // Clear session storage if exists

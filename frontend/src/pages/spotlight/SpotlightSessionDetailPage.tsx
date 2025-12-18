@@ -6,6 +6,8 @@ import { AppLayout } from '../../components/layout/AppLayout'
 import { useAuth } from '../../contexts/AuthContext'
 import { useHasSpotlightData } from '../../hooks/useHasSpotlightData'
 import { ChevronDownIcon, ChevronUpIcon, InfoCircledIcon, ArrowLeftIcon, Share1Icon, CopyIcon } from '@radix-ui/react-icons'
+import { MdQrCode } from 'react-icons/md'
+import { QRCodeSVG } from 'qrcode.react'
 import axios from 'axios'
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000'
@@ -66,6 +68,7 @@ export const SpotlightSessionDetailPage: React.FC = () => {
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null)
   const [copyLinkSuccess, setCopyLinkSuccess] = useState(false)
   const [loadingShare, setLoadingShare] = useState(false)
+  const [showQRCode, setShowQRCode] = useState(false)
 
   const { data: sessionDetail, isLoading: loadingDetail, refetch } = useQuery<SessionDetail>(
     ['spotlight-session-detail', shareToken],
@@ -340,6 +343,15 @@ export const SpotlightSessionDetailPage: React.FC = () => {
               >
                 <CopyIcon /> {copyLinkSuccess ? 'Copied!' : 'Copy Link'}
               </Button>
+              <Button
+                onClick={() => setShowQRCode(true)}
+                variant="soft"
+                size="2"
+                disabled={!shareEnabled || loadingShare || loadingDetail}
+                style={{ cursor: !shareEnabled || loadingShare || loadingDetail ? 'not-allowed' : 'pointer' }}
+              >
+                {MdQrCode({ size: 16 })}
+              </Button>
             </Flex>
           )}
         </Flex>
@@ -613,6 +625,27 @@ export const SpotlightSessionDetailPage: React.FC = () => {
               </Flex>
             )}
           </Box>
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* QR Code Modal */}
+      <Dialog.Root open={showQRCode} onOpenChange={setShowQRCode}>
+        <Dialog.Content style={{ maxWidth: '700px', textAlign: 'center' }}>
+          <Dialog.Title>Session QR Code</Dialog.Title>
+          <Dialog.Description size="2" mb="4">
+            Scan this code to access the session
+          </Dialog.Description>
+          <Flex direction="column" align="center" gap="4">
+            <QRCodeSVG
+              value={`${window.location.origin}/spotlight/session-analytics/${shareToken}`}
+              size={600}
+              level="H"
+              includeMargin={true}
+            />
+            <Text size="1" color="gray">
+              Scan with your phone camera or QR code app
+            </Text>
+          </Flex>
         </Dialog.Content>
       </Dialog.Root>
     </AppLayout>
