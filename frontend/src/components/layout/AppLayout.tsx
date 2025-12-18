@@ -15,7 +15,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       <Flex direction="column" style={{ flex: 1, height: '100vh' }}>
         <QuotaBar />
         <Header />
-        <Box style={{ flex: 1, padding: '24px', overflowY: 'auto', minHeight: 0 }}>
+        <Box className="app-content-area" style={{ flex: 1, padding: '24px', overflow: 'auto', minHeight: 0 }}>
           {children}
         </Box>
       </Flex>

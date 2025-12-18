@@ -13,9 +13,9 @@ interface AuthContextType {
   user: User | null
   token: string | null
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>
-  loginWithGoogle: () => Promise<void>
-  loginWithGithub: () => Promise<void>
-  handleOAuthCallback: (provider: 'google' | 'github', code: string) => Promise<void>
+  loginWithGoogle: (returnTo?: string) => Promise<void>
+  loginWithGithub: (returnTo?: string) => Promise<void>
+  handleOAuthCallback: (provider: 'google' | 'github', code: string, state?: string) => Promise<{ returnTo?: string }>
   register: (email: string, password: string) => Promise<void>
   verify: (email: string, verification_token: string) => Promise<void>
   resendVerification: (email: string) => Promise<void>
@@ -183,8 +183,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await response.json()
   }
 
-  const loginWithGoogle = async () => {
-    const response = await fetch(`${API_BASE_URL}/auth/oauth/google`)
+  const loginWithGoogle = async (returnTo?: string) => {
+    const url = new URL(`${API_BASE_URL}/auth/oauth/google`)
+    if (returnTo) {
+      url.searchParams.append('returnTo', returnTo)
+    }
+
+    const response = await fetch(url.toString())
 
     if (!response.ok) {
       throw new Error('Failed to initiate Google OAuth')
@@ -194,8 +199,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     window.location.href = data.url
   }
 
-  const loginWithGithub = async () => {
-    const response = await fetch(`${API_BASE_URL}/auth/oauth/github`)
+  const loginWithGithub = async (returnTo?: string) => {
+    const url = new URL(`${API_BASE_URL}/auth/oauth/github`)
+    if (returnTo) {
+      url.searchParams.append('returnTo', returnTo)
+    }
+
+    const response = await fetch(url.toString())
 
     if (!response.ok) {
       throw new Error('Failed to initiate GitHub OAuth')
@@ -205,13 +215,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     window.location.href = data.url
   }
 
-  const handleOAuthCallback = async (provider: 'google' | 'github', code: string) => {
+  const handleOAuthCallback = async (provider: 'google' | 'github', code: string, state?: string) => {
     const response = await fetch(`${API_BASE_URL}/auth/oauth/${provider}/callback`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, state }),
     })
 
     if (!response.ok) {
@@ -220,7 +230,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
 
     const data = await response.json()
-    const { token: authToken, user: userData } = data
+    const { token: authToken, user: userData, returnTo } = data
 
     // Store token in localStorage for OAuth logins
     localStorage.setItem('auth_token', authToken)
@@ -228,6 +238,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     setToken(authToken)
     setUser(userData)
+
+    return { returnTo }
   }
 
   const logout = () => {

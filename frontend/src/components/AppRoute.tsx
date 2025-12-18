@@ -84,7 +84,7 @@ export const AppRoute: React.FC<AppRouteProps> = ({
 
     // Getting-started pages require a completed survey
     if (isGettingStartedPage && !survey) {
-      return <Navigate to="/dashboard" replace />
+      return <Navigate to="/spotlight/session-analytics" replace />
     }
 
     // For non-getting-started pages, check survey completion
@@ -93,9 +93,9 @@ export const AppRoute: React.FC<AppRouteProps> = ({
       const allowedPagesWithoutSurvey = ['/dashboard', '/login', '/register']
       const isOnAllowedPage = allowedPagesWithoutSurvey.includes(location.pathname)
 
-      // If survey is not completed and user is not on an allowed page, redirect to dashboard
+      // If survey is not completed and user is not on an allowed page, redirect to spotlight/session-analytics
       if (!survey && !isOnAllowedPage) {
-        return <Navigate to="/dashboard" replace />
+        return <Navigate to="/spotlight/session-analytics" replace />
       }
 
       // Determine if user has any data at all

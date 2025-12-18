@@ -38,7 +38,13 @@ export const LoginPage: React.FC = () => {
     setLoading(true)
 
     try {
-      await loginWithGoogle()
+      // Pass returnTo to OAuth flow (will be encoded in state parameter)
+      // Also store in sessionStorage as fallback
+      const returnToParam = returnTo !== '/dashboard' ? returnTo : undefined
+      if (returnToParam) {
+        sessionStorage.setItem('oauth_return_to', returnToParam)
+      }
+      await loginWithGoogle(returnToParam)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Google login failed')
       setLoading(false)
@@ -50,7 +56,13 @@ export const LoginPage: React.FC = () => {
     setLoading(true)
 
     try {
-      await loginWithGithub()
+      // Pass returnTo to OAuth flow (will be encoded in state parameter)
+      // Also store in sessionStorage as fallback
+      const returnToParam = returnTo !== '/dashboard' ? returnTo : undefined
+      if (returnToParam) {
+        sessionStorage.setItem('oauth_return_to', returnToParam)
+      }
+      await loginWithGithub(returnToParam)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'GitHub login failed')
       setLoading(false)

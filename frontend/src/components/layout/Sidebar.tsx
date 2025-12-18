@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import * as Icons from '@radix-ui/react-icons'
-import { Flex, Text, Badge, Avatar } from '@radix-ui/themes'
+import { Flex, Text, Badge, Avatar, IconButton } from '@radix-ui/themes'
 import { useHasTelemetry } from '../../hooks/useHasTelemetry'
 import { useHasSpotlightData } from '../../hooks/useHasSpotlightData'
+import { useMobileSidebar } from '../../contexts/MobileSidebarContext'
 
 const aiAnalyticsGettingStarted = {
   section: 'Agent Analytics',
@@ -83,6 +84,12 @@ export const Sidebar: React.FC = () => {
   const location = useLocation()
   const { hasTelemetry, loading: telemetryLoading } = useHasTelemetry()
   const { hasSpotlightData, loading: spotlightLoading } = useHasSpotlightData()
+  const { isOpen, closeSidebar } = useMobileSidebar()
+
+  // Close sidebar on navigation (mobile only)
+  useEffect(() => {
+    closeSidebar()
+  }, [location.pathname])
 
   // Filter navigation items based on whether user has telemetry data
   // While loading, default to showing normal buttons to avoid whiplash
@@ -92,31 +99,35 @@ export const Sidebar: React.FC = () => {
     (telemetryLoading || hasTelemetry) ? mcpTelemetryItems : mcpTelemetryOnboarding,
   ]
 
-  return (
-    <Flex
-      direction="column"
-      style={{
-        width: '256px',
-        backgroundColor: 'var(--gray-2)',
-        borderRight: '1px solid var(--gray-6)',
-        height: '100vh',
-        flexShrink: 0,
-        overflow: 'hidden'
-      }}
-    >
+  const sidebarContent = (
+    <>
       {/* Logo */}
       <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-        <Flex align="center" gap="3" style={{ padding: '16px', height: '64px', borderBottom: '1px solid var(--gray-6)', cursor: 'pointer' }}>
-          <img
-            src="/images/ShinzoIcon512.png"
-            alt="Shinzo Logo"
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '6px'
+        <Flex align="center" justify="between" gap="3" style={{ padding: '16px', height: '64px', borderBottom: '1px solid var(--gray-6)', cursor: 'pointer' }}>
+          <Flex align="center" gap="3">
+            <img
+              src="/images/ShinzoIcon512.png"
+              alt="Shinzo Logo"
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px'
+              }}
+            />
+            <Text size="4" weight="bold">Shinzo</Text>
+          </Flex>
+          {/* Close button for mobile */}
+          <IconButton
+            variant="ghost"
+            className="hamburger-button"
+            onClick={(e) => {
+              e.preventDefault()
+              closeSidebar()
             }}
-          />
-          <Text size="4" weight="bold">Shinzo</Text>
+            style={{ display: 'none' }}
+          >
+            <Icons.Cross2Icon />
+          </IconButton>
         </Flex>
       </Link>
 
@@ -143,6 +154,49 @@ export const Sidebar: React.FC = () => {
           </React.Fragment>
         ))}
       </Flex>
-    </Flex>
+    </>
+  )
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={closeSidebar}
+        />
+      )}
+
+      {/* Desktop sidebar */}
+      <Flex
+        direction="column"
+        className="sidebar-desktop"
+        style={{
+          width: '256px',
+          backgroundColor: 'var(--gray-2)',
+          borderRight: '1px solid var(--gray-6)',
+          height: '100vh',
+          flexShrink: 0,
+          overflow: 'hidden'
+        }}
+      >
+        {sidebarContent}
+      </Flex>
+
+      {/* Mobile sidebar */}
+      <Flex
+        direction="column"
+        className={`sidebar-mobile ${isOpen ? 'open' : ''}`}
+        style={{
+          width: '256px',
+          backgroundColor: 'var(--gray-2)',
+          borderRight: '1px solid var(--gray-6)',
+          height: '100vh',
+          overflow: 'hidden'
+        }}
+      >
+        {sidebarContent}
+      </Flex>
+    </>
   )
 }
