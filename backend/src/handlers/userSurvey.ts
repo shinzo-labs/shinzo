@@ -14,25 +14,25 @@ export const handleSaveUserSurvey = async (userUuid: string, requestData: any) =
 
     const { usage_types, role, referral_sources } = requestData
 
-    // Check if survey already exists for this user
-    const existingSurvey = await UserSurvey.findOne({
-      where: { user_uuid: userUuid }
+    // Use findOrCreate to prevent race conditions on concurrent survey submissions
+    // The unique constraint on user_uuid will be enforced at the database level
+    const [survey, created] = await UserSurvey.findOrCreate({
+      where: { user_uuid: userUuid },
+      defaults: {
+        user_uuid: userUuid,
+        usage_types,
+        role,
+        referral_sources,
+      }
     })
 
-    if (existingSurvey) {
+    if (!created) {
+      // Survey already exists
       return {
         status: 400,
         response: { error: 'Survey already exists for this user' }
       }
     }
-
-    // Create new survey
-    const survey = await UserSurvey.create({
-      user_uuid: userUuid,
-      usage_types,
-      role,
-      referral_sources,
-    })
 
     logger.info({
       message: 'User survey saved successfully',

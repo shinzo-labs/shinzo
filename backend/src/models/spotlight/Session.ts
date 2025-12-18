@@ -11,7 +11,8 @@ export class Session extends CommonModel {
   public total_requests!: number
   public total_input_tokens!: number
   public total_output_tokens!: number
-  public total_cached_tokens!: number
+  public total_cache_creation_ephemeral_5m_input_tokens!: number
+  public total_cache_creation_ephemeral_1h_input_tokens!: number
 
   static initialize(sequelize: Sequelize) {
     Session.init(
@@ -57,7 +58,12 @@ export class Session extends CommonModel {
           allowNull: false,
           defaultValue: 0,
         },
-        total_cached_tokens: {
+        total_cache_creation_ephemeral_5m_input_tokens: {
+          type: DataTypes.INTEGER,
+          allowNull: false,
+          defaultValue: 0,
+        },
+        total_cache_creation_ephemeral_1h_input_tokens: {
           type: DataTypes.INTEGER,
           allowNull: false,
           defaultValue: 0,
