@@ -13,6 +13,9 @@ interface AuthContextType {
   user: User | null
   token: string | null
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>
+  loginWithGoogle: () => Promise<void>
+  loginWithGithub: () => Promise<void>
+  handleOAuthCallback: (provider: 'google' | 'github', code: string) => Promise<void>
   register: (email: string, password: string) => Promise<void>
   verify: (email: string, verification_token: string) => Promise<void>
   resendVerification: (email: string) => Promise<void>
@@ -180,18 +183,68 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     await response.json()
   }
 
+  const loginWithGoogle = async () => {
+    const response = await fetch(`${API_BASE_URL}/auth/oauth/google`)
+
+    if (!response.ok) {
+      throw new Error('Failed to initiate Google OAuth')
+    }
+
+    const data = await response.json()
+    window.location.href = data.url
+  }
+
+  const loginWithGithub = async () => {
+    const response = await fetch(`${API_BASE_URL}/auth/oauth/github`)
+
+    if (!response.ok) {
+      throw new Error('Failed to initiate GitHub OAuth')
+    }
+
+    const data = await response.json()
+    window.location.href = data.url
+  }
+
+  const handleOAuthCallback = async (provider: 'google' | 'github', code: string) => {
+    const response = await fetch(`${API_BASE_URL}/auth/oauth/${provider}/callback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ code }),
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(error || 'OAuth authentication failed')
+    }
+
+    const data = await response.json()
+    const { token: authToken, user: userData } = data
+
+    // Store token in localStorage for OAuth logins
+    localStorage.setItem('auth_token', authToken)
+    sessionStorage.removeItem('auth_token')
+
+    setToken(authToken)
+    setUser(userData)
+  }
+
   const logout = () => {
     localStorage.removeItem('auth_token')
     sessionStorage.removeItem('auth_token')
     setToken(null)
     setUser(null)
-    window.location.href = 'https://shinzo.ai'
+    window.location.href = '/login'
   }
 
   const value = {
     user,
     token,
     login,
+    loginWithGoogle,
+    loginWithGithub,
+    handleOAuthCallback,
     register,
     verify,
     resendVerification,

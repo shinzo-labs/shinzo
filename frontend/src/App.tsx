@@ -11,6 +11,7 @@ import { AppRoute } from './components/AppRoute'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
 import { VerifyPage } from './pages/auth/VerifyPage'
+import { OAuthCallbackPage } from './pages/auth/OAuthCallbackPage'
 
 // Main app pages
 import { DashboardPage } from './pages/DashboardPage'
@@ -54,6 +55,8 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/verify" element={<VerifyPage />} />
+                <Route path="/auth/callback/google" element={<OAuthCallbackPage />} />
+                <Route path="/auth/callback/github" element={<OAuthCallbackPage />} />
                 <Route path="/spotlight/session-analytics/shared/:shareToken" element={<SpotlightSharedSessionPage />} />
 
                 {/* Protected routes with onboarding */}

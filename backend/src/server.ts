@@ -27,6 +27,14 @@ import {
 } from './handlers/auth'
 
 import {
+  handleGoogleOAuthUrl,
+  handleGoogleOAuthCallback,
+  handleGithubOAuthUrl,
+  handleGithubOAuthCallback,
+  oauthCallbackSchema
+} from './handlers/oauth'
+
+import {
   handleFetchResources,
   handleFetchTraces,
   handleFetchSpans,
@@ -236,6 +244,65 @@ app.get('/auth/fetch_user_quota', async (request: AuthenticatedRequest, reply: F
   } catch (error: any) {
     logger.error({ message: 'Fetch user quota error', error })
     reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// OAuth endpoints
+app.get('/auth/oauth/google', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const result = await handleGoogleOAuthUrl()
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Google OAuth URL error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.post('/auth/oauth/google/callback', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const validatedBody = await oauthCallbackSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleGoogleOAuthCallback(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Google OAuth callback error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
+  }
+})
+
+app.get('/auth/oauth/github', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const result = await handleGithubOAuthUrl()
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'GitHub OAuth URL error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.post('/auth/oauth/github/callback', async (request: FastifyRequest, reply: FastifyReply) => {
+  try {
+    const validatedBody = await oauthCallbackSchema.validate(request.body, {
+      abortEarly: false,
+      stripUnknown: true,
+    })
+
+    const result = await handleGithubOAuthCallback(validatedBody)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'GitHub OAuth callback error', error })
+    if (error.name === 'ValidationError') {
+      reply.status(400).send({ error: error.message })
+    } else {
+      reply.status(500).send({ error: 'Internal server error' })
+    }
   }
 })
 
