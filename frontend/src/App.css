@@ -1,7 +1,8 @@
 @import '@radix-ui/themes/styles.css';
 
 /* Reset body margins and padding */
-body, html {
+body,
+html {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -41,6 +42,7 @@ body, html {
   0% {
     background-position: 200% 0;
   }
+
   100% {
     background-position: -200% 0;
   }
@@ -74,4 +76,134 @@ button[data-disabled],
 /* Links should always show pointer */
 a:not([disabled]) {
   cursor: pointer !important;
+}
+
+/* Responsive breakpoints */
+:root {
+  --mobile-breakpoint: 768px;
+}
+
+/* Mobile sidebar overlay */
+@media (max-width: 768px) {
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 998;
+  }
+
+  .sidebar-mobile {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 999;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  .sidebar-mobile.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-desktop {
+    display: none !important;
+  }
+
+  .hamburger-button {
+    display: flex !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .sidebar-mobile {
+    display: none !important;
+  }
+
+  .hamburger-button {
+    display: none !important;
+  }
+}
+
+/* Mobile header button optimizations */
+@media (max-width: 768px) {
+  .app-content-area {
+    width: 100vw !important;
+    max-width: none !important;
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Allow flex containers to expand beyond viewport */
+  .app-content-area>* {
+    min-width: min-content !important;
+  }
+
+  /* Hide button text labels on mobile, keep icons */
+  .header-button-text {
+    display: none !important;
+  }
+
+  /* Make header buttons more compact */
+  .rt-Button {
+    padding: 8px !important;
+    min-width: auto !important;
+  }
+
+  /* Reduce header padding and gaps on mobile */
+  .mobile-header {
+    padding: 12px 12px !important;
+    gap: 8px !important;
+    max-width: 100vw !important;
+    width: 100vw !important;
+    position: sticky !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 100 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Ensure header buttons container stays visible */
+  .header-buttons-container {
+    position: relative;
+    margin-left: auto !important;
+  }
+
+  /* Mobile quota bar - also fix to viewport width */
+  .quota-bar-mobile {
+    padding: 8px 12px !important;
+    min-height: 36px !important;
+    max-width: 100vw !important;
+    width: 100vw !important;
+    position: sticky !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 101 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Mobile quota bar optimizations */
+  .quota-bar-mobile {
+    padding: 8px 12px !important;
+    min-height: 36px !important;
+  }
+
+  /* Hide quota bar progress bar on very small screens */
+  .quota-bar-progress {
+    display: none !important;
+  }
+
+  /* Make quota bar button more compact on mobile */
+  .quota-bar-upgrade-btn-text {
+    display: none !important;
+  }
+
+  /* QR Code dialog responsive on mobile */
+  .qr-code-dialog {
+    max-width: calc(100vw - 32px) !important;
+    width: calc(100vw - 32px) !important;
+  }
 }

@@ -1,10 +1,12 @@
 import React from 'react'
-import { DropdownMenu, Avatar, Flex, Text, Button } from '@radix-ui/themes'
+import { DropdownMenu, Avatar, Flex, Text, Button, IconButton } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { useAuth } from '../../contexts/AuthContext'
+import { useMobileSidebar } from '../../contexts/MobileSidebarContext'
 
 export const Header: React.FC = () => {
   const { user, logout } = useAuth()
+  const { toggleSidebar } = useMobileSidebar()
 
   const handleLogout = () => {
     logout()
@@ -12,6 +14,7 @@ export const Header: React.FC = () => {
 
   return (
     <Flex
+      className="mobile-header"
       style={{
         backgroundColor: 'var(--color-background)',
         borderBottom: '1px solid var(--gray-6)',
@@ -19,15 +22,21 @@ export const Header: React.FC = () => {
         minHeight: '64px',
         flexShrink: 0
       }}
-      justify="between"
       align="center"
       gap="4"
     >
-      {/* Left side - could be used for page title or breadcrumbs later */}
-      <Flex />
+      {/* Left side - Hamburger menu for mobile */}
+      <IconButton
+        variant="ghost"
+        className="hamburger-button"
+        onClick={toggleSidebar}
+        style={{ display: 'none' }}
+      >
+        <Icons.HamburgerMenuIcon width="20" height="20" />
+      </IconButton>
 
       {/* Right side */}
-      <Flex align="center" gap="4">
+      <Flex align="center" gap="2" className="header-buttons-container" style={{ flexShrink: 0 }}>
         {/* Documentation button */}
         <Button
           variant="solid"
@@ -35,7 +44,7 @@ export const Header: React.FC = () => {
           onClick={() => window.open('https://docs.shinzo.ai', '_blank')}
         >
           <Icons.QuestionMarkCircledIcon />
-          Docs
+          <span className="header-button-text">Docs</span>
         </Button>
 
         {/* Live Support dropdown */}
@@ -43,8 +52,8 @@ export const Header: React.FC = () => {
           <DropdownMenu.Trigger>
             <Button variant="outline" size="2">
               <Icons.ChatBubbleIcon />
-              Need support?
-              <Icons.ChevronDownIcon />
+              <span className="header-button-text">Need support?</span>
+              <Icons.ChevronDownIcon className="header-button-text" />
             </Button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Content align="end">
@@ -68,10 +77,10 @@ export const Header: React.FC = () => {
               fallback={user?.email.charAt(0).toUpperCase() || 'U'}
               color="blue"
             />
-            <Text size="2">
+            <Text size="2" className="header-button-text">
               {user?.email}
             </Text>
-            <Icons.ChevronDownIcon />
+            <Icons.ChevronDownIcon className="header-button-text" />
           </Button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end">

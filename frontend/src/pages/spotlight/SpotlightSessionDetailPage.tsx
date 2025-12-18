@@ -632,18 +632,21 @@ export const SpotlightSessionDetailPage: React.FC = () => {
 
       {/* QR Code Modal */}
       <Dialog.Root open={showQRCode} onOpenChange={setShowQRCode}>
-        <Dialog.Content style={{ maxWidth: '700px', textAlign: 'center' }}>
+        <Dialog.Content className="qr-code-dialog" style={{ maxWidth: '700px', textAlign: 'center' }}>
           <Dialog.Title>Session QR Code</Dialog.Title>
           <Dialog.Description size="2" mb="4">
             Scan this code to access the session
           </Dialog.Description>
           <Flex direction="column" align="center" gap="4">
-            <QRCodeSVG
-              value={`${window.location.origin}/spotlight/session-analytics/${shareToken}`}
-              size={600}
-              level="H"
-              includeMargin={true}
-            />
+            <Box style={{ width: '100%', maxWidth: '600px', aspectRatio: '1/1' }}>
+              <QRCodeSVG
+                value={`${window.location.origin}/spotlight/session-analytics/${shareToken}`}
+                size={600}
+                level="H"
+                includeMargin={true}
+                style={{ width: '100%', height: 'auto', maxWidth: '100%' }}
+              />
+            </Box>
             <Text size="1" color="gray">
               Scan with your phone camera or QR code app
             </Text>

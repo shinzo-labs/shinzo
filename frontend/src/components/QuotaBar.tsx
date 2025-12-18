@@ -32,7 +32,7 @@ export const QuotaBar: React.FC<QuotaBarProps> = ({ className }) => {
   if (monthlyQuota === null) {
     return (
       <Flex
-        className={className}
+        className={`${className} quota-bar-mobile`}
         style={{
           backgroundColor: 'var(--green-2)',
           borderBottom: '1px solid var(--green-6)',
@@ -76,7 +76,7 @@ export const QuotaBar: React.FC<QuotaBarProps> = ({ className }) => {
 
   return (
     <Flex
-      className={className}
+      className={`${className} quota-bar-mobile`}
       style={{
         backgroundColor: isOverLimit ? 'var(--red-2)' : isNearLimit ? 'var(--orange-2)' : 'var(--blue-2)',
         borderBottom: isOverLimit ? '1px solid var(--red-6)' : isNearLimit ? '1px solid var(--orange-6)' : '1px solid var(--blue-6)',
@@ -85,16 +85,16 @@ export const QuotaBar: React.FC<QuotaBarProps> = ({ className }) => {
       }}
       justify="between"
       align="center"
-      gap="4"
+      gap="2"
     >
-      <Flex align="center" gap="3" style={{ flex: 1 }}>
+      <Flex align="center" gap="2" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
         <Badge color={getStatusColor()} variant="soft">
           {getTierDisplayName()} Plan
         </Badge>
 
-        <Flex direction="column" gap="1" style={{ flex: 1, maxWidth: '300px' }}>
-          <Flex align="center" gap="2">
-            <Text size="1" color="gray">
+        <Flex direction="column" gap="1" style={{ flex: 1, maxWidth: '300px', minWidth: 0 }}>
+          <Flex align="center" gap="2" style={{ flexWrap: 'wrap' }}>
+            <Text size="1" color="gray" style={{ whiteSpace: 'nowrap' }}>
               {getUsageText()}
             </Text>
             {isOverLimit && (
@@ -109,6 +109,7 @@ export const QuotaBar: React.FC<QuotaBarProps> = ({ className }) => {
             )}
           </Flex>
           <Progress
+            className="quota-bar-progress"
             value={usagePercentage}
             color={getStatusColor()}
             size="1"
@@ -118,9 +119,9 @@ export const QuotaBar: React.FC<QuotaBarProps> = ({ className }) => {
 
       <AlertDialog.Root>
         <AlertDialog.Trigger>
-          <Button variant="outline" color={getStatusColor()} size="2">
+          <Button variant="outline" color={getStatusColor()} size="2" style={{ flexShrink: 0 }}>
             {(isNearLimit || isOverLimit) ? <Icons.ExclamationTriangleIcon /> : <Icons.RocketIcon />}
-            Upgrade Plan
+            <span className="quota-bar-upgrade-btn-text">Upgrade Plan</span>
           </Button>
         </AlertDialog.Trigger>
         <AlertDialog.Content style={{ maxWidth: 450 }}>

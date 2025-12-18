@@ -5,6 +5,7 @@ import { Theme } from '@radix-ui/themes'
 import { AuthProvider } from './contexts/AuthContext'
 import { UserPreferencesProvider } from './contexts/UserPreferencesContext'
 import { RefreshProvider } from './contexts/RefreshContext'
+import { MobileSidebarProvider } from './contexts/MobileSidebarContext'
 import { AppRoute } from './components/AppRoute'
 
 // Auth pages
@@ -49,8 +50,9 @@ function App() {
           <UserPreferencesProvider>
             <RefreshProvider>
               <Router>
-                <div className="App">
-                  <Routes>
+                <MobileSidebarProvider>
+                  <div className="App">
+                    <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
@@ -123,7 +125,8 @@ function App() {
                 {/* Default redirect */}
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Routes>
-              </div>
+                  </div>
+                </MobileSidebarProvider>
               </Router>
             </RefreshProvider>
           </UserPreferencesProvider>
