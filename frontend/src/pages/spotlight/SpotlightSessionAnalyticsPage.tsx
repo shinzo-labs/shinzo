@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery } from 'react-query'
-import { Flex, Text, Card, Table, Badge, Dialog, Code, Box, Tooltip, Spinner } from '@radix-ui/themes'
+import { Flex, Text, Card, Table, Badge, Dialog, Grid, Code, Box, Tooltip, Spinner } from '@radix-ui/themes'
 import { AppLayout } from '../../components/layout/AppLayout'
 import { useAuth } from '../../contexts/AuthContext'
 import { ChevronDownIcon, ChevronUpIcon, InfoCircledIcon } from '@radix-ui/react-icons'
@@ -16,6 +16,7 @@ interface Session {
   total_requests: number
   total_input_tokens: number
   total_output_tokens: number
+  total_cache_read_input_tokens: number
   total_cache_creation_ephemeral_5m_input_tokens: number
   total_cache_creation_ephemeral_1h_input_tokens: number
   interaction_count: number
@@ -56,7 +57,26 @@ interface Interaction {
   }>
 }
 
-type SortColumn = 'start_time' | 'end_time' | 'total_requests' | 'total_input_tokens' | 'total_output_tokens' | 'total_cache_creation_ephemeral_5m_input_tokens' | 'total_cache_creation_ephemeral_1h_input_tokens'
+interface TokenAnalytics {
+  summary: {
+    total_input_tokens: number
+    total_output_tokens: number
+    total_cached_tokens: number
+    total_cache_creation_5m_tokens: number
+    total_cache_creation_1h_tokens: number
+    total_requests: number
+  }
+  by_model: Record<string, {
+    input_tokens: number
+    output_tokens: number
+    cached_tokens: number
+    cache_creation_5m_tokens: number
+    cache_creation_1h_tokens: number
+    request_count: number
+  }>
+}
+
+type SortColumn = 'start_time' | 'end_time' | 'total_requests' | 'total_input_tokens' | 'total_output_tokens' | 'total_cache_read_input_tokens' | 'total_cache_creation_ephemeral_5m_input_tokens' | 'total_cache_creation_ephemeral_1h_input_tokens'
 type SortDirection = 'asc' | 'desc'
 
 export const SpotlightSessionAnalyticsPage: React.FC = () => {
@@ -67,10 +87,23 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
   const [sortColumn, setSortColumn] = useState<SortColumn>('start_time')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
-  const { data: analytics, isLoading, error } = useQuery<SessionAnalytics>(
+  const { data: sessionAnalytics, isLoading: isLoadingSessionAnalytics, error: errorSessionAnalytics } = useQuery<SessionAnalytics>(
     'spotlight-session-analytics',
     async () => {
       const response = await axios.get(`${BACKEND_URL}/spotlight/analytics/sessions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      return response.data
+    },
+    {
+      retry: false
+    }
+  )
+
+  const { data: tokenAnalytics, isLoading: isLoadingTokenAnalytics, error: errorTokenAnalytics } = useQuery<TokenAnalytics>(
+    'spotlight-token-analytics',
+    async () => {
+      const response = await axios.get(`${BACKEND_URL}/spotlight/analytics/tokens`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       return response.data
@@ -96,9 +129,9 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
   )
 
   const sortedSessions = useMemo(() => {
-    if (!analytics?.sessions) return []
+    if (!sessionAnalytics?.sessions) return []
 
-    const sorted = [...analytics.sessions].sort((a, b) => {
+    const sorted = [...sessionAnalytics.sessions].sort((a, b) => {
       let aVal: any, bVal: any
 
       switch (sortColumn) {
@@ -142,7 +175,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
     })
 
     return sorted
-  }, [analytics?.sessions, sortColumn, sortDirection])
+  }, [sessionAnalytics?.sessions, sortColumn, sortDirection])
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -169,25 +202,10 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
     </Table.ColumnHeaderCell>
   )
 
-  const estimateTokens = (text: string): number => {
-    // Estimate tokens using 4 characters per token average
-    return Math.ceil(text.length / 4)
-  }
-
-  const getTokenCount = (actualTokens: number, fallbackText?: string): { count: number; isEstimated: boolean } => {
-    if (actualTokens && actualTokens > 0) {
-      return { count: actualTokens, isEstimated: false }
-    }
-    if (fallbackText) {
-      return { count: estimateTokens(fallbackText), isEstimated: true }
-    }
-    return { count: 0, isEstimated: false }
-  }
-
-  const formatTokenDisplay = (actualTokens: number, fallbackText?: string): string => {
-    const { count, isEstimated } = getTokenCount(actualTokens, fallbackText)
-    if (count === 0) return '0'
-    return isEstimated ? `~${count.toLocaleString()}` : count.toLocaleString()
+  const formatTokenDisplay = (actualTokens: number, fallbackText: string = 'N/A'): string => {
+    if (actualTokens === 0) return '0'
+    else if (!actualTokens) return fallbackText
+    else return actualTokens.toLocaleString()
   }
 
   const countToolsInMessages = (messages: any[], toolType: 'tool_use' | 'tool_result'): number => {
@@ -360,18 +378,109 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
     <AppLayout>
       <Flex direction="column" gap="4" style={{ padding: '24px' }}>
         <Flex direction="column" gap="2">
+          <Text size="6" weight="bold">Token Analytics</Text>
+          <Text size="2" color="gray">Track token usage across models and sessions</Text>
+        </Flex>
+
+        {isLoadingTokenAnalytics ? (
+          <Card>
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Spinner size="3" />
+              <Text size="2" color="gray">Loading token analytics...</Text>
+            </Flex>
+          </Card>
+        ) : errorTokenAnalytics ? (
+          <Card>
+            <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+              <Text size="3" color="red">Failed to load token analytics</Text>
+              <Text size="2" color="gray">Please try refreshing the page</Text>
+            </Flex>
+          </Card>
+        ) : (
+          <>
+            <Grid columns="3" gap="4">
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Total Requests</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_requests.toLocaleString()}</Text>
+              </Card>
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Input Tokens</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_input_tokens.toLocaleString()}</Text>
+              </Card>
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Output Tokens</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_output_tokens.toLocaleString()}</Text>
+              </Card>
+            </Grid>
+
+            <Grid columns="3" gap="4">
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Cache Reads</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_cached_tokens.toLocaleString()}</Text>
+              </Card>
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>5m Cache Writes</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_cache_creation_5m_tokens.toLocaleString()}</Text>
+              </Card>
+              <Card>
+                <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>1h Cache Writes</Text>
+                <Text size="6" weight="bold">{tokenAnalytics?.summary.total_cache_creation_1h_tokens.toLocaleString()}</Text>
+              </Card>
+            </Grid>
+
+            <Card>
+              <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Token Usage by Model</Text>
+              {!tokenAnalytics || Object.keys(tokenAnalytics?.by_model || {}).length === 0 ? (
+                <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
+                  <Text size="3" color="gray">No data yet</Text>
+                  <Text size="2" color="gray">Start using Spotlight to see analytics</Text>
+                </Flex>
+              ) : (
+                <Table.Root>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Requests</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {Object.entries(tokenAnalytics?.by_model || {}).map(([model, stats]) => (
+                      <Table.Row key={model}>
+                        <Table.Cell><Badge>{model}</Badge></Table.Cell>
+                        <Table.Cell>{stats.request_count.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.input_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.output_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.cached_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.cache_creation_5m_tokens.toLocaleString()}</Table.Cell>
+                        <Table.Cell>{stats.cache_creation_1h_tokens.toLocaleString()}</Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+              )}
+            </Card>
+          </>
+        )}
+      </Flex>
+      <Flex direction="column" gap="4" style={{ padding: '24px' }}>
+        <Flex direction="column" gap="2">
           <Text size="6" weight="bold">Session Analytics</Text>
           <Text size="2" color="gray">Review conversation sessions and interaction details</Text>
         </Flex>
 
-        {isLoading ? (
+        {isLoadingSessionAnalytics ? (
           <Card>
             <Flex direction="column" align="center" justify="center" gap="3" style={{ padding: '48px' }}>
               <Spinner size="3" />
-              <Text size="2" color="gray">Loading session analytics...</Text>
+              <Text size="2" color="gray">Loading recent sessions...</Text>
             </Flex>
           </Card>
-        ) : error ? (
+        ) : errorSessionAnalytics ? (
           <Card>
             <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
               <Text size="3" color="red">Failed to load analytics</Text>
@@ -380,13 +489,9 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
           </Card>
         ) : (
           <>
-            <Card>
-              <Text size="2" color="gray" style={{ marginBottom: '8px', marginRight: '8px' }}>Total Sessions</Text>
-              <Text size="6" weight="bold">{analytics?.total_sessions}</Text>
-            </Card>
 
             <Card>
-              <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Recent Sessions</Text>
+              <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Recent Sessions ({sessionAnalytics?.sessions?.length?.toLocaleString() || 0})</Text>
               {!sortedSessions || sortedSessions.length === 0 ? (
                 <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
                   <Text size="3" color="gray">No sessions yet</Text>
@@ -397,11 +502,12 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                   <Table.Root>
                     <Table.Header>
                       <Table.Row>
-                        <Table.ColumnHeaderCell>Last Message</Table.ColumnHeaderCell>
+                        <Table.ColumnHeaderCell>Last Completion</Table.ColumnHeaderCell>
                         <SortableHeader column="start_time">Started</SortableHeader>
                         <SortableHeader column="end_time">Last Updated</SortableHeader>
-                        <SortableHeader column="total_requests">Messages</SortableHeader>
+                        <SortableHeader column="total_requests">Completions</SortableHeader>
                         <SortableHeader column="total_input_tokens">Input Tokens</SortableHeader>
+                        <SortableHeader column="total_cache_read_input_tokens">Cache Reads</SortableHeader>
                         <SortableHeader column="total_cache_creation_ephemeral_5m_input_tokens">5m Cache Writes</SortableHeader>
                         <SortableHeader column="total_cache_creation_ephemeral_1h_input_tokens">1h Cache Writes</SortableHeader>
                         <SortableHeader column="total_output_tokens">Output Tokens</SortableHeader>
@@ -423,6 +529,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                           <Table.Cell>{session.end_time ? new Date(session.end_time).toLocaleString() : 'Active'}</Table.Cell>
                           <Table.Cell>{session.interaction_count}</Table.Cell>
                           <Table.Cell>{session.total_input_tokens.toLocaleString()}</Table.Cell>
+                          <Table.Cell>{session.total_cache_read_input_tokens.toLocaleString()}</Table.Cell>
                           <Table.Cell>{session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Table.Cell>
                           <Table.Cell>{session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Table.Cell>
                           <Table.Cell>{session.total_output_tokens.toLocaleString()}</Table.Cell>
@@ -430,9 +537,6 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                       ))}
                     </Table.Body>
                   </Table.Root>
-                  <Text size="1" color="gray" mt="2" style={{ fontStyle: 'italic' }}>
-                    * Token totals exclude estimated counts from error responses
-                  </Text>
                 </>
               )}
             </Card>
@@ -443,10 +547,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
       {/* Session Detail Modal */}
       <Dialog.Root open={!!selectedSessionUuid} onOpenChange={(open) => !open && setSelectedSessionUuid(null)}>
         <Dialog.Content style={{ maxWidth: '90vw', maxHeight: '90vh' }}>
-          <Dialog.Title>Session Details</Dialog.Title>
-          <Dialog.Description size="2" mb="4">
-            {sessionDetail?.session.session_id}
-          </Dialog.Description>
+          <Dialog.Title>Session ID: <code style={{ color: 'var(--blue-10)' }}>{sessionDetail?.session.session_id}</code></Dialog.Title>
 
           <Box style={{ maxHeight: 'calc(90vh - 120px)', overflowY: 'auto' }}>
             {loadingDetail ? (
@@ -457,44 +558,35 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
             ) : sessionDetail ? (
               <Flex direction="column" gap="4">
               {/* Session Summary */}
-              <Card>
-                <Flex direction="column" gap="2">
-                  <Flex justify="between">
-                    <Text size="2" color="gray">Total Requests</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_requests}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">Input Tokens</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_input_tokens.toLocaleString()}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">5m Cache Writes</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">1h Cache Writes</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">Output Tokens</Text>
-                    <Text size="2" weight="bold">{sessionDetail.session.total_output_tokens.toLocaleString()}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">Tool Uses</Text>
-                    <Text size="2" weight="bold">{getSessionToolUses(sessionDetail)}</Text>
-                  </Flex>
-                  <Flex justify="between">
-                    <Text size="2" color="gray">Tool Results</Text>
-                    <Text size="2" weight="bold">{getSessionToolResults(sessionDetail)}</Text>
-                  </Flex>
-                </Flex>
-                <Text size="1" color="gray" mt="2" style={{ fontStyle: 'italic' }}>
-                  * Estimated token counts from error responses are not included in these totals
-                </Text>
-              </Card>
+              <Box>
+                <Table.Root variant="surface">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeaderCell>Total Requests</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Tool Uses</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Tool Results</Table.ColumnHeaderCell>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    <Table.Row>
+                      <Table.Cell>{sessionDetail.session.total_requests}</Table.Cell>
+                      <Table.Cell>{sessionDetail.session.total_input_tokens.toLocaleString()}</Table.Cell>
+                      <Table.Cell>{sessionDetail.session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Table.Cell>
+                      <Table.Cell>{sessionDetail.session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Table.Cell>
+                      <Table.Cell>{sessionDetail.session.total_output_tokens.toLocaleString()}</Table.Cell>
+                      <Table.Cell>{getSessionToolUses(sessionDetail)}</Table.Cell>
+                      <Table.Cell>{getSessionToolResults(sessionDetail)}</Table.Cell>
+                    </Table.Row>
+                  </Table.Body>
+                </Table.Root>
+              </Box>
 
-              {/* Interactions Table */}
-              <Text size="4" weight="bold">Interactions</Text>
+              {/* Completions Table */}
+              <Text size="4" weight="bold">Completions</Text>
               <Table.Root>
                 <Table.Header>
                   <Table.Row>
@@ -505,6 +597,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                     <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
+                    <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
                     <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
@@ -552,6 +645,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                         </Table.Cell>
                         <Table.Cell><Badge>{interaction.model}</Badge></Table.Cell>
                         <Table.Cell>{formatTokenDisplay(interaction.input_tokens, JSON.stringify(interaction.request_data?.messages || ''))}</Table.Cell>
+                        <Table.Cell>{formatTokenDisplay(interaction.cache_read_input_tokens)}</Table.Cell>
                         <Table.Cell>{formatTokenDisplay(interaction.cache_creation_ephemeral_5m_input_tokens)}</Table.Cell>
                         <Table.Cell>{formatTokenDisplay(interaction.cache_creation_ephemeral_1h_input_tokens)}</Table.Cell>
                         <Table.Cell>{formatTokenDisplay(interaction.output_tokens, interaction.response_data?.content || '')}</Table.Cell>
@@ -565,49 +659,25 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                               <Flex direction="column" gap="3" p="3">
                                 {/* Request Metadata Table */}
                                 <Box>
-                                  <Text size="3" weight="bold" mb="2">Request Metadata</Text>
                                   <Table.Root variant="surface">
                                     <Table.Header>
                                       <Table.Row>
                                         <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
                                         <Table.ColumnHeaderCell>Provider</Table.ColumnHeaderCell>
+                                        <Table.ColumnHeaderCell>Messages</Table.ColumnHeaderCell>
                                         <Table.ColumnHeaderCell>Max Tokens</Table.ColumnHeaderCell>
                                         <Table.ColumnHeaderCell>Temperature</Table.ColumnHeaderCell>
+                                        <Table.ColumnHeaderCell>Stop Reason</Table.ColumnHeaderCell>
                                       </Table.Row>
                                     </Table.Header>
                                     <Table.Body>
                                       <Table.Row>
                                         <Table.Cell><Badge>{interaction.model}</Badge></Table.Cell>
                                         <Table.Cell><Badge>{interaction.provider}</Badge></Table.Cell>
+                                        <Table.Cell>{interaction.request_data?.messages?.length || 0}</Table.Cell>
                                         <Table.Cell>{interaction.request_data?.max_tokens || 'N/A'}</Table.Cell>
                                         <Table.Cell>{interaction.request_data?.temperature !== undefined ? interaction.request_data.temperature : 'N/A'}</Table.Cell>
-                                      </Table.Row>
-                                    </Table.Body>
-                                  </Table.Root>
-                                </Box>
-
-                                {/* Response Metadata Table */}
-                                <Box>
-                                  <Text size="3" weight="bold" mb="2">Response Metadata</Text>
-                                  <Table.Root variant="surface">
-                                    <Table.Header>
-                                      <Table.Row>
-                                        <Table.ColumnHeaderCell>Stop Reason</Table.ColumnHeaderCell>
-                                        <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
-                                        <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
-                                        <Table.ColumnHeaderCell>Cache Read</Table.ColumnHeaderCell>
-                                        <Table.ColumnHeaderCell>Cache Creation</Table.ColumnHeaderCell>
-                                        <Table.ColumnHeaderCell>Latency</Table.ColumnHeaderCell>
-                                      </Table.Row>
-                                    </Table.Header>
-                                    <Table.Body>
-                                      <Table.Row>
                                         <Table.Cell>{interaction.response_data?.stop_reason || 'N/A'}</Table.Cell>
-                                        <Table.Cell>{formatTokenDisplay(interaction.input_tokens, JSON.stringify(interaction.request_data?.messages || ''))}</Table.Cell>
-                                        <Table.Cell>{formatTokenDisplay(interaction.output_tokens, interaction.response_data?.content || '')}</Table.Cell>
-                                        <Table.Cell>{formatTokenDisplay(interaction.cache_read_input_tokens)}</Table.Cell>
-                                        <Table.Cell>{formatTokenDisplay(interaction.cache_creation_input_tokens)}</Table.Cell>
-                                        <Table.Cell>{interaction.latency_ms} ms</Table.Cell>
                                       </Table.Row>
                                     </Table.Body>
                                   </Table.Root>
@@ -642,7 +712,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                                     {interaction.request_data?.messages?.length > 1 ? (
                                       <details>
                                         <summary style={{ cursor: 'pointer', marginBottom: '8px' }}>
-                                          <Text size="2" color="blue">Show full conversation ({interaction.request_data.messages.length} messages)</Text>
+                                          <Text size="2" color="blue">Show full conversation... ({interaction.request_data.messages.length} messages)</Text>
                                         </summary>
                                         {formatMessages(interaction.request_data.messages)}
                                       </details>

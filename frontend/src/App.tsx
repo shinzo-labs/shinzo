@@ -23,7 +23,6 @@ import { SettingsPage } from './pages/SettingsPage'
 
 // Spotlight pages
 import { SpotlightApiKeysPage } from './pages/spotlight/SpotlightApiKeysPage'
-import { SpotlightTokenAnalyticsPage } from './pages/spotlight/SpotlightTokenAnalyticsPage'
 import { SpotlightSessionAnalyticsPage } from './pages/spotlight/SpotlightSessionAnalyticsPage'
 import { SpotlightGettingStartedPage } from './pages/spotlight/SpotlightGettingStartedPage'
 
@@ -90,11 +89,6 @@ function App() {
                 <Route path="/spotlight/api-keys" element={
                   <AppRoute protected requireOnboarding>
                     <SpotlightApiKeysPage />
-                  </AppRoute>
-                } />
-                <Route path="/spotlight/token-analytics" element={
-                  <AppRoute protected requireOnboarding>
-                    <SpotlightTokenAnalyticsPage />
                   </AppRoute>
                 } />
                 <Route path="/spotlight/session-analytics" element={

@@ -6,7 +6,7 @@ import { useHasTelemetry } from '../../hooks/useHasTelemetry'
 import { useHasSpotlightData } from '../../hooks/useHasSpotlightData'
 
 const aiAnalyticsGettingStarted = {
-  section: 'AI Analytics',
+  section: 'Agent Analytics',
   items: [
     {
       name: 'Getting Started',
@@ -17,17 +17,12 @@ const aiAnalyticsGettingStarted = {
 }
 
 const aiAnalyticsItems = {
-  section: 'AI Analytics',
+  section: 'Agent Analytics',
   items: [
     {
-      name: 'Token Analytics',
-      href: '/spotlight/token-analytics',
-      icon: Icons.BarChartIcon,
-    },
-    {
-      name: 'Session Analytics',
+      name: 'Dashboard',
       href: '/spotlight/session-analytics',
-      icon: Icons.ActivityLogIcon,
+      icon: Icons.DashboardIcon,
     },
     {
       name: 'API Keys',
