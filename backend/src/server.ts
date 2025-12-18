@@ -94,6 +94,8 @@ import {
   handleFetchSharedSessionDetail,
 } from './handlers/spotlight'
 
+logger.info('STARTUP: server.ts - All imports loaded, creating Fastify instance')
+
 // Create Fastify instance
 const app = fastify({
   logger: pinoConfig('backend'),
@@ -956,15 +958,19 @@ app.setErrorHandler((error, request, reply) => {
 // Start server
 const start = async () => {
   try {
+    logger.info('STARTUP: Entering start() function')
+
     // Test database connection
+    logger.info('STARTUP: About to call sequelize.authenticate()')
     await sequelize.authenticate()
-    logger.info('Database connection established successfully')
+    logger.info('STARTUP: Database connection established successfully')
 
     // Start server
-    logger.info({ msg: `Starting service on port ${PORT}` })
+    logger.info({ msg: `STARTUP: Starting Fastify server on port ${PORT}` })
     await app.listen({ port: parseInt(PORT), host: '0.0.0.0' })
+    logger.info({ msg: `STARTUP: Server successfully listening on port ${PORT}` })
   } catch (error) {
-    logger.error({ message: 'Failed to start server', error })
+    logger.error({ message: 'STARTUP ERROR: Failed to start server', error })
     process.exit(1)
   }
 }
@@ -984,4 +990,5 @@ process.on('SIGINT', async () => {
   process.exit(0)
 })
 
+logger.info('STARTUP: Server module loaded, about to call start()')
 start()

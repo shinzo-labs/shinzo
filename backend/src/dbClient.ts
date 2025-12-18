@@ -28,6 +28,7 @@ import {
   UserAnalytics
 } from './models'
 
+logger.info('STARTUP: dbClient - About to create Sequelize instance')
 export const sequelize = new Sequelize(DATABASE_URL, {
   dialect: 'postgres',
   dialectOptions: {
@@ -45,8 +46,10 @@ export const sequelize = new Sequelize(DATABASE_URL, {
     evict: 1_000// time interval (ms) after which sequelize-pool will remove idle connections
   }
 })
+logger.info('STARTUP: dbClient - Sequelize instance created')
 
 // Initialize models
+logger.info('STARTUP: dbClient - About to initialize models')
 User.initialize(sequelize)
 SubscriptionTier.initialize(sequelize)
 UserPreferences.initialize(sequelize)
@@ -71,8 +74,10 @@ TokenCountRequest.initialize(sequelize)
 Tool.initialize(sequelize)
 ToolUsage.initialize(sequelize)
 UserAnalytics.initialize(sequelize)
+logger.info('STARTUP: dbClient - All models initialized')
 
 // Set up associations
+logger.info('STARTUP: dbClient - About to set up associations')
 User.hasMany(Resource, { foreignKey: 'user_uuid', as: 'resources' })
 User.hasMany(IngestToken, { foreignKey: 'user_uuid', as: 'ingestTokens' })
 User.belongsTo(SubscriptionTier, { foreignKey: 'subscription_tier_uuid', as: 'subscriptionTier' })
@@ -153,4 +158,5 @@ ToolUsage.belongsTo(Tool, { foreignKey: 'tool_uuid', as: 'tool' })
 
 UserAnalytics.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
 
+logger.info('STARTUP: dbClient - All associations set up, dbClient module loaded successfully')
 export const dbClient = sequelize
