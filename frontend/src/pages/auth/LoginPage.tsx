@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button, TextField, Checkbox, Text, Heading, Card, Flex, Callout } from '@radix-ui/themes'
 import { EyeOpenIcon, EyeNoneIcon, ExclamationTriangleIcon } from '@radix-ui/react-icons'
@@ -14,6 +14,8 @@ export const LoginPage: React.FC = () => {
 
   const { login } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo') || '/dashboard'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,7 +24,7 @@ export const LoginPage: React.FC = () => {
 
     try {
       await login(email, password, rememberMe)
-      navigate('/dashboard')
+      navigate(returnTo)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
@@ -163,7 +165,7 @@ export const LoginPage: React.FC = () => {
           <Flex direction="column" gap="4" align="center">
             <Text size="2" color="gray">
               Don't have an account?{' '}
-              <Link to="/register" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
+              <Link to={`/register${returnTo !== '/dashboard' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
                 Create one
               </Link>
             </Text>

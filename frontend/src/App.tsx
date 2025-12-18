@@ -99,7 +99,7 @@ function App() {
                     <SpotlightSessionAnalyticsPage />
                   </AppRoute>
                 } />
-                <Route path="/spotlight/session-analytics/:sessionUuid" element={
+                <Route path="/spotlight/session-analytics/:shareToken" element={
                   <AppRoute protected requireOnboarding>
                     <SpotlightSessionDetailPage />
                   </AppRoute>

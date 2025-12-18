@@ -85,6 +85,7 @@ import {
   handleFetchTokenAnalytics,
   handleFetchSessionAnalytics,
   handleFetchSessionDetail,
+  handleFetchSessionDetailByShareToken,
   fetchAnalyticsSchema,
   // Session sharing handlers
   handleCreateSessionShare,
@@ -872,6 +873,21 @@ app.get('/spotlight/analytics/sessions/:sessionUuid', async (request: Authentica
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Fetch session detail error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+// Get session detail by share token (authenticated)
+app.get('/spotlight/analytics/sessions/share/:shareToken', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { shareToken } = request.params as { shareToken: string }
+    const result = await handleFetchSessionDetailByShareToken(request.user!.uuid, shareToken)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Fetch session detail by share token error', error })
     reply.status(500).send({ error: 'Internal server error' })
   }
 })

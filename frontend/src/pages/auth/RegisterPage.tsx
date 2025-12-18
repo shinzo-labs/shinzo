@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button, TextField, Checkbox, Text, Heading, Card, Flex, Callout, Progress } from '@radix-ui/themes'
 import { CheckIcon, ExclamationTriangleIcon } from '@radix-ui/react-icons'
@@ -18,6 +18,8 @@ export const RegisterPage: React.FC = () => {
 
   const { register, resendVerification, verify } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo') || '/dashboard'
 
   const getPasswordStrength = (password: string) => {
     let strength = 0
@@ -100,7 +102,7 @@ export const RegisterPage: React.FC = () => {
       await verify(email, verificationToken)
       // Auto-redirect after successful verification
       setTimeout(() => {
-        navigate('/')
+        navigate(returnTo)
       }, 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Verification failed')
@@ -374,7 +376,7 @@ export const RegisterPage: React.FC = () => {
 
           <Text size="2" color="gray" align="center">
             Already have an account?{' '}
-            <Link to="/login" style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
+            <Link to={`/login${returnTo !== '/dashboard' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} style={{ color: 'var(--accent-9)', textDecoration: 'none' }}>
               Sign in
             </Link>
           </Text>

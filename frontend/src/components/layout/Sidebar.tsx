@@ -105,18 +105,20 @@ export const Sidebar: React.FC = () => {
       }}
     >
       {/* Logo */}
-      <Flex align="center" gap="3" style={{ padding: '16px', height: '64px', borderBottom: '1px solid var(--gray-6)' }}>
-        <img
-          src="/images/ShinzoIcon512.png"
-          alt="Shinzo Logo"
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '6px'
-          }}
-        />
-        <Text size="4" weight="bold">Shinzo</Text>
-      </Flex>
+      <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Flex align="center" gap="3" style={{ padding: '16px', height: '64px', borderBottom: '1px solid var(--gray-6)', cursor: 'pointer' }}>
+          <img
+            src="/images/ShinzoIcon512.png"
+            alt="Shinzo Logo"
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '6px'
+            }}
+          />
+          <Text size="4" weight="bold">Shinzo</Text>
+        </Flex>
+      </Link>
 
       {/* Navigation */}
       <Flex direction="column" style={{ flex: 1, padding: '16px', gap: '4px', overflowY: 'auto' }}>

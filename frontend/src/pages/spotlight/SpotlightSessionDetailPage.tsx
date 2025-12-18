@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Flex, Text, Card, Table, Badge, Box, Tooltip, Spinner, Button, Dialog, Code, Switch } from '@radix-ui/themes'
 import { AppLayout } from '../../components/layout/AppLayout'
 import { useAuth } from '../../contexts/AuthContext'
+import { useHasSpotlightData } from '../../hooks/useHasSpotlightData'
 import { ChevronDownIcon, ChevronUpIcon, InfoCircledIcon, ArrowLeftIcon, Share1Icon, CopyIcon } from '@radix-ui/react-icons'
 import axios from 'axios'
 
@@ -26,6 +27,9 @@ interface Session {
 interface SessionDetail {
   session: Session
   interactions: Interaction[]
+  is_owner: boolean
+  share_token: string
+  is_share_active: boolean
 }
 
 interface Interaction {
@@ -53,32 +57,35 @@ interface Interaction {
 }
 
 export const SpotlightSessionDetailPage: React.FC = () => {
-  const { sessionUuid } = useParams<{ sessionUuid: string }>()
+  const { shareToken } = useParams<{ shareToken: string }>()
   const navigate = useNavigate()
   const { token } = useAuth()
+  const { hasSpotlightData } = useHasSpotlightData()
   const [expandedInteractionUuid, setExpandedInteractionUuid] = useState<string | null>(null)
   const [popoutMessageView, setPopoutMessageView] = useState(false)
   const [selectedInteraction, setSelectedInteraction] = useState<Interaction | null>(null)
-  const [shareEnabled, setShareEnabled] = useState(false)
-  const [shareToken, setShareToken] = useState<string | null>(null)
   const [copyLinkSuccess, setCopyLinkSuccess] = useState(false)
   const [loadingShare, setLoadingShare] = useState(false)
 
   const { data: sessionDetail, isLoading: loadingDetail, refetch } = useQuery<SessionDetail>(
-    ['spotlight-session-detail', sessionUuid],
+    ['spotlight-session-detail', shareToken],
     async () => {
       const response = await axios.get(
-        `${BACKEND_URL}/spotlight/analytics/sessions/${sessionUuid}`,
+        `${BACKEND_URL}/spotlight/analytics/sessions/share/${shareToken}`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
       return response.data
     },
     {
-      enabled: !!sessionUuid,
+      enabled: !!shareToken,
       retry: false,
       refetchInterval: REFRESH_INTERVAL
     }
   )
+
+  // Derive these from query data instead of using state
+  const isOwner = sessionDetail?.is_owner || false
+  const shareEnabled = sessionDetail?.is_share_active || false
 
   const formatTokenDisplay = (actualTokens: number, fallbackText: string = 'N/A'): string => {
     if (actualTokens === 0) return '0'
@@ -243,57 +250,35 @@ export const SpotlightSessionDetailPage: React.FC = () => {
     })
   }
 
-  // Fetch share status on load
-  useEffect(() => {
-    const fetchShareStatus = async () => {
-      if (!sessionUuid || !token) return
-
-      try {
-        const response = await axios.get(
-          `${BACKEND_URL}/spotlight/analytics/sessions/${sessionUuid}/share`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
-        setShareEnabled(response.data.is_shared)
-        setShareToken(response.data.share_token)
-      } catch (error) {
-        console.error('Error fetching share status:', error)
-      }
-    }
-
-    fetchShareStatus()
-  }, [sessionUuid, token])
-
   const handleCopyLink = () => {
     if (!shareToken) return
-    const url = `${window.location.origin}/spotlight/session-analytics/shared/${shareToken}`
+    const url = `${window.location.origin}/spotlight/session-analytics/${shareToken}`
     navigator.clipboard.writeText(url)
     setCopyLinkSuccess(true)
     setTimeout(() => setCopyLinkSuccess(false), 2000)
   }
 
   const handleToggleShare = async () => {
-    if (!sessionUuid || !token) return
+    if (!sessionDetail || !token) return
 
     setLoadingShare(true)
     try {
       if (shareEnabled) {
         // Disable sharing
         await axios.delete(
-          `${BACKEND_URL}/spotlight/analytics/sessions/${sessionUuid}/share`,
+          `${BACKEND_URL}/spotlight/analytics/sessions/${sessionDetail.session.uuid}/share`,
           { headers: { Authorization: `Bearer ${token}` } }
         )
-        setShareEnabled(false)
-        setShareToken(null)
       } else {
         // Enable sharing
-        const response = await axios.post(
-          `${BACKEND_URL}/spotlight/analytics/sessions/${sessionUuid}/share`,
+        await axios.post(
+          `${BACKEND_URL}/spotlight/analytics/sessions/${sessionDetail.session.uuid}/share`,
           {},
           { headers: { Authorization: `Bearer ${token}` } }
         )
-        setShareEnabled(true)
-        setShareToken(response.data.share_token)
       }
+      // Refetch session data to update the share status
+      await refetch()
     } catch (error) {
       console.error('Error toggling share:', error)
     } finally {
@@ -306,6 +291,16 @@ export const SpotlightSessionDetailPage: React.FC = () => {
     setPopoutMessageView(true)
   }
 
+  const handleBackClick = () => {
+    // If user is viewing someone else's session and has no spotlight data,
+    // redirect to getting started page
+    if (!isOwner && !hasSpotlightData) {
+      navigate('/spotlight/getting-started')
+    } else {
+      navigate('/spotlight/session-analytics')
+    }
+  }
+
   return (
     <AppLayout>
       <Flex direction="column" gap="4" style={{ padding: '24px' }}>
@@ -313,7 +308,7 @@ export const SpotlightSessionDetailPage: React.FC = () => {
         <Flex direction="row" gap="3" align="center">
           <Button
             variant="ghost"
-            onClick={() => navigate('/spotlight/session-analytics')}
+            onClick={handleBackClick}
             style={{ cursor: 'pointer' }}
           >
             <ArrowLeftIcon /> Back
@@ -322,32 +317,32 @@ export const SpotlightSessionDetailPage: React.FC = () => {
             <Text size="6" weight="bold">Session Details</Text>
             <Text size="2" color="gray">Session ID: <code style={{ color: 'var(--blue-10)' }}>{sessionDetail?.session.session_id}</code></Text>
           </Flex>
-        </Flex>
 
-        {/* Share Controls */}
-        <Card>
-          <Flex direction="column" gap="3">
-            <Flex align="center" gap="3">
+          {/* Share Controls - Show while loading, only hide if definitely not owner */}
+          {(loadingDetail || isOwner) && (
+            <Flex align="center" gap="2" style={{ border: '1px solid var(--gray-6)', borderRadius: '8px', padding: '8px 12px', opacity: loadingDetail ? 0.5 : 1 }}>
               <Share1Icon />
-              <Flex direction="column" gap="1" style={{ flex: 1 }}>
-                <Text size="3" weight="bold">Share Session</Text>
-                <Text size="2" color="gray">Grant view-only access to anyone with the link</Text>
-              </Flex>
-              <Switch
-                checked={shareEnabled}
-                onCheckedChange={handleToggleShare}
-                disabled={loadingShare}
-              />
+              <Text size="2" weight="bold" style={{ marginRight: '8px' }}>Share</Text>
+              <Box style={{ cursor: loadingShare || loadingDetail ? 'not-allowed' : 'pointer' }}>
+                <Switch
+                  checked={shareEnabled}
+                  onCheckedChange={handleToggleShare}
+                  disabled={loadingShare || loadingDetail}
+                  style={{ cursor: loadingShare || loadingDetail ? 'not-allowed' : 'pointer' }}
+                />
+              </Box>
+              <Button
+                onClick={handleCopyLink}
+                variant="soft"
+                size="2"
+                disabled={!shareEnabled || loadingShare || loadingDetail}
+                style={{ cursor: !shareEnabled || loadingShare || loadingDetail ? 'not-allowed' : 'pointer' }}
+              >
+                <CopyIcon /> {copyLinkSuccess ? 'Copied!' : 'Copy Link'}
+              </Button>
             </Flex>
-            <Button
-              onClick={handleCopyLink}
-              variant="soft"
-              disabled={!shareEnabled || loadingShare}
-            >
-              <CopyIcon /> {copyLinkSuccess ? 'Link Copied!' : 'Copy Link'}
-            </Button>
-          </Flex>
-        </Card>
+          )}
+        </Flex>
 
         {loadingDetail ? (
           <Card>
@@ -410,7 +405,12 @@ export const SpotlightSessionDetailPage: React.FC = () => {
                   {sessionDetail.interactions.map((interaction) => (
                     <React.Fragment key={interaction.uuid}>
                       <Table.Row
-                        style={{ cursor: 'pointer' }}
+                        style={{
+                          cursor: 'pointer',
+                          transition: 'background-color 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray-3)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
                         onClick={() => setExpandedInteractionUuid(
                           expandedInteractionUuid === interaction.uuid ? null : interaction.uuid
                         )}

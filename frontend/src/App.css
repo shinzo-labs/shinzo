@@ -45,3 +45,33 @@ body, html {
     background-position: -200% 0;
   }
 }
+
+/* Global cursor styles for all interactive elements */
+button,
+a,
+[role="button"],
+[role="menuitem"],
+[role="tab"],
+.rt-Button,
+.rt-DropdownMenuTrigger,
+.rt-DropdownMenuItem,
+.rt-Switch,
+.rt-Checkbox,
+.rt-RadioGroupItem,
+.rt-TabsTrigger {
+  cursor: pointer !important;
+}
+
+/* Disabled state should show not-allowed cursor */
+button:disabled,
+button[disabled],
+button[data-disabled],
+.rt-Button:disabled,
+.rt-Button[data-disabled] {
+  cursor: not-allowed !important;
+}
+
+/* Links should always show pointer */
+a:not([disabled]) {
+  cursor: pointer !important;
+}

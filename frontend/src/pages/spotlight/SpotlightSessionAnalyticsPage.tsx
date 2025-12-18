@@ -23,6 +23,7 @@ interface Session {
   total_cache_creation_ephemeral_1h_input_tokens: number
   interaction_count: number
   last_message_preview: string
+  share_token: string
 }
 
 interface SessionAnalytics {
@@ -304,8 +305,13 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                       {sortedSessions.map((session) => (
                         <Table.Row
                           key={session.uuid}
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => navigate(`/spotlight/session-analytics/${session.uuid}`)}
+                          style={{
+                            cursor: 'pointer',
+                            transition: 'background-color 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray-3)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
+                          onClick={() => navigate(`/spotlight/session-analytics/${session.share_token}`)}
                         >
                           <Table.Cell>
                             <Text size="2" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
