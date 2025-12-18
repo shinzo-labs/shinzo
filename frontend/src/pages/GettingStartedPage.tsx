@@ -337,11 +337,11 @@ async def shutdown():
                 variant="solid"
                 size="3"
                 color="green"
-                onClick={() => window.location.href = '/dashboard'}
+                onClick={() => window.location.href = '/spotlight/session-analytics'}
                 style={{ alignSelf: 'flex-start', cursor: 'pointer' }}
               >
                 <Icons.DashboardIcon />
-                <span style={{ marginLeft: 8 }}>Open Dashboard</span>
+                <span style={{ marginLeft: 8 }}>View Analytics</span>
                 <Icons.ArrowRightIcon style={{ marginLeft: 8 }} />
               </Button>
             </>

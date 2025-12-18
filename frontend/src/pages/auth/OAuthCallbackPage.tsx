@@ -13,6 +13,7 @@ export const OAuthCallbackPage: React.FC = () => {
   useEffect(() => {
     const processCallback = async () => {
       const code = searchParams.get('code')
+      const state = searchParams.get('state')
       const provider = window.location.pathname.includes('google') ? 'google' : 'github'
 
       if (!code) {
@@ -21,8 +22,21 @@ export const OAuthCallbackPage: React.FC = () => {
       }
 
       try {
-        await handleOAuthCallback(provider, code)
-        navigate('/dashboard')
+        const result = await handleOAuthCallback(provider, code, state || undefined)
+
+        // Priority 1: Use returnTo from OAuth state parameter
+        // Priority 2: Use returnTo from sessionStorage fallback
+        // Priority 3: Default to /spotlight/session-analytics
+        let returnTo = result.returnTo
+        if (!returnTo) {
+          const storedReturnTo = sessionStorage.getItem('oauth_return_to')
+          if (storedReturnTo) {
+            returnTo = storedReturnTo
+            sessionStorage.removeItem('oauth_return_to')
+          }
+        }
+
+        navigate(returnTo || '/spotlight/session-analytics')
       } catch (err) {
         setError(err instanceof Error ? err.message : 'OAuth authentication failed')
       }

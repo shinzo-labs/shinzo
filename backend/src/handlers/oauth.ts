@@ -42,9 +42,14 @@ function generateEmailToken(): string {
 }
 
 // Google OAuth handlers
-export const handleGoogleOAuthUrl = async () => {
+export const handleGoogleOAuthUrl = async (returnTo?: string) => {
   try {
-    const state = crypto.randomBytes(16).toString('hex')
+    // Encode returnTo in state parameter if provided
+    const stateData = {
+      random: crypto.randomBytes(16).toString('hex'),
+      returnTo: returnTo || ''
+    }
+    const state = Buffer.from(JSON.stringify(stateData)).toString('base64')
 
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
@@ -77,6 +82,17 @@ export const handleGoogleOAuthUrl = async () => {
 
 export const handleGoogleOAuthCallback = async (request: yup.InferType<typeof oauthCallbackSchema>) => {
   try {
+    // Decode state to extract returnTo if present
+    let returnTo = ''
+    if (request.state) {
+      try {
+        const stateData = JSON.parse(Buffer.from(request.state, 'base64').toString())
+        returnTo = stateData.returnTo || ''
+      } catch (e) {
+        logger.warn({ message: 'Failed to decode state parameter', state: request.state })
+      }
+    }
+
     // Exchange authorization code for access token
     const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
       code: request.code,
@@ -169,7 +185,8 @@ export const handleGoogleOAuthCallback = async (request: yup.InferType<typeof oa
           uuid: user.uuid,
           email: user.email,
           verified: user.verified
-        }
+        },
+        returnTo
       },
       status: 200
     }
@@ -191,9 +208,14 @@ export const handleGoogleOAuthCallback = async (request: yup.InferType<typeof oa
 }
 
 // GitHub OAuth handlers
-export const handleGithubOAuthUrl = async () => {
+export const handleGithubOAuthUrl = async (returnTo?: string) => {
   try {
-    const state = crypto.randomBytes(16).toString('hex')
+    // Encode returnTo in state parameter if provided
+    const stateData = {
+      random: crypto.randomBytes(16).toString('hex'),
+      returnTo: returnTo || ''
+    }
+    const state = Buffer.from(JSON.stringify(stateData)).toString('base64')
 
     const params = new URLSearchParams({
       client_id: GITHUB_CLIENT_ID,
@@ -223,6 +245,17 @@ export const handleGithubOAuthUrl = async () => {
 
 export const handleGithubOAuthCallback = async (request: yup.InferType<typeof oauthCallbackSchema>) => {
   try {
+    // Decode state to extract returnTo if present
+    let returnTo = ''
+    if (request.state) {
+      try {
+        const stateData = JSON.parse(Buffer.from(request.state, 'base64').toString())
+        returnTo = stateData.returnTo || ''
+      } catch (e) {
+        logger.warn({ message: 'Failed to decode state parameter', state: request.state })
+      }
+    }
+
     // Exchange authorization code for access token
     const tokenResponse = await axios.post(
       'https://github.com/login/oauth/access_token',
@@ -343,7 +376,8 @@ export const handleGithubOAuthCallback = async (request: yup.InferType<typeof oa
           uuid: user.uuid,
           email: user.email,
           verified: user.verified
-        }
+        },
+        returnTo
       },
       status: 200
     }

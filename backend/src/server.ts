@@ -248,9 +248,10 @@ app.get('/auth/fetch_user_quota', async (request: AuthenticatedRequest, reply: F
 })
 
 // OAuth endpoints
-app.get('/auth/oauth/google', async (request: FastifyRequest, reply: FastifyReply) => {
+app.get('/auth/oauth/google', async (request: FastifyRequest<{ Querystring: { returnTo?: string } }>, reply: FastifyReply) => {
   try {
-    const result = await handleGoogleOAuthUrl()
+    const { returnTo } = request.query
+    const result = await handleGoogleOAuthUrl(returnTo)
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'Google OAuth URL error', error })
@@ -277,9 +278,10 @@ app.post('/auth/oauth/google/callback', async (request: FastifyRequest, reply: F
   }
 })
 
-app.get('/auth/oauth/github', async (request: FastifyRequest, reply: FastifyReply) => {
+app.get('/auth/oauth/github', async (request: FastifyRequest<{ Querystring: { returnTo?: string } }>, reply: FastifyReply) => {
   try {
-    const result = await handleGithubOAuthUrl()
+    const { returnTo } = request.query
+    const result = await handleGithubOAuthUrl(returnTo)
     reply.status(result.status || 200).send(result.response)
   } catch (error: any) {
     logger.error({ message: 'GitHub OAuth URL error', error })
