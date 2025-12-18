@@ -1,6 +1,6 @@
-\restrict 1JEXxbzq5t2RHgcERsU9l85L200SwYFdYLMX3TA0HCWQ2buq8aZH8tWGetsXUMF
+\restrict SLydAwJHmyNGe4zsmCJkjrIePyeopFw5LrRpxPbTzFp5uVZiiGIXJPTrMrwLppc
 
--- Dumped from database version 15.14 (Homebrew)
+-- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
 
 SET statement_timeout = 0;
@@ -2062,7 +2062,7 @@ ALTER TABLE ONLY spotlight.user_analytics
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1JEXxbzq5t2RHgcERsU9l85L200SwYFdYLMX3TA0HCWQ2buq8aZH8tWGetsXUMF
+\unrestrict SLydAwJHmyNGe4zsmCJkjrIePyeopFw5LrRpxPbTzFp5uVZiiGIXJPTrMrwLppc
 
 
 --
@@ -2071,9 +2071,7 @@ ALTER TABLE ONLY spotlight.user_analytics
 
 INSERT INTO public.schema_migrations (version) VALUES
     ('20250914000000'),
-    ('20250918000000'),
     ('20250919000000'),
-    ('20250930000000'),
     ('20251001000000'),
     ('20251002000000'),
     ('20251120000000'),
@@ -2085,7 +2083,6 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20251213000000'),
     ('20251217000000'),
     ('20251218000000'),
-    ('20251218000001'),
     ('20251218100000'),
     ('20251218100001'),
     ('20251218100002');
