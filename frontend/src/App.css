@@ -1,6 +1,82 @@
 @import '@radix-ui/themes/styles.css';
 
 /* Reset body margins and padding */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Gold shimmer animation for GitHub star button */
+@keyframes shimmer-border {
+  0% {
+    border-image-source: linear-gradient(90deg,
+      transparent, transparent, transparent,
+      #FFD700, #FFA500, #FFD700,
+      transparent, transparent, transparent
+    );
+  }
+  25% {
+    border-image-source: linear-gradient(180deg,
+      transparent, transparent, transparent,
+      #FFD700, #FFA500, #FFD700,
+      transparent, transparent, transparent
+    );
+  }
+  50% {
+    border-image-source: linear-gradient(270deg,
+      transparent, transparent, transparent,
+      #FFD700, #FFA500, #FFD700,
+      transparent, transparent, transparent
+    );
+  }
+  75% {
+    border-image-source: linear-gradient(0deg,
+      transparent, transparent, transparent,
+      #FFD700, #FFA500, #FFD700,
+      transparent, transparent, transparent
+    );
+  }
+  100% {
+    border-image-source: linear-gradient(90deg,
+      transparent, transparent, transparent,
+      #FFD700, #FFA500, #FFD700,
+      transparent, transparent, transparent
+    );
+  }
+}
+
+@keyframes shimmer-glow {
+  0%, 100% {
+    box-shadow:
+      2px 0 8px -2px #FFD700,
+      0 0 0 transparent;
+  }
+  25% {
+    box-shadow:
+      0 2px 8px -2px #FFD700,
+      0 0 0 transparent;
+  }
+  50% {
+    box-shadow:
+      -2px 0 8px -2px #FFD700,
+      0 0 0 transparent;
+  }
+  75% {
+    box-shadow:
+      0 -2px 8px -2px #FFD700,
+      0 0 0 transparent;
+  }
+}
+
+.github-star-button {
+  position: relative;
+  overflow: visible !important;
+  animation: shimmer-glow 3s ease-in-out infinite;
+  border: 2px solid transparent !important;
+  background-clip: padding-box;
+}
+
 body,
 html {
   margin: 0;
@@ -126,6 +202,11 @@ a:not([disabled]) {
   .hamburger-button {
     display: none !important;
   }
+
+  /* Hide mobile-only elements on desktop */
+  .mobile-only {
+    display: none !important;
+  }
 }
 
 /* Mobile header button optimizations */
@@ -145,6 +226,11 @@ a:not([disabled]) {
   /* Hide button text labels on mobile, keep icons */
   .header-button-text {
     display: none !important;
+  }
+
+  /* Show only on mobile */
+  .mobile-only {
+    display: inline-flex !important;
   }
 
   /* Make header buttons more compact */
@@ -169,7 +255,6 @@ a:not([disabled]) {
   /* Ensure header buttons container stays visible */
   .header-buttons-container {
     position: relative;
-    margin-left: auto !important;
   }
 
   /* Mobile quota bar - also fix to viewport width */

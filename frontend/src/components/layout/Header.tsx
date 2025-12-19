@@ -20,10 +20,13 @@ export const Header: React.FC = () => {
         borderBottom: '1px solid var(--gray-6)',
         padding: '16px 24px',
         minHeight: '64px',
-        flexShrink: 0
+        flexShrink: 0,
+        boxSizing: 'border-box',
+        width: '100%',
+        minWidth: 0,
+        overflow: 'hidden'
       }}
       align="center"
-      gap="4"
     >
       {/* Left side - Hamburger menu for mobile */}
       <IconButton
@@ -35,8 +38,22 @@ export const Header: React.FC = () => {
         <Icons.HamburgerMenuIcon width="20" height="20" />
       </IconButton>
 
+      {/* Spacer to push buttons to the right */}
+      <div style={{ flex: 1, minWidth: 0 }} />
+
       {/* Right side */}
-      <Flex align="center" gap="2" className="header-buttons-container" style={{ flexShrink: 0 }}>
+      <Flex align="center" gap="2" className="header-buttons-container" style={{ flexShrink: 1, minWidth: 0 }}>
+        {/* GitHub Star button */}
+        <Button
+          variant="outline"
+          size="2"
+          className="github-star-button"
+          onClick={() => window.open('https://github.com/shinzo-labs/shinzo', '_blank')}
+        >
+          <span className="mobile-only"><Icons.StarIcon /></span>
+          <span className="header-button-text">Add a ⭐ if you like Shinzo!</span>
+        </Button>
+
         {/* Documentation button */}
         <Button
           variant="solid"
@@ -70,28 +87,28 @@ export const Header: React.FC = () => {
 
         {/* User menu */}
         <DropdownMenu.Root>
-        <DropdownMenu.Trigger>
-          <Button variant="ghost" size="2">
-            <Avatar
-              size="1"
-              fallback={user?.email.charAt(0).toUpperCase() || 'U'}
-              color="blue"
-            />
-            <Text size="2" className="header-button-text">
-              {user?.email}
-            </Text>
-            <Icons.ChevronDownIcon className="header-button-text" />
-          </Button>
-        </DropdownMenu.Trigger>
-        <DropdownMenu.Content align="end">
-          <DropdownMenu.Label>{user?.email}</DropdownMenu.Label>
-          <DropdownMenu.Separator />
-          <DropdownMenu.Item color="red" onSelect={handleLogout}>
-            <Icons.ExitIcon />
-            Sign out
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu.Root>
+          <DropdownMenu.Trigger>
+            <Button variant="ghost" size="2">
+              <Avatar
+                size="1"
+                fallback={user?.email.charAt(0).toUpperCase() || 'U'}
+                color="blue"
+              />
+              <Text size="2" className="header-button-text">
+                {user?.email}
+              </Text>
+              <Icons.ChevronDownIcon className="header-button-text" />
+            </Button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content align="end">
+            <DropdownMenu.Label>{user?.email}</DropdownMenu.Label>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item color="red" onSelect={handleLogout}>
+              <Icons.ExitIcon />
+              Sign out
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
       </Flex>
     </Flex>
   )
