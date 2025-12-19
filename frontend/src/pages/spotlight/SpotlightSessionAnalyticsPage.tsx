@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery } from 'react-query'
 import { useNavigate } from 'react-router-dom'
-import { Flex, Text, Card, Table, Badge, Grid, Spinner } from '@radix-ui/themes'
+import { Flex, Text, Card, Table, Badge, Grid, Spinner, Box } from '@radix-ui/themes'
 import { AppLayout } from '../../components/layout/AppLayout'
 import { useAuth } from '../../contexts/AuthContext'
 import { ChevronDownIcon, ChevronUpIcon } from '@radix-ui/react-icons'
@@ -224,32 +224,34 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                   <Text size="2" color="gray">Start using Spotlight to see analytics</Text>
                 </Flex>
               ) : (
-                <Table.Root>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell>Requests</Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
-                      <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {Object.entries(tokenAnalytics?.by_model || {}).map(([model, stats]) => (
-                      <Table.Row key={model}>
-                        <Table.Cell><Badge>{model}</Badge></Table.Cell>
-                        <Table.Cell>{stats.request_count.toLocaleString()}</Table.Cell>
-                        <Table.Cell>{stats.input_tokens.toLocaleString()}</Table.Cell>
-                        <Table.Cell>{stats.output_tokens.toLocaleString()}</Table.Cell>
-                        <Table.Cell>{stats.cached_tokens.toLocaleString()}</Table.Cell>
-                        <Table.Cell>{stats.cache_creation_5m_tokens.toLocaleString()}</Table.Cell>
-                        <Table.Cell>{stats.cache_creation_1h_tokens.toLocaleString()}</Table.Cell>
+                <Box style={{ overflowX: 'auto', width: '100%' }}>
+                  <Table.Root>
+                    <Table.Header>
+                      <Table.Row>
+                        <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
+                        <Table.ColumnHeaderCell>Requests</Table.ColumnHeaderCell>
+                        <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
+                        <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
+                        <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
+                        <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
+                        <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
                       </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Root>
+                    </Table.Header>
+                    <Table.Body>
+                      {Object.entries(tokenAnalytics?.by_model || {}).map(([model, stats]) => (
+                        <Table.Row key={model}>
+                          <Table.Cell><Badge>{model}</Badge></Table.Cell>
+                          <Table.Cell>{stats.request_count.toLocaleString()}</Table.Cell>
+                          <Table.Cell>{stats.input_tokens.toLocaleString()}</Table.Cell>
+                          <Table.Cell>{stats.output_tokens.toLocaleString()}</Table.Cell>
+                          <Table.Cell>{stats.cached_tokens.toLocaleString()}</Table.Cell>
+                          <Table.Cell>{stats.cache_creation_5m_tokens.toLocaleString()}</Table.Cell>
+                          <Table.Cell>{stats.cache_creation_1h_tokens.toLocaleString()}</Table.Cell>
+                        </Table.Row>
+                      ))}
+                    </Table.Body>
+                  </Table.Root>
+                </Box>
               )}
             </Card>
           </>
@@ -287,49 +289,51 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                 </Flex>
               ) : (
                 <>
-                  <Table.Root>
-                    <Table.Header>
-                      <Table.Row>
-                        <Table.ColumnHeaderCell>Last Completion</Table.ColumnHeaderCell>
-                        <SortableHeader column="start_time">Started</SortableHeader>
-                        <SortableHeader column="end_time">Last Updated</SortableHeader>
-                        <SortableHeader column="total_requests">Completions</SortableHeader>
-                        <SortableHeader column="total_input_tokens">Input Tokens</SortableHeader>
-                        <SortableHeader column="total_cache_read_input_tokens">Cache Reads</SortableHeader>
-                        <SortableHeader column="total_cache_creation_ephemeral_5m_input_tokens">5m Cache Writes</SortableHeader>
-                        <SortableHeader column="total_cache_creation_ephemeral_1h_input_tokens">1h Cache Writes</SortableHeader>
-                        <SortableHeader column="total_output_tokens">Output Tokens</SortableHeader>
-                      </Table.Row>
-                    </Table.Header>
-                    <Table.Body>
-                      {sortedSessions.map((session) => (
-                        <Table.Row
-                          key={session.uuid}
-                          style={{
-                            cursor: 'pointer',
-                            transition: 'background-color 0.15s ease'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray-3)'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
-                          onClick={() => navigate(`/spotlight/session-analytics/${session.share_token}`)}
-                        >
-                          <Table.Cell>
-                            <Text size="2" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {session.last_message_preview}
-                            </Text>
-                          </Table.Cell>
-                          <Table.Cell>{new Date(session.start_time).toLocaleString()}</Table.Cell>
-                          <Table.Cell>{session.end_time ? new Date(session.end_time).toLocaleString() : 'Active'}</Table.Cell>
-                          <Table.Cell>{session.interaction_count}</Table.Cell>
-                          <Table.Cell>{session.total_input_tokens.toLocaleString()}</Table.Cell>
-                          <Table.Cell>{session.total_cache_read_input_tokens.toLocaleString()}</Table.Cell>
-                          <Table.Cell>{session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Table.Cell>
-                          <Table.Cell>{session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Table.Cell>
-                          <Table.Cell>{session.total_output_tokens.toLocaleString()}</Table.Cell>
+                  <Box style={{ overflowX: 'auto', width: '100%' }}>
+                    <Table.Root>
+                      <Table.Header>
+                        <Table.Row>
+                          <Table.ColumnHeaderCell>Last Completion</Table.ColumnHeaderCell>
+                          <SortableHeader column="start_time">Started</SortableHeader>
+                          <SortableHeader column="end_time">Last Updated</SortableHeader>
+                          <SortableHeader column="total_requests">Completions</SortableHeader>
+                          <SortableHeader column="total_input_tokens">Input Tokens</SortableHeader>
+                          <SortableHeader column="total_cache_read_input_tokens">Cache Reads</SortableHeader>
+                          <SortableHeader column="total_cache_creation_ephemeral_5m_input_tokens">5m Cache Writes</SortableHeader>
+                          <SortableHeader column="total_cache_creation_ephemeral_1h_input_tokens">1h Cache Writes</SortableHeader>
+                          <SortableHeader column="total_output_tokens">Output Tokens</SortableHeader>
                         </Table.Row>
-                      ))}
-                    </Table.Body>
-                  </Table.Root>
+                      </Table.Header>
+                      <Table.Body>
+                        {sortedSessions.map((session) => (
+                          <Table.Row
+                            key={session.uuid}
+                            style={{
+                              cursor: 'pointer',
+                              transition: 'background-color 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--gray-3)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
+                            onClick={() => navigate(`/spotlight/session-analytics/${session.share_token}`)}
+                          >
+                            <Table.Cell>
+                              <Text size="2" style={{ maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {session.last_message_preview}
+                              </Text>
+                            </Table.Cell>
+                            <Table.Cell>{new Date(session.start_time).toLocaleString()}</Table.Cell>
+                            <Table.Cell>{session.end_time ? new Date(session.end_time).toLocaleString() : 'Active'}</Table.Cell>
+                            <Table.Cell>{session.interaction_count}</Table.Cell>
+                            <Table.Cell>{session.total_input_tokens.toLocaleString()}</Table.Cell>
+                            <Table.Cell>{session.total_cache_read_input_tokens.toLocaleString()}</Table.Cell>
+                            <Table.Cell>{session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Table.Cell>
+                            <Table.Cell>{session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Table.Cell>
+                            <Table.Cell>{session.total_output_tokens.toLocaleString()}</Table.Cell>
+                          </Table.Row>
+                        ))}
+                      </Table.Body>
+                    </Table.Root>
+                  </Box>
                 </>
               )}
             </Card>

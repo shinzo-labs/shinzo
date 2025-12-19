@@ -35,6 +35,17 @@ export const AppRoute: React.FC<AppRouteProps> = ({
   const [surveyLoading, setSurveyLoading] = useState(requireOnboarding)
   const [showDialog, setShowDialog] = useState(false)
 
+  // Store the current location when landing on a session details page for new users
+  // This ensures they're returned here after completing the survey
+  useEffect(() => {
+    if (isAuthenticated && location.pathname.match(/^\/spotlight\/session-analytics\/[^/]+$/)) {
+      const storedPath = sessionStorage.getItem('survey_return_to')
+      if (!storedPath || storedPath !== location.pathname) {
+        sessionStorage.setItem('survey_return_to', location.pathname)
+      }
+    }
+  }, [isAuthenticated, location.pathname])
+
   // Fetch user survey if onboarding is required
   useEffect(() => {
     if (!requireOnboarding || !token) {
@@ -128,11 +139,18 @@ export const AppRoute: React.FC<AppRouteProps> = ({
               const response = await surveyService.fetchSurvey(token!)
               setSurvey(response.survey)
 
-              // If user is on a shared session page, keep them there
-              // Otherwise, redirect to appropriate getting-started page based on survey response
-              const isOnSessionPage = location.pathname.startsWith('/spotlight/session-analytics/')
+              // Priority 1: Check if there's a stored return path (for users who logged in via shareToken)
+              const storedReturnTo = sessionStorage.getItem('survey_return_to')
+              if (storedReturnTo) {
+                sessionStorage.removeItem('survey_return_to')
+                navigate(storedReturnTo, { replace: true })
+                return
+              }
 
+              // Priority 2: If user is on a session analytics page, keep them there
+              const isOnSessionPage = location.pathname.startsWith('/spotlight/session-analytics/')
               if (!isOnSessionPage && response.survey) {
+                // Priority 3: Redirect to appropriate getting-started page based on survey response
                 const usageTypes = response.survey.usage_types || []
                 if (usageTypes.includes('ai-agent')) {
                   navigate('/spotlight/getting-started', { replace: true })

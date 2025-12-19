@@ -368,53 +368,56 @@ export const SpotlightSessionDetailPage: React.FC = () => {
             {/* Session Summary */}
             <Card>
               <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Session Summary</Text>
-              <Table.Root variant="surface">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeaderCell>Total Requests</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
-                    {/* <Table.ColumnHeaderCell>Tool Uses</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Tool Results</Table.ColumnHeaderCell> */}
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  <Table.Row>
-                    <Table.Cell>{sessionDetail.session.total_requests}</Table.Cell>
-                    <Table.Cell>{sessionDetail.session.total_input_tokens.toLocaleString()}</Table.Cell>
-                    <Table.Cell>{sessionDetail.session.total_cache_read_input_tokens.toLocaleString()}</Table.Cell>
-                    <Table.Cell>{sessionDetail.session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Table.Cell>
-                    <Table.Cell>{sessionDetail.session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Table.Cell>
-                    <Table.Cell>{sessionDetail.session.total_output_tokens.toLocaleString()}</Table.Cell>
-                    {/* <Table.Cell>{getSessionToolUses(sessionDetail)}</Table.Cell>
-                    <Table.Cell>{getSessionToolResults(sessionDetail)}</Table.Cell> */}
-                  </Table.Row>
-                </Table.Body>
-              </Table.Root>
+              <Box style={{ overflowX: 'auto', width: '100%' }}>
+                <Table.Root variant="surface">
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeaderCell>Total Requests</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
+                      {/* <Table.ColumnHeaderCell>Tool Uses</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Tool Results</Table.ColumnHeaderCell> */}
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    <Table.Row>
+                      <Table.Cell>{sessionDetail.session.total_requests}</Table.Cell>
+                      <Table.Cell>{sessionDetail.session.total_input_tokens.toLocaleString()}</Table.Cell>
+                      <Table.Cell>{sessionDetail.session.total_cache_read_input_tokens.toLocaleString()}</Table.Cell>
+                      <Table.Cell>{sessionDetail.session.total_cache_creation_ephemeral_5m_input_tokens.toLocaleString()}</Table.Cell>
+                      <Table.Cell>{sessionDetail.session.total_cache_creation_ephemeral_1h_input_tokens.toLocaleString()}</Table.Cell>
+                      <Table.Cell>{sessionDetail.session.total_output_tokens.toLocaleString()}</Table.Cell>
+                      {/* <Table.Cell>{getSessionToolUses(sessionDetail)}</Table.Cell>
+                      <Table.Cell>{getSessionToolResults(sessionDetail)}</Table.Cell> */}
+                    </Table.Row>
+                  </Table.Body>
+                </Table.Root>
+              </Box>
             </Card>
 
             {/* Completions Table */}
             <Card>
               <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Completions</Text>
-              <Table.Root>
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeaderCell>Request</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Response</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Sent</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Latency</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
-                  </Table.Row>
-                </Table.Header>
+              <Box style={{ overflowX: 'auto', width: '100%' }}>
+                <Table.Root>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeaderCell>Request</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Response</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Sent</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Latency</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Model</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Input Tokens</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Output Tokens</Table.ColumnHeaderCell>
+                    </Table.Row>
+                  </Table.Header>
                 <Table.Body>
                   {sessionDetail.interactions.map((interaction) => (
                     <React.Fragment key={interaction.uuid}>
@@ -579,6 +582,7 @@ export const SpotlightSessionDetailPage: React.FC = () => {
                   ))}
                 </Table.Body>
               </Table.Root>
+              </Box>
             </Card>
           </Flex>
         ) : (
