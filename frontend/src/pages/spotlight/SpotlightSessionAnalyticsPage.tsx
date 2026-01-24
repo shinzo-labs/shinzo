@@ -1,35 +1,15 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState } from 'react'
 import { useQuery } from 'react-query'
 import { useNavigate } from 'react-router-dom'
 import { Flex, Text, Card, Table, Badge, Grid, Spinner, Box } from '@radix-ui/themes'
 import { AppLayout } from '../../components/layout/AppLayout'
 import { useAuth } from '../../contexts/AuthContext'
-import { ChevronDownIcon, ChevronUpIcon } from '@radix-ui/react-icons'
+import { spotlightService, SessionAnalyticsResponse } from '../../backendService'
+import { Pagination, usePagination, SortableHeader, useSort } from '../../components/ui/Pagination'
 import axios from 'axios'
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000'
-const REFRESH_INTERVAL = 5000 // 5 seconds
-
-interface Session {
-  uuid: string
-  session_id: string
-  start_time: string
-  end_time: string | null
-  total_requests: number
-  total_input_tokens: number
-  total_output_tokens: number
-  total_cache_read_input_tokens: number
-  total_cache_creation_ephemeral_5m_input_tokens: number
-  total_cache_creation_ephemeral_1h_input_tokens: number
-  interaction_count: number
-  last_message_preview: string
-  share_token: string
-}
-
-interface SessionAnalytics {
-  sessions: Session[]
-  total_sessions: number
-}
+const REFRESH_INTERVAL = 10000 // 10 seconds
 
 interface TokenAnalytics {
   summary: {
@@ -50,26 +30,31 @@ interface TokenAnalytics {
   }>
 }
 
-type SortColumn = 'start_time' | 'end_time' | 'total_requests' | 'total_input_tokens' | 'total_output_tokens' | 'total_cache_read_input_tokens' | 'total_cache_creation_ephemeral_5m_input_tokens' | 'total_cache_creation_ephemeral_1h_input_tokens'
-type SortDirection = 'asc' | 'desc'
+type SortColumn = 'start_time' | 'end_time' | 'total_requests' | 'total_input_tokens' | 'total_output_tokens'
 
 export const SpotlightSessionAnalyticsPage: React.FC = () => {
   const { token } = useAuth()
   const navigate = useNavigate()
-  const [sortColumn, setSortColumn] = useState<SortColumn>('start_time')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
-  const { data: sessionAnalytics, isLoading: isLoadingSessionAnalytics, error: errorSessionAnalytics } = useQuery<SessionAnalytics>(
-    'spotlight-session-analytics',
+  // Pagination state
+  const { page, pageSize, offset, handlePageChange, handlePageSizeChange, resetPage } = usePagination(25)
+  const { sortKey, sortDirection, handleSort } = useSort('start_time', 'desc')
+
+  const { data: sessionAnalytics, isLoading: isLoadingSessionAnalytics, error: errorSessionAnalytics } = useQuery<SessionAnalyticsResponse>(
+    ['spotlight-session-analytics', page, pageSize, sortKey, sortDirection],
     async () => {
-      const response = await axios.get(`${BACKEND_URL}/spotlight/analytics/sessions`, {
-        headers: { Authorization: `Bearer ${token}` }
+      return spotlightService.fetchSessions(token!, {
+        limit: pageSize,
+        offset,
+        sort: sortKey || 'start_time',
+        sortDirection: sortDirection
       })
-      return response.data
     },
     {
       retry: false,
-      refetchInterval: REFRESH_INTERVAL
+      refetchInterval: REFRESH_INTERVAL,
+      keepPreviousData: true,
+      enabled: !!token
     }
   )
 
@@ -87,80 +72,10 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
     }
   )
 
-  const sortedSessions = useMemo(() => {
-    if (!sessionAnalytics?.sessions) return []
-
-    const sorted = [...sessionAnalytics.sessions].sort((a, b) => {
-      let aVal: any, bVal: any
-
-      switch (sortColumn) {
-        case 'start_time':
-          aVal = new Date(a.start_time).getTime()
-          bVal = new Date(b.start_time).getTime()
-          break
-        case 'end_time':
-          aVal = a.end_time ? new Date(a.end_time).getTime() : 0
-          bVal = b.end_time ? new Date(b.end_time).getTime() : 0
-          break
-        case 'total_requests':
-          aVal = a.total_requests
-          bVal = b.total_requests
-          break
-        case 'total_input_tokens':
-          aVal = a.total_input_tokens
-          bVal = b.total_input_tokens
-          break
-        case 'total_output_tokens':
-          aVal = a.total_output_tokens
-          bVal = b.total_output_tokens
-          break
-        case 'total_cache_creation_ephemeral_5m_input_tokens':
-          aVal = a.total_cache_creation_ephemeral_5m_input_tokens
-          bVal = b.total_cache_creation_ephemeral_5m_input_tokens
-          break
-        case 'total_cache_creation_ephemeral_1h_input_tokens':
-          aVal = a.total_cache_creation_ephemeral_1h_input_tokens
-          bVal = b.total_cache_creation_ephemeral_1h_input_tokens
-          break
-        default:
-          return 0
-      }
-
-      if (sortDirection === 'asc') {
-        return aVal > bVal ? 1 : -1
-      } else {
-        return aVal < bVal ? 1 : -1
-      }
-    })
-
-    return sorted
-  }, [sessionAnalytics?.sessions, sortColumn, sortDirection])
-
-  const handleSort = (column: SortColumn) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortColumn(column)
-      setSortDirection('desc')
-    }
+  const handleSortColumn = (column: string) => {
+    handleSort(column)
+    resetPage() // Reset to first page when sort changes
   }
-
-  const SortableHeader: React.FC<{ column: SortColumn; children: React.ReactNode }> = ({ column, children }) => (
-    <Table.ColumnHeaderCell>
-      <Flex
-        align="center"
-        gap="1"
-        style={{ cursor: 'pointer', userSelect: 'none' }}
-        onClick={() => handleSort(column)}
-      >
-        {children}
-        {sortColumn === column && (
-          sortDirection === 'asc' ? <ChevronUpIcon /> : <ChevronDownIcon />
-        )}
-      </Flex>
-    </Table.ColumnHeaderCell>
-  )
-
 
   return (
     <AppLayout>
@@ -263,7 +178,7 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
           <Text size="2" color="gray">Review conversation sessions and interaction details</Text>
         </Flex>
 
-        {isLoadingSessionAnalytics ? (
+        {isLoadingSessionAnalytics && !sessionAnalytics ? (
           <Card>
             <Flex direction="column" align="center" justify="center" gap="3" style={{ padding: '48px' }}>
               <Spinner size="3" />
@@ -279,10 +194,11 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
           </Card>
         ) : (
           <>
-
             <Card>
-              <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>Recent Sessions ({sessionAnalytics?.sessions?.length?.toLocaleString() || 0})</Text>
-              {!sortedSessions || sortedSessions.length === 0 ? (
+              <Text size="4" weight="bold" style={{ marginBottom: '12px' }}>
+                Recent Sessions ({sessionAnalytics?.total_count?.toLocaleString() || 0})
+              </Text>
+              {!sessionAnalytics?.sessions || sessionAnalytics.sessions.length === 0 ? (
                 <Flex direction="column" align="center" justify="center" style={{ padding: '48px' }}>
                   <Text size="3" color="gray">No sessions yet</Text>
                   <Text size="2" color="gray">Start using Spotlight to see sessions</Text>
@@ -294,18 +210,58 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                       <Table.Header>
                         <Table.Row>
                           <Table.ColumnHeaderCell>Last Completion</Table.ColumnHeaderCell>
-                          <SortableHeader column="start_time">Started</SortableHeader>
-                          <SortableHeader column="end_time">Last Updated</SortableHeader>
-                          <SortableHeader column="total_requests">Completions</SortableHeader>
-                          <SortableHeader column="total_input_tokens">Input Tokens</SortableHeader>
-                          <SortableHeader column="total_cache_read_input_tokens">Cache Reads</SortableHeader>
-                          <SortableHeader column="total_cache_creation_ephemeral_5m_input_tokens">5m Cache Writes</SortableHeader>
-                          <SortableHeader column="total_cache_creation_ephemeral_1h_input_tokens">1h Cache Writes</SortableHeader>
-                          <SortableHeader column="total_output_tokens">Output Tokens</SortableHeader>
+                          <Table.ColumnHeaderCell>
+                            <SortableHeader
+                              label="Started"
+                              sortKey="start_time"
+                              currentSort={sortKey}
+                              currentDirection={sortDirection}
+                              onSort={handleSortColumn}
+                            />
+                          </Table.ColumnHeaderCell>
+                          <Table.ColumnHeaderCell>
+                            <SortableHeader
+                              label="Last Updated"
+                              sortKey="end_time"
+                              currentSort={sortKey}
+                              currentDirection={sortDirection}
+                              onSort={handleSortColumn}
+                            />
+                          </Table.ColumnHeaderCell>
+                          <Table.ColumnHeaderCell>
+                            <SortableHeader
+                              label="Completions"
+                              sortKey="total_requests"
+                              currentSort={sortKey}
+                              currentDirection={sortDirection}
+                              onSort={handleSortColumn}
+                            />
+                          </Table.ColumnHeaderCell>
+                          <Table.ColumnHeaderCell>
+                            <SortableHeader
+                              label="Input Tokens"
+                              sortKey="total_input_tokens"
+                              currentSort={sortKey}
+                              currentDirection={sortDirection}
+                              onSort={handleSortColumn}
+                            />
+                          </Table.ColumnHeaderCell>
+                          <Table.ColumnHeaderCell>Cache Reads</Table.ColumnHeaderCell>
+                          <Table.ColumnHeaderCell>5m Cache Writes</Table.ColumnHeaderCell>
+                          <Table.ColumnHeaderCell>1h Cache Writes</Table.ColumnHeaderCell>
+                          <Table.ColumnHeaderCell>
+                            <SortableHeader
+                              label="Output Tokens"
+                              sortKey="total_output_tokens"
+                              currentSort={sortKey}
+                              currentDirection={sortDirection}
+                              onSort={handleSortColumn}
+                            />
+                          </Table.ColumnHeaderCell>
                         </Table.Row>
                       </Table.Header>
                       <Table.Body>
-                        {sortedSessions.map((session) => (
+                        {sessionAnalytics.sessions.map((session) => (
                           <Table.Row
                             key={session.uuid}
                             style={{
@@ -334,6 +290,16 @@ export const SpotlightSessionAnalyticsPage: React.FC = () => {
                       </Table.Body>
                     </Table.Root>
                   </Box>
+
+                  <Pagination
+                    currentPage={page}
+                    totalPages={sessionAnalytics.total_pages}
+                    totalItems={sessionAnalytics.total_count}
+                    pageSize={pageSize}
+                    onPageChange={handlePageChange}
+                    onPageSizeChange={handlePageSizeChange}
+                    isLoading={isLoadingSessionAnalytics}
+                  />
                 </>
               )}
             </Card>

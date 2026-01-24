@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from 'react-query'
 import { AppLayout } from '../components/layout/AppLayout'
 import { Button, TextField, Card, Flex, Text, Heading, Badge, Select, Box, Table } from '@radix-ui/themes'
@@ -7,26 +7,9 @@ import { DEFAULT_TIME_RANGE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
 import { useUserPreferences } from '../contexts/UserPreferencesContext'
 import { useRefresh } from '../contexts/RefreshContext'
-import { telemetryService } from '../backendService'
+import { telemetryService, Metric } from '../backendService'
+import { Pagination, usePagination, SortableHeader, useSort } from '../components/ui/Pagination'
 import { format, subHours, subDays } from 'date-fns'
-
-interface Metric {
-  uuid: string
-  name: string
-  description: string | null
-  unit: string | null
-  metric_type: string
-  timestamp: string
-  value: number
-  scope_name: string | null
-  scope_version: string | null
-  created_at: string
-  updated_at: string
-  attributes: Array<{
-    key: string
-    value: string
-  }>
-}
 
 export const MetricsPage: React.FC = () => {
   const { token } = useAuth()
@@ -37,6 +20,10 @@ export const MetricsPage: React.FC = () => {
   const [metricNameFilter, setMetricNameFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
 
+  // Pagination state (client-side)
+  const { page, pageSize, handlePageChange, handlePageSizeChange, resetPage } = usePagination(25)
+  const { sortKey, sortDirection, handleSort } = useSort('timestamp', 'desc')
+
   // Load saved time range preference on mount
   useEffect(() => {
     const savedTimeRange = getPreference('metrics_time_range', DEFAULT_TIME_RANGE)
@@ -46,6 +33,7 @@ export const MetricsPage: React.FC = () => {
   // Save time range preference when it changes
   const handleTimeRangeChange = async (newTimeRange: string) => {
     setTimeRange(newTimeRange)
+    resetPage()
     try {
       await savePreference('metrics_time_range', newTimeRange)
     } catch (error) {
@@ -92,25 +80,78 @@ export const MetricsPage: React.FC = () => {
       enabled: !!token,
       keepPreviousData: true,
       refetchOnWindowFocus: false,
-      staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
+      staleTime: 4000
     }
   )
 
-  // Refresh function for manual refresh
-  const handleRefresh = useCallback(() => {
-    queryClient.invalidateQueries(['metrics', timeRange, refreshTrigger])
-  }, [queryClient, timeRange, refreshTrigger])
+  // Handle sort changes
+  const handleSortColumn = (column: string) => {
+    handleSort(column)
+    resetPage()
+  }
 
-  // Filter metrics
-  const filteredMetrics = metrics.filter((metric: Metric) => {
-    if (metricNameFilter && !metric.name.toLowerCase().includes(metricNameFilter.toLowerCase())) {
-      return false
+  // Handle filter changes
+  const handleMetricNameFilterChange = (value: string) => {
+    setMetricNameFilter(value)
+    resetPage()
+  }
+
+  const handleTypeFilterChange = (value: string) => {
+    setTypeFilter(value)
+    resetPage()
+  }
+
+  // Filter and sort metrics (client-side)
+  const filteredAndSortedMetrics = useMemo(() => {
+    let result = metrics.filter((metric: Metric) => {
+      if (metricNameFilter && !metric.name.toLowerCase().includes(metricNameFilter.toLowerCase())) {
+        return false
+      }
+      if (typeFilter && typeFilter !== 'all' && metric.metric_type !== typeFilter) {
+        return false
+      }
+      return true
+    })
+
+    // Sort
+    if (sortKey) {
+      result = [...result].sort((a: Metric, b: Metric) => {
+        let aVal: any, bVal: any
+        switch (sortKey) {
+          case 'timestamp':
+            aVal = new Date(a.timestamp).getTime()
+            bVal = new Date(b.timestamp).getTime()
+            break
+          case 'name':
+            aVal = a.name.toLowerCase()
+            bVal = b.name.toLowerCase()
+            break
+          case 'metric_type':
+            aVal = a.metric_type
+            bVal = b.metric_type
+            break
+          case 'value':
+            aVal = a.value
+            bVal = b.value
+            break
+          default:
+            return 0
+        }
+        if (sortDirection === 'asc') {
+          return aVal > bVal ? 1 : -1
+        } else {
+          return aVal < bVal ? 1 : -1
+        }
+      })
     }
-    if (typeFilter && typeFilter !== 'all' && metric.metric_type !== typeFilter) {
-      return false
-    }
-    return true
-  })
+
+    return result
+  }, [metrics, metricNameFilter, typeFilter, sortKey, sortDirection])
+
+  // Paginate results (client-side)
+  const totalCount = filteredAndSortedMetrics.length
+  const totalPages = Math.ceil(totalCount / pageSize)
+  const paginatedMetrics = filteredAndSortedMetrics.slice((page - 1) * pageSize, page * pageSize)
 
   const timeRangeOptions = [
     { value: '1h', label: 'Last 1 hour' },
@@ -164,14 +205,14 @@ export const MetricsPage: React.FC = () => {
                 <TextField.Root
                   placeholder="Filter by metric name"
                   value={metricNameFilter}
-                  onChange={(e) => setMetricNameFilter(e.target.value)}
+                  onChange={(e) => handleMetricNameFilterChange(e.target.value)}
                 />
               </Flex>
 
               {/* Type filter */}
               <Flex direction="column" gap="2" style={{ minWidth: '180px' }}>
                 <Text size="2" weight="medium">Type</Text>
-                <Select.Root value={typeFilter} onValueChange={setTypeFilter}>
+                <Select.Root value={typeFilter} onValueChange={handleTypeFilterChange}>
                   <Select.Trigger placeholder="All types" style={{ width: '100%' }} />
                   <Select.Content>
                     {typeOptions.map((option) => (
@@ -190,6 +231,7 @@ export const MetricsPage: React.FC = () => {
                   onClick={() => {
                     setMetricNameFilter('')
                     setTypeFilter('all')
+                    resetPage()
                   }}
                 >
                   Clear Filters
@@ -204,7 +246,7 @@ export const MetricsPage: React.FC = () => {
           <Flex direction="column" gap="4">
             <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
               <Heading size="4">
-                Metrics ({filteredMetrics.length})
+                Metrics ({totalCount.toLocaleString()})
               </Heading>
             </Box>
 
@@ -219,7 +261,7 @@ export const MetricsPage: React.FC = () => {
                 <Icons.ExclamationTriangleIcon width="48" height="48" color="var(--red-9)" />
                 <Text size="2" color="red" style={{ marginTop: '8px' }}>Failed to load metrics</Text>
               </Flex>
-            ) : filteredMetrics.length === 0 ? (
+            ) : paginatedMetrics.length === 0 ? (
               <Flex direction="column" align="center" justify="center" style={{ padding: '48px 0', textAlign: 'center' }}>
                 <Icons.BarChartIcon width="48" height="48" color="var(--gray-8)" />
                 <Text size="2" color="gray" style={{ marginTop: '8px' }}>No metrics found</Text>
@@ -228,55 +270,99 @@ export const MetricsPage: React.FC = () => {
                 </Text>
               </Flex>
             ) : (
-              <Table.Root>
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeaderCell>Timestamp</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Metric Name</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Type</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Value</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Unit</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Description</Table.ColumnHeaderCell>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {filteredMetrics.map((metric: Metric) => (
-                    <Table.Row key={metric.uuid}>
-                      <Table.RowHeaderCell>
-                        <Text size="2">{format(new Date(metric.timestamp), 'HH:mm:ss.SSS')}</Text>
-                      </Table.RowHeaderCell>
-                      <Table.Cell>
-                        <Text size="2" weight="medium">{metric.name}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge
-                          color={
-                            metric.metric_type === 'counter' ? 'blue' :
-                            metric.metric_type === 'gauge' ? 'green' :
-                            metric.metric_type === 'histogram' ? 'purple' : 'gray'
-                          }
-                          variant="soft"
-                        >
-                          {metric.metric_type}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2" style={{ fontFamily: 'var(--default-font-family-mono)' }}>
-                          {metric.value.toLocaleString()}
-                        </Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2" color="gray">{metric.unit || '-'}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2" color="gray" style={{ maxWidth: '200px' }} truncate>
-                          {metric.description || '-'}
-                        </Text>
-                      </Table.Cell>
+              <>
+                <Table.Root>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Timestamp"
+                          sortKey="timestamp"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Metric Name"
+                          sortKey="name"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Type"
+                          sortKey="metric_type"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Value"
+                          sortKey="value"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Unit</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Description</Table.ColumnHeaderCell>
                     </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
+                  </Table.Header>
+                  <Table.Body>
+                    {paginatedMetrics.map((metric: Metric) => (
+                      <Table.Row key={metric.uuid}>
+                        <Table.RowHeaderCell>
+                          <Text size="2">{format(new Date(metric.timestamp), 'HH:mm:ss.SSS')}</Text>
+                        </Table.RowHeaderCell>
+                        <Table.Cell>
+                          <Text size="2" weight="medium">{metric.name}</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Badge
+                            color={
+                              metric.metric_type === 'counter' ? 'blue' :
+                              metric.metric_type === 'gauge' ? 'green' :
+                              metric.metric_type === 'histogram' ? 'purple' : 'gray'
+                            }
+                            variant="soft"
+                          >
+                            {metric.metric_type}
+                          </Badge>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text size="2" style={{ fontFamily: 'var(--default-font-family-mono)' }}>
+                            {metric.value.toLocaleString()}
+                          </Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text size="2" color="gray">{metric.unit || '-'}</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text size="2" color="gray" style={{ maxWidth: '200px' }} truncate>
+                            {metric.description || '-'}
+                          </Text>
+                        </Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  totalItems={totalCount}
+                  pageSize={pageSize}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                  isLoading={isLoading}
+                />
+              </>
             )}
           </Flex>
         </Card>

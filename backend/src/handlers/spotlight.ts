@@ -68,7 +68,14 @@ export const fetchAnalyticsSchema = yup.object({
   session_id: yup.string().optional(),
   model: yup.string().optional(),
   provider: yup.string().optional(),
+  // Pagination params
+  limit: yup.number().optional(),
+  offset: yup.number().optional(),
+  sort: yup.string().optional(),
+  sortDirection: yup.string().optional().oneOf(['asc', 'desc']),
 }).optional()
+
+type FetchAnalyticsFilters = yup.InferType<typeof fetchAnalyticsSchema>
 
 // ============================================================================
 // Shinzo API Key CRUD Operations
@@ -946,7 +953,7 @@ export const handleEventLogging = async (
 
 export const handleFetchTokenAnalytics = async (
   userUuid: string,
-  filters: yup.InferType<typeof fetchAnalyticsSchema> = {}
+  filters: FetchAnalyticsFilters = {}
 ) => {
   try {
     const where: any = { user_uuid: userUuid, status: 'success' }
@@ -1034,108 +1041,95 @@ export const handleFetchTokenAnalytics = async (
 
 export const handleFetchSessionAnalytics = async (
   userUuid: string,
-  filters: yup.InferType<typeof fetchAnalyticsSchema> = {}
+  filters: FetchAnalyticsFilters = {}
 ) => {
   try {
-    const where: any = { user_uuid: userUuid }
+    // Pagination params
+    const limit = filters?.limit || 25
+    const offset = filters?.offset || 0
+    const sort = filters?.sort || 'start_time'
+    const sortDirection = filters?.sortDirection || 'desc'
 
-    if (filters.session_id) {
-      where.session_id = filters.session_id
-    }
+    // Validate sort column to prevent SQL injection
+    const validSortColumns = ['start_time', 'end_time', 'total_requests', 'total_input_tokens', 'total_output_tokens', 'session_id']
+    const safeSort = validSortColumns.includes(sort) ? sort : 'start_time'
+    const safeSortDirection = sortDirection === 'asc' ? 'ASC' : 'DESC'
 
-    const sessions = await Session.findAll({
-      where,
-      include: [
-        {
-          model: Interaction,
-          as: 'interactions',
-          required: false,
-        }
-      ],
-      order: [['start_time', 'DESC']],
-      limit: 100,
+    // First, get total count for pagination
+    const [countResult] = await sequelize.query(`
+      SELECT COUNT(*) as total
+      FROM spotlight.session s
+      WHERE s.user_uuid = $1
+      ${filters?.session_id ? 'AND s.session_id = $2' : ''}
+    `, {
+      bind: filters?.session_id ? [userUuid, filters.session_id] : [userUuid]
+    })
+    const totalCount = parseInt((countResult as any[])[0]?.total) || 0
+
+    // Optimized: Single query to get sessions with aggregated data and share tokens
+    // Uses a LEFT JOIN to session_share instead of N+1 queries
+    const [sessionsWithShares] = await sequelize.query(`
+      SELECT
+        s.uuid,
+        s.session_id,
+        s.start_time,
+        s.end_time,
+        s.total_requests,
+        s.total_input_tokens,
+        s.total_output_tokens,
+        s.total_cache_creation_ephemeral_5m_input_tokens,
+        s.total_cache_creation_ephemeral_1h_input_tokens,
+        COALESCE(ss.share_token, '') as share_token,
+        (SELECT COUNT(*) FROM spotlight.interaction i WHERE i.session_uuid = s.uuid) as interaction_count,
+        (SELECT COALESCE(SUM(i.cache_read_input_tokens), 0) FROM spotlight.interaction i WHERE i.session_uuid = s.uuid) as total_cache_read_input_tokens
+      FROM spotlight.session s
+      LEFT JOIN spotlight.session_share ss ON ss.session_uuid = s.uuid
+      WHERE s.user_uuid = $1
+      ${filters?.session_id ? 'AND s.session_id = $2' : ''}
+      ORDER BY s.${safeSort} ${safeSortDirection}
+      LIMIT $${filters?.session_id ? '3' : '2'} OFFSET $${filters?.session_id ? '4' : '3'}
+    `, {
+      bind: filters?.session_id
+        ? [userUuid, filters.session_id, limit, offset]
+        : [userUuid, limit, offset]
     })
 
-    const getLastMessagePreview = (interactions: any[]): string => {
-      if (!interactions || interactions.length === 0) return 'No messages'
+    // Get session UUIDs that need share tokens created
+    const sessionsNeedingTokens = (sessionsWithShares as any[]).filter(s => !s.share_token)
 
-      // Sort by request_timestamp to get the last interaction
-      const sortedInteractions = [...interactions].sort((a, b) =>
-        new Date(b.request_timestamp).getTime() - new Date(a.request_timestamp).getTime()
-      )
-      const lastInteraction = sortedInteractions[0]
+    // Batch create missing share tokens in a single query
+    if (sessionsNeedingTokens.length > 0) {
+      const insertValues = sessionsNeedingTokens.map(s => {
+        const token = generateShareToken()
+        return `('${s.uuid}', '${userUuid}', '${token}', false)`
+      }).join(',')
 
-      // Try to get response content first, fallback to request
-      let messageContent = ''
+      await sequelize.query(`
+        INSERT INTO spotlight.session_share (session_uuid, user_uuid, share_token, is_active)
+        VALUES ${insertValues}
+        ON CONFLICT (session_uuid) DO NOTHING
+      `)
 
-      if (lastInteraction.response_data?.content) {
-        const content = lastInteraction.response_data.content
-        if (typeof content === 'string') {
-          messageContent = content
-        } else if (Array.isArray(content)) {
-          const textBlock = content.find((block: any) => block.type === 'text')
-          if (textBlock?.text) {
-            messageContent = textBlock.text
-          }
+      // Fetch the created tokens in a single query
+      const sessionUuids = sessionsNeedingTokens.map(s => s.uuid)
+      const [newTokens] = await sequelize.query(`
+        SELECT session_uuid, share_token
+        FROM spotlight.session_share
+        WHERE session_uuid = ANY($1::uuid[])
+      `, { bind: [sessionUuids] })
+
+      // Map new tokens back to sessions
+      const tokenMap = new Map((newTokens as any[]).map(t => [t.session_uuid, t.share_token]))
+      for (const session of sessionsWithShares as any[]) {
+        if (!session.share_token && tokenMap.has(session.uuid)) {
+          session.share_token = tokenMap.get(session.uuid)
         }
       }
-
-      // Fallback to request if no response
-      if (!messageContent && lastInteraction.request_data?.messages) {
-        const messages = lastInteraction.request_data.messages
-        if (Array.isArray(messages) && messages.length > 0) {
-          const lastMessage = messages[messages.length - 1]
-          if (typeof lastMessage.content === 'string') {
-            messageContent = lastMessage.content
-          } else if (Array.isArray(lastMessage.content)) {
-            const textBlock = lastMessage.content.find((block: any) => block.type === 'text')
-            if (textBlock?.text) {
-              messageContent = textBlock.text
-            }
-          }
-        }
-      }
-
-      // Truncate to 100 characters
-      if (messageContent.length > 100) {
-        return messageContent.substring(0, 100) + '...'
-      }
-      return messageContent || 'No text content'
     }
 
-    // Fetch or create shareToken for each session
-    const sessionsWithShareTokens = await Promise.all(
-      sessions.map(async (session) => {
-        // Check if shareToken exists
-        const [shareResults] = await sequelize.query(
-          `SELECT share_token FROM spotlight.session_share WHERE session_uuid = $1`,
-          { bind: [session.uuid] }
-        )
-
-        let shareToken: string
-        if (shareResults && (shareResults as any).length > 0) {
-          shareToken = (shareResults as any)[0].share_token
-        } else {
-          // Create new shareToken with sharing disabled by default
-          shareToken = generateShareToken()
-          await sequelize.query(
-            `INSERT INTO spotlight.session_share (session_uuid, user_uuid, share_token, is_active)
-             VALUES ($1, $2, $3, false)
-             ON CONFLICT (session_uuid) DO NOTHING`,
-            { bind: [session.uuid, userUuid, shareToken] }
-          )
-
-          // Re-query to get the actual shareToken (in case of conflict)
-          const [refetchResults] = await sequelize.query(
-            `SELECT share_token FROM spotlight.session_share WHERE session_uuid = $1`,
-            { bind: [session.uuid] }
-          )
-          if (refetchResults && (refetchResults as any).length > 0) {
-            shareToken = (refetchResults as any)[0].share_token
-          }
-        }
-
-        return {
+    return {
+      response: {
+        sessions: (sessionsWithShares as any[]).map(session => ({
           uuid: session.uuid,
           session_id: session.session_id,
           start_time: session.start_time,
@@ -1143,20 +1137,17 @@ export const handleFetchSessionAnalytics = async (
           total_requests: session.total_requests,
           total_input_tokens: session.total_input_tokens,
           total_output_tokens: session.total_output_tokens,
-          total_cache_read_input_tokens: (session as any).interactions?.reduce((sum: number, interaction: any) => sum + (interaction.cache_read_input_tokens || 0), 0) || 0,
+          total_cache_read_input_tokens: parseInt(session.total_cache_read_input_tokens) || 0,
           total_cache_creation_ephemeral_5m_input_tokens: session.total_cache_creation_ephemeral_5m_input_tokens,
           total_cache_creation_ephemeral_1h_input_tokens: session.total_cache_creation_ephemeral_1h_input_tokens,
-          interaction_count: (session as any).interactions?.length || 0,
-          last_message_preview: getLastMessagePreview((session as any).interactions || []),
-          share_token: shareToken,
-        }
-      })
-    )
-
-    return {
-      response: {
-        sessions: sessionsWithShareTokens,
-        total_sessions: sessions.length,
+          interaction_count: parseInt(session.interaction_count) || 0,
+          last_message_preview: 'View session for details',
+          share_token: session.share_token,
+        })),
+        total_count: totalCount,
+        page: Math.floor(offset / limit) + 1,
+        page_size: limit,
+        total_pages: Math.ceil(totalCount / limit),
       },
       status: 200
     }

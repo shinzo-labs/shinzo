@@ -3,7 +3,7 @@ import fastifyCors from '@fastify/cors'
 import fastifyRateLimit from '@fastify/rate-limit'
 import { PORT, RATE_LIMIT_WINDOW, RATE_LIMIT_MAX, MAX_PAYLOAD_SIZE, LOG_LEVEL } from './config'
 import { logger, pinoConfig } from './logger'
-import { sequelize } from './dbClient'
+import { sequelize, getPoolStats } from './dbClient'
 import { authenticateJWT, AuthenticatedRequest, authenticatedShinzoCredentials, getProviderCredentials, constructModelAPIResponseHeaders } from './middleware/auth'
 import { PassThrough } from 'stream'
 
@@ -134,13 +134,76 @@ app.addHook('preHandler', async (request, reply) => {
   }
 })
 
-// Health check endpoint
-app.get('/health', async (request, reply) => {
+// Health check state - track database connectivity without checking on every request
+let dbHealthy = false
+let lastDbCheck = 0
+const DB_CHECK_INTERVAL = 30_000 // Check database every 30 seconds, not on every health probe
+
+// Background database health check
+const checkDatabaseHealth = async () => {
   try {
     await sequelize.authenticate()
-    reply.send({ status: 'ok', timestamp: new Date().toISOString() })
+    dbHealthy = true
+    lastDbCheck = Date.now()
   } catch (error) {
-    reply.status(503).send({ status: 'error', message: 'Database connection failed' })
+    logger.error({ message: 'Database health check failed', error })
+    dbHealthy = false
+    lastDbCheck = Date.now()
+  }
+}
+
+// Start periodic database health check
+setInterval(checkDatabaseHealth, DB_CHECK_INTERVAL)
+// Initial check on startup (already done in start() but this updates our flag)
+checkDatabaseHealth()
+
+// Health check endpoint - fast response using cached state
+// This prevents connection pool exhaustion from frequent Kubernetes probes
+app.get('/health', async (request, reply) => {
+  const now = Date.now()
+
+  // If we haven't checked in a while (e.g., server just started), check now
+  if (now - lastDbCheck > DB_CHECK_INTERVAL * 2) {
+    await checkDatabaseHealth()
+  }
+
+  if (dbHealthy) {
+    reply.send({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      dbLastChecked: new Date(lastDbCheck).toISOString()
+    })
+  } else {
+    reply.status(503).send({
+      status: 'error',
+      message: 'Database connection unhealthy',
+      dbLastChecked: new Date(lastDbCheck).toISOString()
+    })
+  }
+})
+
+// Deep health check endpoint for manual diagnostics (not used by Kubernetes probes)
+app.get('/health/deep', async (request, reply) => {
+  try {
+    const startTime = Date.now()
+    await sequelize.authenticate()
+    const dbLatency = Date.now() - startTime
+
+    reply.send({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      database: {
+        connected: true,
+        latencyMs: dbLatency
+      },
+      pool: getPoolStats()
+    })
+  } catch (error: any) {
+    reply.status(503).send({
+      status: 'error',
+      message: 'Database connection failed',
+      error: error.message
+    })
   }
 })
 
@@ -1037,6 +1100,11 @@ const start = async () => {
     )
     await Promise.race([authenticatePromise, timeoutPromise])
     logger.info('STARTUP: Database connection established successfully')
+
+    // Mark database as healthy for health checks (this ensures immediate readiness)
+    dbHealthy = true
+    lastDbCheck = Date.now()
+    logger.info('STARTUP: Database health flag set to true')
 
     // Start server
     logger.info({ msg: `STARTUP: Starting Fastify server on port ${PORT}` })

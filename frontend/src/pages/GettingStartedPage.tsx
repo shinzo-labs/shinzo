@@ -44,13 +44,13 @@ export const GettingStartedPage: React.FC = () => {
 
     const checkForTelemetry = async () => {
       try {
-        const traces = await telemetryService.fetchTraces(token, {
+        const response = await telemetryService.fetchTraces(token, {
           start_time: subHours(new Date(), 1).toISOString(),
           end_time: new Date().toISOString(),
           limit: 1
         })
 
-        setHasTelemetry(traces.length > 0)
+        setHasTelemetry(response.traces.length > 0)
       } catch (error) {
         console.error('Error checking for telemetry:', error)
       }

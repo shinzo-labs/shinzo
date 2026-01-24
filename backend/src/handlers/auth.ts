@@ -1,4 +1,5 @@
 import * as yup from 'yup'
+import { Op } from 'sequelize'
 import { User, SubscriptionTier } from '../models'
 import { logger } from '../logger'
 import * as crypto from 'crypto'
@@ -366,19 +367,40 @@ export const verifyJWT = (token: string): { uuid: string; email: string; verifie
 }
 
 export const handleFetchUserQuota = async (userUuid: string) => {
-  const transaction = await User.sequelize!.transaction()
-
   try {
-    // Use SELECT FOR UPDATE to prevent race conditions on counter reset
-    // Note: We lock only the user table, not the join, to avoid PostgreSQL limitations
+    // Optimized: Single query with JOIN to get user and subscription tier
+    // Use atomic UPDATE for counter reset to avoid transaction locks
+    const now = new Date()
+    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+
+    // Atomic reset: Only reset if more than 1 month has passed
+    // This avoids the need for SELECT FOR UPDATE locks
+    await User.update(
+      {
+        monthly_counter: 0,
+        last_counter_reset: now
+      },
+      {
+        where: {
+          uuid: userUuid,
+          last_counter_reset: { [Op.lte]: oneMonthAgo }
+        }
+      }
+    )
+
+    // Single query to get user with subscription tier
     const user = await User.findOne({
       where: { uuid: userUuid },
-      lock: transaction.LOCK.UPDATE,
-      transaction
+      include: [
+        {
+          model: SubscriptionTier,
+          as: 'subscriptionTier',
+          required: false
+        }
+      ]
     })
 
     if (!user) {
-      await transaction.rollback()
       return {
         response: 'User not found',
         error: true,
@@ -386,38 +408,20 @@ export const handleFetchUserQuota = async (userUuid: string) => {
       }
     }
 
-    const now = new Date()
-    const lastReset = new Date(user.last_counter_reset)
-    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-
-    // Check if we need to reset the counter (if more than 1 month has passed)
-    let currentCounter = user.monthly_counter
-    if (lastReset <= oneMonthAgo) {
-      await user.update({
-        monthly_counter: 0,
-        last_counter_reset: now
-      }, { transaction })
-      currentCounter = 0
-    }
-
-    await transaction.commit()
-
-    // Fetch subscription tier separately (after transaction commits)
-    const subscriptionTier = await SubscriptionTier.findByPk(user.subscription_tier_uuid)
+    const subscriptionTier = (user as any).subscriptionTier
 
     return {
       response: {
-        currentUsage: currentCounter,
+        currentUsage: user.monthly_counter,
         monthlyQuota: subscriptionTier?.monthly_quota,
         tier: subscriptionTier?.tier,
-        lastCounterReset: now,
+        lastCounterReset: user.last_counter_reset,
         subscribedOn: user.subscribed_on
       },
       status: 200
     }
 
   } catch (error) {
-    await transaction.rollback()
     logger.error({ message: 'Error fetching user quota', error })
     return {
       response: 'Error fetching user quota',

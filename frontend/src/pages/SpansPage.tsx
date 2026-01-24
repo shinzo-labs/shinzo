@@ -7,7 +7,8 @@ import { DEFAULT_TIME_RANGE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
 import { useUserPreferences } from '../contexts/UserPreferencesContext'
 import { useRefresh } from '../contexts/RefreshContext'
-import { telemetryService } from '../backendService'
+import { telemetryService, SpansResponse, Span } from '../backendService'
+import { Pagination, usePagination, SortableHeader, useSort } from '../components/ui/Pagination'
 import { format, subHours, subDays } from 'date-fns'
 
 export const SpansPage: React.FC = () => {
@@ -19,6 +20,10 @@ export const SpansPage: React.FC = () => {
   const [traceIdFilter, setTraceIdFilter] = useState('')
   const [serviceFilter, setServiceFilter] = useState('')
 
+  // Pagination state
+  const { page, pageSize, offset, handlePageChange, handlePageSizeChange, resetPage } = usePagination(25)
+  const { sortKey, sortDirection, handleSort } = useSort('start_time', 'desc')
+
   // Load saved time range preference on mount
   useEffect(() => {
     const savedTimeRange = getPreference('spans_time_range', DEFAULT_TIME_RANGE)
@@ -28,6 +33,7 @@ export const SpansPage: React.FC = () => {
   // Save time range preference when it changes
   const handleTimeRangeChange = async (newTimeRange: string) => {
     setTimeRange(newTimeRange)
+    resetPage()
     try {
       await savePreference('spans_time_range', newTimeRange)
     } catch (error) {
@@ -63,36 +69,48 @@ export const SpansPage: React.FC = () => {
     }
   }
 
-  // Fetch spans
-  const { data: spans = [], isLoading, error } = useQuery(
-    ['spans', timeRange, refreshTrigger],
+  // Fetch spans with server-side pagination
+  const { data: spansResponse, isLoading, error } = useQuery<SpansResponse>(
+    ['spans', timeRange, serviceFilter, page, pageSize, sortKey, sortDirection, refreshTrigger],
     async () => {
       const timeParams = getTimeRange()
-      return telemetryService.fetchSpans(token!, timeParams)
+      return telemetryService.fetchSpans(token!, {
+        ...timeParams,
+        limit: pageSize,
+        offset,
+        sort: sortKey || 'start_time',
+        sortDirection,
+        service_name: serviceFilter || undefined
+      })
     },
     {
       enabled: !!token,
       keepPreviousData: true,
       refetchOnWindowFocus: false,
-      staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
+      staleTime: 4000
     }
   )
 
-  // Refresh function for manual refresh
-  const handleRefresh = useCallback(() => {
-    queryClient.invalidateQueries(['spans', timeRange, refreshTrigger])
-  }, [queryClient, timeRange, refreshTrigger])
+  // Handle sort changes
+  const handleSortColumn = (column: string) => {
+    handleSort(column)
+    resetPage()
+  }
 
-  // Filter spans
-  const filteredSpans = spans.filter((span: any) => {
-    if (traceIdFilter && !span.trace_uuid.includes(traceIdFilter)) {
-      return false
-    }
-    if (serviceFilter && !span.service_name?.toLowerCase().includes(serviceFilter.toLowerCase())) {
-      return false
-    }
-    return true
-  })
+  // Handle filter changes
+  const handleServiceFilterChange = (value: string) => {
+    setServiceFilter(value)
+    resetPage()
+  }
+
+  // Filter spans by trace ID (client-side since it's not in backend filter)
+  const allSpans = spansResponse?.spans || []
+  const filteredSpans = traceIdFilter
+    ? allSpans.filter(span => span.trace_uuid.includes(traceIdFilter))
+    : allSpans
+
+  const totalCount = spansResponse?.total_count || 0
+  const totalPages = spansResponse?.total_pages || 0
 
   const timeRangeOptions = [
     { value: '1h', label: 'Last 1 hour' },
@@ -148,7 +166,7 @@ export const SpansPage: React.FC = () => {
                 <TextField.Root
                   placeholder="Filter by service name"
                   value={serviceFilter}
-                  onChange={(e) => setServiceFilter(e.target.value)}
+                  onChange={(e) => handleServiceFilterChange(e.target.value)}
                 />
               </Flex>
 
@@ -159,6 +177,7 @@ export const SpansPage: React.FC = () => {
                   onClick={() => {
                     setTraceIdFilter('')
                     setServiceFilter('')
+                    resetPage()
                   }}
                 >
                   Clear Filters
@@ -173,11 +192,11 @@ export const SpansPage: React.FC = () => {
           <Flex direction="column" gap="4">
             <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
               <Heading size="4">
-                Spans ({filteredSpans.length})
+                Spans ({totalCount.toLocaleString()})
               </Heading>
             </Box>
 
-            {isLoading ? (
+            {isLoading && !spansResponse ? (
               <Flex direction="column" gap="3">
                 {[...Array(5)].map((_, i) => (
                   <Box key={i} className="loading-skeleton" style={{ height: '64px', borderRadius: 'var(--radius-2)' }} />
@@ -197,49 +216,101 @@ export const SpansPage: React.FC = () => {
                 </Text>
               </Flex>
             ) : (
-              <Table.Root>
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeaderCell>Start Time</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Trace ID</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Operation</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Duration</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Service</Table.ColumnHeaderCell>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {filteredSpans.map((span: any) => (
-                    <Table.Row key={span.uuid} style={{ cursor: 'pointer' }}>
-                      <Table.RowHeaderCell>
-                        <Text size="2">{format(new Date(span.start_time), 'HH:mm:ss.SSS')}</Text>
-                      </Table.RowHeaderCell>
-                      <Table.Cell>
-                        <Text size="2" style={{ fontFamily: 'var(--default-font-family-mono)' }} color="gray">
-                          {span.trace_uuid.slice(0, 8)}...
-                        </Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2">{span.operation_name}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2">{span.duration_ms ? `${span.duration_ms} ms` : '-'}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge
-                          color={span.status_code === 1 ? 'green' : span.status_code === 2 ? 'red' : 'gray'}
-                          variant="soft"
-                        >
-                          {span.status_code === 1 ? 'OK' : span.status_code === 2 ? 'Error' : span.status_code === 0 ? 'Unset' : 'Unknown'}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2" color="gray">{span.service_name || '-'}</Text>
-                      </Table.Cell>
+              <>
+                <Table.Root>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Start Time"
+                          sortKey="start_time"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Trace ID</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Operation"
+                          sortKey="operation_name"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Duration"
+                          sortKey="duration_ms"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Status"
+                          sortKey="status_code"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Service"
+                          sortKey="service_name"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
                     </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
+                  </Table.Header>
+                  <Table.Body>
+                    {filteredSpans.map((span: Span) => (
+                      <Table.Row key={span.uuid} style={{ cursor: 'pointer' }}>
+                        <Table.RowHeaderCell>
+                          <Text size="2">{format(new Date(span.start_time), 'HH:mm:ss.SSS')}</Text>
+                        </Table.RowHeaderCell>
+                        <Table.Cell>
+                          <Text size="2" style={{ fontFamily: 'var(--default-font-family-mono)' }} color="gray">
+                            {span.trace_uuid.slice(0, 8)}...
+                          </Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text size="2">{span.operation_name}</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text size="2">{span.duration_ms ? `${span.duration_ms} ms` : '-'}</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Badge
+                            color={span.status_code === 1 ? 'green' : span.status_code === 2 ? 'red' : 'gray'}
+                            variant="soft"
+                          >
+                            {span.status_code === 1 ? 'OK' : span.status_code === 2 ? 'Error' : span.status_code === 0 ? 'Unset' : 'Unknown'}
+                          </Badge>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text size="2" color="gray">{span.service_name || '-'}</Text>
+                        </Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  totalItems={totalCount}
+                  pageSize={pageSize}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                  isLoading={isLoading}
+                />
+              </>
             )}
           </Flex>
         </Card>

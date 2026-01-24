@@ -7,19 +7,9 @@ import { DEFAULT_TIME_RANGE } from '../config'
 import { useAuth } from '../contexts/AuthContext'
 import { useUserPreferences } from '../contexts/UserPreferencesContext'
 import { useRefresh } from '../contexts/RefreshContext'
-import { telemetryService } from '../backendService'
+import { telemetryService, TracesResponse, Trace } from '../backendService'
+import { Pagination, usePagination, SortableHeader, useSort } from '../components/ui/Pagination'
 import { format, subHours, subDays } from 'date-fns'
-
-interface Trace {
-  uuid: string
-  start_time: string
-  end_time: string | null
-  service_name: string
-  operation_name: string | null
-  status: string | null
-  span_count: number
-  duration_ms: number | null
-}
 
 export const TracesPage: React.FC = () => {
   const { token } = useAuth()
@@ -30,6 +20,10 @@ export const TracesPage: React.FC = () => {
   const [serviceFilter, setServiceFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
+  // Pagination state
+  const { page, pageSize, offset, handlePageChange, handlePageSizeChange, resetPage } = usePagination(25)
+  const { sortKey, sortDirection, handleSort } = useSort('start_time', 'desc')
+
   // Load saved time range preference on mount
   useEffect(() => {
     const savedTimeRange = getPreference('traces_time_range', DEFAULT_TIME_RANGE)
@@ -39,6 +33,7 @@ export const TracesPage: React.FC = () => {
   // Save time range preference when it changes
   const handleTimeRangeChange = async (newTimeRange: string) => {
     setTimeRange(newTimeRange)
+    resetPage()
     try {
       await savePreference('traces_time_range', newTimeRange)
     } catch (error) {
@@ -74,36 +69,45 @@ export const TracesPage: React.FC = () => {
     }
   }
 
-  // Fetch traces
-  const { data: traces = [], isLoading, error } = useQuery(
-    ['traces', timeRange, serviceFilter, statusFilter, refreshTrigger],
+  // Fetch traces with server-side pagination
+  const { data: tracesResponse, isLoading, error } = useQuery<TracesResponse>(
+    ['traces', timeRange, serviceFilter, statusFilter, page, pageSize, sortKey, sortDirection, refreshTrigger],
     async () => {
       const timeParams = getTimeRange()
-      return telemetryService.fetchTraces(token!, timeParams)
+      return telemetryService.fetchTraces(token!, {
+        ...timeParams,
+        limit: pageSize,
+        offset,
+        sort: sortKey || 'start_time',
+        sortDirection,
+        service_name: serviceFilter || undefined,
+        status: statusFilter !== 'all' ? statusFilter : undefined
+      })
     },
     {
       enabled: !!token,
       keepPreviousData: true,
       refetchOnWindowFocus: false,
-      staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
+      staleTime: 4000
     }
   )
 
-  // Refresh function for manual refresh
-  const handleRefresh = useCallback(() => {
-    queryClient.invalidateQueries(['traces', timeRange, serviceFilter, statusFilter, refreshTrigger])
-  }, [queryClient, timeRange, serviceFilter, statusFilter, refreshTrigger])
+  // Handle sort changes
+  const handleSortColumn = (column: string) => {
+    handleSort(column)
+    resetPage()
+  }
 
-  // Filter traces based on selected filters
-  const filteredTraces = traces.filter((trace: Trace) => {
-    if (serviceFilter && !trace.service_name.toLowerCase().includes(serviceFilter.toLowerCase())) {
-      return false
-    }
-    if (statusFilter && statusFilter !== 'all' && trace.status !== statusFilter) {
-      return false
-    }
-    return true
-  })
+  // Handle filter changes
+  const handleServiceFilterChange = (value: string) => {
+    setServiceFilter(value)
+    resetPage()
+  }
+
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value)
+    resetPage()
+  }
 
   const statusOptions = [
     { value: 'all', label: 'All statuses' },
@@ -118,6 +122,10 @@ export const TracesPage: React.FC = () => {
     { value: '7d', label: 'Last 7 days' },
     { value: '30d', label: 'Last 30 days' },
   ]
+
+  const traces = tracesResponse?.traces || []
+  const totalCount = tracesResponse?.total_count || 0
+  const totalPages = tracesResponse?.total_pages || 0
 
   return (
     <AppLayout>
@@ -156,14 +164,14 @@ export const TracesPage: React.FC = () => {
                 <TextField.Root
                   placeholder="Filter by service name"
                   value={serviceFilter}
-                  onChange={(e) => setServiceFilter(e.target.value)}
+                  onChange={(e) => handleServiceFilterChange(e.target.value)}
                 />
               </Flex>
 
               {/* Status filter */}
               <Flex direction="column" gap="2" style={{ minWidth: '180px' }}>
                 <Text size="2" weight="medium">Status</Text>
-                <Select.Root value={statusFilter} onValueChange={setStatusFilter}>
+                <Select.Root value={statusFilter} onValueChange={handleStatusFilterChange}>
                   <Select.Trigger placeholder="All statuses" style={{ width: '100%' }} />
                   <Select.Content>
                     {statusOptions.map((option) => (
@@ -182,6 +190,7 @@ export const TracesPage: React.FC = () => {
                   onClick={() => {
                     setServiceFilter('')
                     setStatusFilter('all')
+                    resetPage()
                   }}
                 >
                   Clear Filters
@@ -196,11 +205,11 @@ export const TracesPage: React.FC = () => {
           <Flex direction="column" gap="4">
             <Box style={{ borderBottom: '1px solid var(--gray-6)', paddingBottom: '16px' }}>
               <Heading size="4">
-                Traces ({filteredTraces.length})
+                Traces ({totalCount.toLocaleString()})
               </Heading>
             </Box>
 
-            {isLoading ? (
+            {isLoading && !tracesResponse ? (
               <Flex direction="column" gap="3">
                 {[...Array(5)].map((_, i) => (
                   <Box key={i} className="loading-skeleton" style={{ height: '64px', borderRadius: 'var(--radius-2)' }} />
@@ -211,7 +220,7 @@ export const TracesPage: React.FC = () => {
                 <Icons.ExclamationTriangleIcon width="48" height="48" color="var(--red-9)" />
                 <Text size="2" color="red" style={{ marginTop: '8px' }}>Failed to load traces</Text>
               </Flex>
-            ) : filteredTraces.length === 0 ? (
+            ) : traces.length === 0 ? (
               <Flex direction="column" align="center" justify="center" style={{ padding: '48px 0', textAlign: 'center' }}>
                 <Icons.ActivityLogIcon width="48" height="48" color="var(--gray-8)" />
                 <Text size="2" color="gray" style={{ marginTop: '8px' }}>No traces found</Text>
@@ -220,47 +229,99 @@ export const TracesPage: React.FC = () => {
                 </Text>
               </Flex>
             ) : (
-              <Table.Root>
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeaderCell>Start Time</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Service</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Operation</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Duration</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
-                    <Table.ColumnHeaderCell>Spans</Table.ColumnHeaderCell>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {filteredTraces.map((trace: Trace) => (
-                    <Table.Row key={trace.uuid} style={{ cursor: 'pointer' }}>
-                      <Table.RowHeaderCell>
-                        <Text size="2">{format(new Date(trace.start_time), 'HH:mm:ss')}</Text>
-                      </Table.RowHeaderCell>
-                      <Table.Cell>
-                        <Text size="2">{trace.service_name}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2">{trace.operation_name || '-'}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2">{trace.duration_ms ? `${trace.duration_ms} ms` : '-'}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Badge
-                          color={trace.status === 'ok' ? 'green' : trace.status === 'error' ? 'red' : 'gray'}
-                          variant="soft"
-                        >
-                          {trace.status || 'unknown'}
-                        </Badge>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Text size="2" color="gray">{trace.span_count}</Text>
-                      </Table.Cell>
+              <>
+                <Table.Root>
+                  <Table.Header>
+                    <Table.Row>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Start Time"
+                          sortKey="start_time"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Service"
+                          sortKey="service_name"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Operation"
+                          sortKey="operation_name"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>Duration</Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Status"
+                          sortKey="status"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
+                      <Table.ColumnHeaderCell>
+                        <SortableHeader
+                          label="Spans"
+                          sortKey="span_count"
+                          currentSort={sortKey}
+                          currentDirection={sortDirection}
+                          onSort={handleSortColumn}
+                        />
+                      </Table.ColumnHeaderCell>
                     </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
+                  </Table.Header>
+                  <Table.Body>
+                    {traces.map((trace: Trace) => (
+                      <Table.Row key={trace.uuid} style={{ cursor: 'pointer' }}>
+                        <Table.RowHeaderCell>
+                          <Text size="2">{format(new Date(trace.start_time), 'HH:mm:ss')}</Text>
+                        </Table.RowHeaderCell>
+                        <Table.Cell>
+                          <Text size="2">{trace.service_name}</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text size="2">{trace.operation_name || '-'}</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text size="2">{trace.duration_ms ? `${trace.duration_ms} ms` : '-'}</Text>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Badge
+                            color={trace.status === 'ok' ? 'green' : trace.status === 'error' ? 'red' : 'gray'}
+                            variant="soft"
+                          >
+                            {trace.status || 'unknown'}
+                          </Badge>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Text size="2" color="gray">{trace.span_count}</Text>
+                        </Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Root>
+
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  totalItems={totalCount}
+                  pageSize={pageSize}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                  isLoading={isLoading}
+                />
+              </>
             )}
           </Flex>
         </Card>
