@@ -112,13 +112,14 @@ export const DashboardPage: React.FC = () => {
   )
 
   // Fetch traces for the selected time range for charts
-  const { data: traces = [] } = useQuery(
+  const { data: tracesResponse } = useQuery(
     ['dashboard-traces', timeRange.label, refreshTrigger],
     async () => {
       const currentRange = getCurrentTimeRange()
       return telemetryService.fetchTraces(token!, {
         start_time: currentRange.start.toISOString(),
         end_time: currentRange.end.toISOString(),
+        limit: 1000,
       })
     },
     {
@@ -128,15 +129,17 @@ export const DashboardPage: React.FC = () => {
       staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
     }
   )
+  const traces = tracesResponse?.traces || []
 
   // Fetch spans for the selected time range for latency histogram
-  const { data: spans = [] } = useQuery(
+  const { data: spansResponse } = useQuery(
     ['dashboard-spans', timeRange.label, refreshTrigger],
     async () => {
       const currentRange = getCurrentTimeRange()
       return telemetryService.fetchSpans(token!, {
         start_time: currentRange.start.toISOString(),
         end_time: currentRange.end.toISOString(),
+        limit: 1000,
       })
     },
     {
@@ -146,15 +149,17 @@ export const DashboardPage: React.FC = () => {
       staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
     }
   )
+  const spans = spansResponse?.spans || []
 
   // Fetch traces for the selected time range to calculate stats
-  const { data: statsTraces = [] } = useQuery(
+  const { data: statsTracesResponse } = useQuery(
     ['dashboard-stats-traces', timeRange.label, refreshTrigger],
     async () => {
       const currentRange = getCurrentTimeRange()
       return telemetryService.fetchTraces(token!, {
         start_time: currentRange.start.toISOString(),
         end_time: currentRange.end.toISOString(),
+        limit: 1000,
       })
     },
     {
@@ -164,6 +169,7 @@ export const DashboardPage: React.FC = () => {
       staleTime: 4000 // Consider data fresh for 4 seconds (just under the 5s refresh interval)
     }
   )
+  const statsTraces = statsTracesResponse?.traces || []
 
 
   // Calculate real stats from selected time range data

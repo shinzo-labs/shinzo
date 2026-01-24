@@ -15,6 +15,13 @@ import { logger } from '../logger'
 export const fetchDataSchema = yup.object({
   start_time: yup.string().required('Start time is required'),
   end_time: yup.string().required('End time is required'),
+  limit: yup.number().optional().default(25).max(1000),
+  offset: yup.number().optional().default(0),
+  sort: yup.string().optional().default('start_time'),
+  sortDirection: yup.string().optional().oneOf(['asc', 'desc']).default('desc'),
+  // Filters
+  service_name: yup.string().optional(),
+  status: yup.string().optional(),
 }).required()
 
 export const handleFetchResources = async (userUuid: string) => {
@@ -90,6 +97,10 @@ export const handleFetchTraces = async (userUuid: string, query: yup.InferType<t
   try {
     const startTime = new Date(query.start_time)
     const endTime = new Date(query.end_time)
+    const limit = query.limit || 25
+    const offset = query.offset || 0
+    const sort = query.sort || 'start_time'
+    const sortDirection = query.sortDirection || 'desc'
 
     if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
       return {
@@ -99,53 +110,77 @@ export const handleFetchTraces = async (userUuid: string, query: yup.InferType<t
       }
     }
 
-    const userResources = await Resource.findAll({
-      where: { user_uuid: userUuid },
-      attributes: ['uuid']
-    })
+    // Validate sort column to prevent SQL injection
+    const validSortColumns = ['start_time', 'end_time', 'service_name', 'operation_name', 'status', 'span_count']
+    const safeSort = validSortColumns.includes(sort) ? sort : 'start_time'
+    const safeSortDirection = sortDirection === 'asc' ? 'ASC' : 'DESC'
 
-    const resourceUuids = userResources.map(r => r.uuid)
-
-    if (resourceUuids.length === 0) {
-      return {
-        response: [],
-        status: 200
+    // Build where clause with optional filters
+    const whereClause: any = {
+      start_time: {
+        [Op.gte]: startTime,
+        [Op.lte]: endTime
       }
     }
+    if (query.service_name) {
+      whereClause.service_name = { [Op.iLike]: `%${query.service_name}%` }
+    }
+    if (query.status && query.status !== 'all') {
+      whereClause.status = query.status
+    }
 
-    const traces = await Trace.findAll({
-      where: {
-        resource_uuid: { [Op.in]: resourceUuids },
-        start_time: {
-          [Op.gte]: startTime,
-          [Op.lte]: endTime
-        }
-      },
+    // Get total count first
+    const totalCount = await Trace.count({
+      where: whereClause,
       include: [
         {
           model: Resource,
           as: 'resource',
-          required: true
+          required: true,
+          where: { user_uuid: userUuid },
+          attributes: []
+        }
+      ]
+    })
+
+    // Single optimized query with JOIN instead of two separate queries
+    const traces = await Trace.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Resource,
+          as: 'resource',
+          required: true,
+          where: { user_uuid: userUuid },
+          attributes: [] // Don't fetch resource columns, we only need the filter
         }
       ],
-      order: [['start_time', 'DESC']]
+      order: [[safeSort, safeSortDirection]],
+      limit,
+      offset
     })
 
     return {
-      response: traces.map(trace => ({
-        uuid: trace.uuid,
-        start_time: trace.start_time,
-        end_time: trace.end_time,
-        service_name: trace.service_name,
-        operation_name: trace.operation_name,
-        status: trace.status,
-        span_count: trace.span_count,
-        duration_ms: trace.end_time && trace.start_time
-          ? new Date(trace.end_time).getTime() - new Date(trace.start_time).getTime()
-          : null,
-        created_at: trace.created_at,
-        updated_at: trace.updated_at
-      })),
+      response: {
+        traces: traces.map(trace => ({
+          uuid: trace.uuid,
+          start_time: trace.start_time,
+          end_time: trace.end_time,
+          service_name: trace.service_name,
+          operation_name: trace.operation_name,
+          status: trace.status,
+          span_count: trace.span_count,
+          duration_ms: trace.end_time && trace.start_time
+            ? new Date(trace.end_time).getTime() - new Date(trace.start_time).getTime()
+            : null,
+          created_at: trace.created_at,
+          updated_at: trace.updated_at
+        })),
+        total_count: totalCount,
+        page: Math.floor(offset / limit) + 1,
+        page_size: limit,
+        total_pages: Math.ceil(totalCount / limit),
+      },
       status: 200
     }
 
@@ -163,6 +198,10 @@ export const handleFetchSpans = async (userUuid: string, query: yup.InferType<ty
   try {
     const startTime = new Date(query.start_time)
     const endTime = new Date(query.end_time)
+    const limit = query.limit || 25
+    const offset = query.offset || 0
+    const sort = query.sort || 'start_time'
+    const sortDirection = query.sortDirection || 'desc'
 
     if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
       return {
@@ -172,76 +211,72 @@ export const handleFetchSpans = async (userUuid: string, query: yup.InferType<ty
       }
     }
 
-    const userResources = await Resource.findAll({
-      where: { user_uuid: userUuid },
-      attributes: ['uuid']
-    })
+    // Validate sort column
+    const validSortColumns = ['start_time', 'end_time', 'operation_name', 'duration_ms', 'service_name', 'status_code']
+    const safeSort = validSortColumns.includes(sort) ? sort : 'start_time'
+    const safeSortDirection = sortDirection === 'asc' ? 'ASC' : 'DESC'
 
-    const resourceUuids = userResources.map(r => r.uuid)
-
-    if (resourceUuids.length === 0) {
-      return {
-        response: [],
-        status: 200
+    // Build where clause with optional filters
+    const whereClause: any = {
+      start_time: {
+        [Op.gte]: startTime,
+        [Op.lte]: endTime
       }
     }
+    if (query.service_name) {
+      whereClause.service_name = { [Op.iLike]: `%${query.service_name}%` }
+    }
 
-    const spans = await Span.findAll({
-      where: {
-        start_time: {
-          [Op.gte]: startTime,
-          [Op.lte]: endTime
-        }
-      },
+    // Get total count first
+    const totalCount = await Span.count({
+      where: whereClause,
       include: [
         {
           model: Trace,
           as: 'trace',
           required: true,
-          where: {
-            resource_uuid: { [Op.in]: resourceUuids }
-          }
-        },
+          attributes: [],
+          include: [
+            {
+              model: Resource,
+              as: 'resource',
+              required: true,
+              where: { user_uuid: userUuid },
+              attributes: []
+            }
+          ]
+        }
+      ]
+    })
+
+    // Single optimized query - join through Trace to Resource for user filtering
+    const spans = await Span.findAll({
+      where: whereClause,
+      include: [
         {
-          model: SpanAttribute,
-          as: 'attributes',
-          required: false
+          model: Trace,
+          as: 'trace',
+          required: true,
+          attributes: [],
+          include: [
+            {
+              model: Resource,
+              as: 'resource',
+              required: true,
+              where: { user_uuid: userUuid },
+              attributes: []
+            }
+          ]
         }
       ],
-      order: [['start_time', 'DESC']]
+      order: [[safeSort, safeSortDirection]],
+      limit,
+      offset
     })
 
     return {
-      response: spans.map(span => {
-        // Transform attributes array to key-value object
-        const attributes: Record<string, any> = {}
-        if ((span as any).attributes && Array.isArray((span as any).attributes)) {
-          (span as any).attributes.forEach((attr: any) => {
-            let value: any
-            switch (attr.value_type) {
-              case 'string':
-                value = attr.string_value
-                break
-              case 'int':
-                value = attr.int_value
-                break
-              case 'double':
-                value = attr.double_value
-                break
-              case 'bool':
-                value = attr.bool_value
-                break
-              case 'array':
-                value = attr.array_value
-                break
-              default:
-                value = attr.string_value
-            }
-            attributes[attr.key] = value
-          })
-        }
-
-        return {
+      response: {
+        spans: spans.map(span => ({
           uuid: span.uuid,
           trace_uuid: span.trace_uuid,
           parent_span_uuid: span.parent_span_uuid,
@@ -254,10 +289,13 @@ export const handleFetchSpans = async (userUuid: string, query: yup.InferType<ty
           span_kind: span.span_kind,
           service_name: span.service_name,
           created_at: span.created_at,
-          updated_at: span.updated_at,
-          attributes
-        }
-      }),
+          updated_at: span.updated_at
+        })),
+        total_count: totalCount,
+        page: Math.floor(offset / limit) + 1,
+        page_size: limit,
+        total_pages: Math.ceil(totalCount / limit),
+      },
       status: 200
     }
 

@@ -33,7 +33,10 @@ export const sequelize = new Sequelize(DATABASE_URL, {
   dialect: 'postgres',
   dialectOptions: {
     supportBigNumbers: true,
-    bigNumberStrings: true
+    bigNumberStrings: true,
+    // Add connection timeout to prevent hanging connections
+    connectTimeout: 10_000, // 10 second connection timeout
+    statement_timeout: 30_000, // 30 second query timeout
   },
   timezone: TZ || 'UTC',
   logging: logger.debug.bind(logger),
@@ -41,11 +44,47 @@ export const sequelize = new Sequelize(DATABASE_URL, {
   logQueryParameters: true,
   pool: {
     max: 25, // max number of connections (reduced from 150 to allow multiple pods)
-    idle: 5_000,// max time (ms) that a connection can be idle before being released
-    acquire: 30_000,// max time (ms) that pool will try to get connection before throwing error
-    evict: 1_000// time interval (ms) after which sequelize-pool will remove idle connections
+    min: 2, // keep minimum connections warm to reduce cold start latency
+    idle: 10_000, // max time (ms) that a connection can be idle before being released
+    acquire: 10_000, // reduced from 30s - fail fast if pool is exhausted (matches K8s probe behavior)
+    evict: 1_000, // time interval (ms) after which sequelize-pool will remove idle connections
+    validate: (client: any) => {
+      // Validate connection before use to prevent using stale connections
+      return client && !client._ending
+    }
+  },
+  retry: {
+    max: 3, // retry failed queries up to 3 times
+    match: [
+      /SequelizeConnectionError/,
+      /SequelizeConnectionRefusedError/,
+      /SequelizeHostNotFoundError/,
+      /SequelizeHostNotReachableError/,
+      /SequelizeInvalidConnectionError/,
+      /SequelizeConnectionTimedOutError/,
+      /TimeoutError/,
+    ],
   }
 })
+
+// Helper function to get pool statistics for debugging
+export const getPoolStats = () => {
+  try {
+    const pool = (sequelize as any).connectionManager?.pool
+    if (pool) {
+      return {
+        size: pool.size ?? 'unknown',
+        available: pool.available ?? 'unknown',
+        pending: pool.pending ?? 'unknown',
+        max: 25
+      }
+    }
+  } catch (e) {
+    // Pool stats not available
+  }
+  return { size: 'unknown', available: 'unknown', pending: 'unknown', max: 25 }
+}
+
 logger.info('STARTUP: dbClient - Sequelize instance created')
 
 // Initialize models

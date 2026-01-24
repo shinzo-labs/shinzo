@@ -75,9 +75,10 @@ interface Span {
   end_time: string | null
   service_name: string
   operation_name: string | null
-  status: string | null
+  status_code: number | null
+  status_message: string | null
+  span_kind: string | null
   duration_ms: number | null
-  attributes: Record<string, any>
 }
 
 interface Metric {
@@ -103,6 +104,34 @@ interface TelemetryQueryParams {
   end_time: string
   limit?: number
   offset?: number
+  sort?: string
+  sortDirection?: 'asc' | 'desc'
+  service_name?: string
+  status?: string
+}
+
+interface PaginatedResponse<T> {
+  data: T[]
+  total_count: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+interface TracesResponse {
+  traces: Trace[]
+  total_count: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+interface SpansResponse {
+  spans: Span[]
+  total_count: number
+  page: number
+  page_size: number
+  total_pages: number
 }
 
 interface UserQuota {
@@ -204,7 +233,18 @@ export const ingestTokenService = {
   }
 }
 
-export type { UserQuota }
+export type {
+  UserQuota,
+  Trace,
+  Span,
+  Metric,
+  TracesResponse,
+  SpansResponse,
+  TelemetryQueryParams,
+  SpotlightSession,
+  SessionAnalyticsParams,
+  SessionAnalyticsResponse
+}
 
 export const telemetryService = {
   async fetchResources(token: string): Promise<Resource[]> {
@@ -214,12 +254,16 @@ export const telemetryService = {
     return handleResponse(response)
   },
 
-  async fetchTraces(token: string, params: TelemetryQueryParams): Promise<Trace[]> {
+  async fetchTraces(token: string, params: TelemetryQueryParams): Promise<TracesResponse> {
     const queryParams = new URLSearchParams()
     queryParams.append('start_time', params.start_time)
     queryParams.append('end_time', params.end_time)
     if (params.limit) queryParams.append('limit', params.limit.toString())
-    if (params.offset) queryParams.append('offset', params.offset.toString())
+    if (params.offset !== undefined) queryParams.append('offset', params.offset.toString())
+    if (params.sort) queryParams.append('sort', params.sort)
+    if (params.sortDirection) queryParams.append('sortDirection', params.sortDirection)
+    if (params.service_name) queryParams.append('service_name', params.service_name)
+    if (params.status) queryParams.append('status', params.status)
 
     const response = await fetch(`${API_BASE_URL}/telemetry/fetch_traces?${queryParams}`, {
       headers: getAuthHeaders(token)
@@ -227,12 +271,15 @@ export const telemetryService = {
     return handleResponse(response)
   },
 
-  async fetchSpans(token: string, params: TelemetryQueryParams): Promise<Span[]> {
+  async fetchSpans(token: string, params: TelemetryQueryParams): Promise<SpansResponse> {
     const queryParams = new URLSearchParams()
     queryParams.append('start_time', params.start_time)
     queryParams.append('end_time', params.end_time)
     if (params.limit) queryParams.append('limit', params.limit.toString())
-    if (params.offset) queryParams.append('offset', params.offset.toString())
+    if (params.offset !== undefined) queryParams.append('offset', params.offset.toString())
+    if (params.sort) queryParams.append('sort', params.sort)
+    if (params.sortDirection) queryParams.append('sortDirection', params.sortDirection)
+    if (params.service_name) queryParams.append('service_name', params.service_name)
 
     const response = await fetch(`${API_BASE_URL}/telemetry/fetch_spans?${queryParams}`, {
       headers: getAuthHeaders(token)
@@ -306,8 +353,37 @@ export const userPreferencesService = {
 interface SpotlightSession {
   uuid: string
   session_id: string
-  created_at: string
-  updated_at: string
+  start_time: string
+  end_time: string | null
+  total_requests: number
+  total_input_tokens: number
+  total_output_tokens: number
+  total_cache_read_input_tokens: number
+  total_cache_creation_ephemeral_5m_input_tokens: number
+  total_cache_creation_ephemeral_1h_input_tokens: number
+  interaction_count: number
+  last_message_preview: string
+  share_token: string
+}
+
+interface SessionAnalyticsParams {
+  limit?: number
+  offset?: number
+  sort?: string
+  sortDirection?: 'asc' | 'desc'
+  session_id?: string
+  start_date?: string
+  end_date?: string
+  model?: string
+  provider?: string
+}
+
+interface SessionAnalyticsResponse {
+  sessions: SpotlightSession[]
+  total_count: number
+  page: number
+  page_size: number
+  total_pages: number
 }
 
 interface ShinzoApiKey {
@@ -330,10 +406,17 @@ interface UserSurvey {
 }
 
 export const spotlightService = {
-  async fetchSessions(token: string, params: { limit?: number; offset?: number }): Promise<{ sessions: SpotlightSession[] }> {
+  async fetchSessions(token: string, params: SessionAnalyticsParams = {}): Promise<SessionAnalyticsResponse> {
     const queryParams = new URLSearchParams()
     if (params.limit) queryParams.append('limit', params.limit.toString())
-    if (params.offset) queryParams.append('offset', params.offset.toString())
+    if (params.offset !== undefined) queryParams.append('offset', params.offset.toString())
+    if (params.sort) queryParams.append('sort', params.sort)
+    if (params.sortDirection) queryParams.append('sortDirection', params.sortDirection)
+    if (params.session_id) queryParams.append('session_id', params.session_id)
+    if (params.start_date) queryParams.append('start_date', params.start_date)
+    if (params.end_date) queryParams.append('end_date', params.end_date)
+    if (params.model) queryParams.append('model', params.model)
+    if (params.provider) queryParams.append('provider', params.provider)
 
     const response = await fetch(`${API_BASE_URL}/spotlight/analytics/sessions?${queryParams}`, {
       headers: getAuthHeaders(token)
