@@ -18,6 +18,7 @@
         "axios": "^1.7.7",
         "clsx": "^2.1.1",
         "date-fns": "^3.6.0",
+        "posthog-js": "^1.335.2",
         "qrcode.react": "^4.2.0",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
