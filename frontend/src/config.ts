@@ -9,3 +9,8 @@ export const DEFAULT_TIME_RANGE = process.env.REACT_APP_DEFAULT_TIME_RANGE ?? '1
 // Onboarding and UI constants
 export const CHECK_INTERVAL = 5_000 // ms - Poll interval for checking telemetry data
 export const CLIPBOARD_TIMEOUT = 2_000 // ms - Duration to show "Copied!" message
+
+// PostHog constants
+export const POSTHOG_API_KEY = process.env.REACT_APP_POSTHOG_API_KEY ?? ''
+export const POSTHOG_HOST = process.env.REACT_APP_POSTHOG_HOST ?? ''
+export const POSTHOG_DEBUG = process.env.NODE_ENV === 'development'
