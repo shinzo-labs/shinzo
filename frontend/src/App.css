@@ -104,7 +104,54 @@ html {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(90deg, rgb(194, 229, 255) 0%, rgb(153, 255, 248) 50%, rgb(92, 122, 255) 100%);
+  background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 25%, #2d1b4e 50%, #1e3a5f 75%, #0f2027 100%);
+}
+
+/* Two-column auth layout */
+.auth-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 60px;
+  width: 100%;
+  max-width: 1200px;
+  padding: 40px;
+}
+
+/* Feature checklist panel (left side) */
+.feature-checklist-panel {
+  flex: 1;
+  max-width: 520px;
+}
+
+/* Auth form container (right side) */
+.auth-form-container {
+  flex-shrink: 0;
+}
+
+/* Hide feature panel on mobile/tablet, show only on larger screens */
+@media (max-width: 1024px) {
+  .auth-layout {
+    gap: 40px;
+    padding: 20px;
+  }
+
+  .feature-checklist-panel {
+    display: none;
+  }
+
+  .auth-form-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+}
+
+/* Adjust feature grid to single column on medium screens */
+@media (max-width: 1200px) and (min-width: 1025px) {
+  .feature-checklist-panel {
+    max-width: 400px;
+  }
 }
 
 /* Loading states */
