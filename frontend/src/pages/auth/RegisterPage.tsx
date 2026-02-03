@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button, TextField, Checkbox, Text, Heading, Card, Flex, Callout, Progress, Separator } from '@radix-ui/themes'
 import { CheckIcon, ExclamationTriangleIcon } from '@radix-ui/react-icons'
+import { FeatureChecklist } from '../../components/auth/FeatureChecklist'
 
 export const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -165,7 +166,10 @@ export const RegisterPage: React.FC = () => {
             }}
           />
         </a>
-        <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
+        <div className="auth-layout">
+          <FeatureChecklist />
+          <div className="auth-form-container">
+            <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
           <Flex direction="column" gap="6">
             <Flex justify="center" align="center" style={{ width: '100%' }}>
               <a
@@ -261,6 +265,8 @@ export const RegisterPage: React.FC = () => {
             </Flex>
           </Flex>
         </Card>
+          </div>
+        </div>
       </div>
     )
   }
@@ -286,7 +292,10 @@ export const RegisterPage: React.FC = () => {
           }}
         />
       </a>
-      <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
+      <div className="auth-layout">
+        <FeatureChecklist />
+        <div className="auth-form-container">
+          <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
         <Flex direction="column" gap="2">
           <Flex justify="center" align="center" style={{ width: '100%' }}>
             <a
@@ -451,6 +460,8 @@ export const RegisterPage: React.FC = () => {
           </form>
         </Flex>
       </Card>
+        </div>
+      </div>
     </div>
   )
 }

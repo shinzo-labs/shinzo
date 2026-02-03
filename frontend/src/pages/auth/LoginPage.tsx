@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Button, TextField, Checkbox, Text, Heading, Card, Flex, Callout, Separator } from '@radix-ui/themes'
 import { EyeOpenIcon, EyeNoneIcon, ExclamationTriangleIcon } from '@radix-ui/react-icons'
+import { FeatureChecklist } from '../../components/auth/FeatureChecklist'
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('')
@@ -89,7 +90,10 @@ export const LoginPage: React.FC = () => {
           }}
         />
       </a>
-      <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
+      <div className="auth-layout">
+        <FeatureChecklist />
+        <div className="auth-form-container">
+          <Card size="4" style={{ maxWidth: '400px', width: '100%' }}>
         <Flex direction="column" gap="2">
           <Flex justify="center" align="center" style={{ width: '100%' }}>
             <a
@@ -255,6 +259,8 @@ export const LoginPage: React.FC = () => {
           </Flex>
         </Flex>
       </Card>
+        </div>
+      </div>
     </div>
   )
 }
