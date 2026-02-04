@@ -622,11 +622,11 @@ print(message.content)`
                   <Flex direction="column" gap="2" style={{ paddingLeft: '8px' }}>
                     <Text size="2">
                       1. When prompted to choose a login method, select{' '}
-                      <Text weight="medium" style={{ fontFamily: 'monospace' }}>2. Anthropic Console account · API usage billing</Text>
+                      <Text weight="medium" style={{ fontFamily: 'monospace' }}> "Anthropic Console account · API usage billing"</Text>
                     </Text>
                     <Text size="2">
-                      2. When you see "Detected a custom API key in your environment... Do you want to use this API key?", select{' '}
-                      <Text weight="medium" style={{ fontFamily: 'monospace' }}>No (Recommended)</Text>
+                      2. If you see "Detected a custom API key in your environment... Do you want to use this API key?", select{' '}
+                      <Text weight="medium" style={{ fontFamily: 'monospace' }}> "No (Recommended)"</Text>
                     </Text>
                     <Text size="2">
                       3. You may need to restart <Text style={{ fontFamily: 'monospace' }}>claude</Text> after completing login for Shinzo observability to take effect.
@@ -639,11 +639,11 @@ print(message.content)`
           <Flex direction="column" gap="2" style={{ paddingLeft: '20px', marginTop: selectedIntegration === 'claude-code' ? '16px' : '0' }}>
             <Flex align="center" gap="2">
               <Icons.CheckIcon color="var(--green-9)" />
-              <Text size="2">Claude API requests are made</Text>
+              <Text size="2">Claude API requests are made to Shinzo with Shinzo platform API Key in a custom header</Text>
             </Flex>
             <Flex align="center" gap="2">
               <Icons.CheckIcon color="var(--green-9)" />
-              <Text size="2">Analytics data is sent to Shinzo</Text>
+              <Text size="2">Analytics data is recorded, and the request is repackaged with the stored API key</Text>
             </Flex>
             <Flex align="center" gap="2">
               <Icons.CheckIcon color="var(--green-9)" />
