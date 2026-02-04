@@ -78,6 +78,42 @@ export const fetchAnalyticsSchema = yup.object({
 type FetchAnalyticsFilters = yup.InferType<typeof fetchAnalyticsSchema>
 
 // ============================================================================
+// Subscription Access Guard
+// ============================================================================
+
+/**
+ * Checks if the request is using subscription-based auth and returns an error response if so.
+ * Subscription-based access (OAuth tokens from Claude subscriptions) is temporarily disabled
+ * due to unclear terms and conditions with Anthropic's API.
+ *
+ * @returns Error response object if subscription auth, null if API key auth (allowed)
+ */
+const checkSubscriptionAccess = (
+  authType: ProviderCredentials['authType'],
+  userUuid: string,
+  context: string
+): { response: any; error: boolean; status: number } | null => {
+  if (authType === 'subscription') {
+    logger.warn({
+      message: `Subscription-based access blocked for ${context}`,
+      userUuid,
+      authType
+    })
+    return {
+      response: {
+        error: {
+          type: 'subscription_not_supported',
+          message: 'Shinzo Platform is currently only compatible with API key-based access. Please add your Anthropic API key in the settings page to continue. Subscription-based access (using Claude subscription OAuth tokens) is not supported at this time.'
+        }
+      },
+      error: true,
+      status: 403
+    }
+  }
+  return null
+}
+
+// ============================================================================
 // Shinzo API Key CRUD Operations
 // ============================================================================
 
@@ -492,6 +528,9 @@ export const handleModelProxy = async (
     const { apiKeyUuid, userUuid } = shinzoCredentials
     const { providerKeyUuid, authType } = providerCredentials
 
+    const subscriptionError = checkSubscriptionAccess(authType, userUuid, 'model proxy')
+    if (subscriptionError) return subscriptionError
+
     let session: any = null
     const sessionId = requestBody.metadata?.user_id || 'default-session'
 
@@ -798,6 +837,10 @@ export const handleCountTokens = async (
   try {
     const { apiKeyUuid, userUuid } = shinzoCredentials
     const { providerKeyUuid, authType } = providerCredentials
+
+    const subscriptionError = checkSubscriptionAccess(authType, userUuid, 'count tokens')
+    if (subscriptionError) return subscriptionError
+
     const requestTimestamp = new Date()
     const messageCount = requestBody.messages?.length || 0
     const hasSystemPrompt = !!requestBody.system
@@ -910,7 +953,11 @@ export const handleEventLogging = async (
 ) => {
   try {
     const { apiKeyUuid, userUuid } = shinzoCredentials
-    
+    const { authType } = providerCredentials
+
+    const subscriptionError = checkSubscriptionAccess(authType, userUuid, 'event logging')
+    if (subscriptionError) return subscriptionError
+
     const headers = constructModelAPIHeaders(requestHeaders)
 
     const url = `${modelProviderBaseURL[provider]}${modelAPISpec[provider].eventLogging}`

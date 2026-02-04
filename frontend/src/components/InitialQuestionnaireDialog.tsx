@@ -20,19 +20,19 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
     hideRequiredBadge: true, // All questions are required, so no need to show the badge
     questions: [
       {
-        id: 'usage_types',
-        type: 'multi-select',
-        question: 'What would you like to do with Shinzo?',
-        description: 'Select all that apply.',
+        id: 'usage_type',
+        type: 'single-select-radio',
+        question: 'Which type of analytics do you want to use first?',
+        description: "Don't worry — you can always switch to the other option later in the onboarding flow.",
         required: true,
         options: [
           {
-            label: 'Track AI Agent usage',
+            label: 'AI Agent Analytics',
             value: 'ai-agent',
             description: 'Monitor Claude API usage, token consumption, and agent interactions.'
           },
           {
-            label: 'Track MCP Server usage',
+            label: 'MCP Server Analytics',
             value: 'mcp-server',
             description: 'Monitor MCP server telemetry, traces, spans, and metrics.'
           },
@@ -108,15 +108,18 @@ export const InitialQuestionnaireDialog: React.FC<InitialQuestionnaireDialogProp
       return option?.label || value
     }
 
-    // Transform usage_types to display text
-    const usage_types_values = answers.usage_types as string[] || []
-    const usage_types = usage_types_values.map(value => {
-      // If "Something Else" is selected and has custom text, use that instead
-      if (value === 'something-else' && answers['usage_types_text']) {
-        return answers['usage_types_text'] as string
+    // Store usage_type raw value for routing, with custom text fallback
+    const usage_type_value = answers.usage_type as string || ''
+    let usage_types: string[] = []
+    if (usage_type_value) {
+      // If "Something Else" is selected and has custom text, use that text
+      if (usage_type_value === 'something-else' && answers['usage_type_text']) {
+        usage_types = [answers['usage_type_text'] as string]
+      } else {
+        // Store the raw value ('ai-agent' or 'mcp-server') for routing
+        usage_types = [usage_type_value]
       }
-      return getLabel('usage_types', value)
-    })
+    }
 
     // Transform role to display text
     const role_value = answers.role as string

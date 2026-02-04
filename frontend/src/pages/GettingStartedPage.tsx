@@ -13,9 +13,11 @@ type SdkType = 'typescript' | 'python-mcp' | 'python-fastmcp'
 export const GettingStartedPage: React.FC = () => {
   const { token } = useAuth()
   const [ingestToken, setIngestToken] = useState<string>('')
+  const [ingestTokenUuid, setIngestTokenUuid] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [hasTelemetry, setHasTelemetry] = useState(false)
   const [sdkType, setSdkType] = useState<SdkType>('typescript')
+  const [regeneratingToken, setRegeneratingToken] = useState(false)
 
   useEffect(() => {
     const fetchIngestToken = async () => {
@@ -23,6 +25,7 @@ export const GettingStartedPage: React.FC = () => {
         const tokens = await ingestTokenService.fetchAll(token!)
         if (tokens.length > 0) {
           setIngestToken(tokens[0].ingest_token)
+          setIngestTokenUuid(tokens[0].uuid)
         }
       } catch (error) {
         console.error('Failed to fetch ingest token:', error)
@@ -35,6 +38,25 @@ export const GettingStartedPage: React.FC = () => {
       fetchIngestToken()
     }
   }, [token])
+
+  const handleRegenerateIngestToken = async () => {
+    setRegeneratingToken(true)
+    try {
+      // Revoke the old token
+      if (ingestTokenUuid) {
+        await ingestTokenService.revoke(token!, ingestTokenUuid)
+      }
+
+      // Generate a new token
+      const newToken = await ingestTokenService.generate(token!)
+      setIngestToken(newToken.token)
+      setIngestTokenUuid(newToken.uuid)
+    } catch (error) {
+      console.error('Failed to regenerate ingest token:', error)
+    } finally {
+      setRegeneratingToken(false)
+    }
+  }
 
   // Poll for telemetry data every 5 seconds
   useEffect(() => {
@@ -165,8 +187,6 @@ async def shutdown():
         <OnboardingHeader
           title="Getting Started"
           description="Set up your MCP server with Shinzo Platform in under 60 seconds"
-          successMessage="Your ingest token has been automatically generated! Copy the code below and start sending telemetry data."
-          showSuccess={!!ingestToken}
           videoUrl="https://www.youtube.com/embed/ngv4QTURY6c"
           videoTitle="Get Onboarded to the Shinzo Analytics Platform in 60 Seconds or Less"
         />
@@ -264,21 +284,39 @@ async def shutdown():
           title="Add Telemetry to Your Server"
           description="Import and initialize Shinzo instrumentation in your MCP server"
         >
-          <CodeSnippet
-            code={getCurrentSnippet()}
-            copyId="code-snippet"
-          />
+          <Flex direction="column" gap="3">
+            {ingestToken && (
+              <Flex align="center" gap="2">
+                <Text size="2" weight="medium">Ingest Token:</Text>
+                <Text size="2" style={{ fontFamily: 'monospace' }}>{ingestToken.substring(0, 20)}...</Text>
+                <Button
+                  size="1"
+                  variant="ghost"
+                  onClick={handleRegenerateIngestToken}
+                  disabled={regeneratingToken}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {regeneratingToken ? <Spinner size="1" /> : <Icons.ReloadIcon />}
+                </Button>
+              </Flex>
+            )}
 
-          {!ingestToken && (
-            <Callout.Root color="amber">
-              <Callout.Icon>
-                <Icons.ExclamationTriangleIcon />
-              </Callout.Icon>
-              <Callout.Text>
-                No ingest token found. Generate one in Settings → Ingest Tokens.
-              </Callout.Text>
-            </Callout.Root>
-          )}
+            <CodeSnippet
+              code={getCurrentSnippet()}
+              copyId="code-snippet"
+            />
+
+            {!ingestToken && (
+              <Callout.Root color="amber">
+                <Callout.Icon>
+                  <Icons.ExclamationTriangleIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  No ingest token found. Generate one in Settings → Ingest Tokens.
+                </Callout.Text>
+              </Callout.Root>
+            )}
+          </Flex>
         </OnboardingStep>
 
         {/* Step 4: Run and verify */}
