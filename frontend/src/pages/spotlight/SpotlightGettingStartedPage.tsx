@@ -155,17 +155,17 @@ export const SpotlightGettingStartedPage: React.FC = () => {
     }
   }
 
-  // Claude Code setup - using ANTHROPIC_API_KEY instead of custom headers
-  const claudeCodeSetupMacOS = `echo 'export ANTHROPIC_API_KEY="${shinzoApiKey}"' >> ~/.zshrc
-echo 'export ANTHROPIC_BASE_URL="${BACKEND_URL}/spotlight/anthropic"' >> ~/.zshrc
+  // Claude Code setup - using custom headers for Shinzo API key
+  const claudeCodeSetupMacOS = `echo 'export ANTHROPIC_BASE_URL="${BACKEND_URL}/spotlight/anthropic"' >> ~/.zshrc
+echo 'export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.zshrc
 source ~/.zshrc`
 
-  const claudeCodeSetupLinux = `echo 'export ANTHROPIC_API_KEY="${shinzoApiKey}"' >> ~/.bashrc
-echo 'export ANTHROPIC_BASE_URL="${BACKEND_URL}/spotlight/anthropic"' >> ~/.bashrc
+  const claudeCodeSetupLinux = `echo 'export ANTHROPIC_BASE_URL="${BACKEND_URL}/spotlight/anthropic"' >> ~/.bashrc
+echo 'export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.bashrc
 source ~/.bashrc`
 
-  const claudeCodeSetupWindows = `[System.Environment]::SetEnvironmentVariable('ANTHROPIC_API_KEY', '${shinzoApiKey}', 'User')
-[System.Environment]::SetEnvironmentVariable('ANTHROPIC_BASE_URL', '${BACKEND_URL}/spotlight/anthropic', 'User')`
+  const claudeCodeSetupWindows = `[System.Environment]::SetEnvironmentVariable('ANTHROPIC_BASE_URL', '${BACKEND_URL}/spotlight/anthropic', 'User')
+[System.Environment]::SetEnvironmentVariable('ANTHROPIC_CUSTOM_HEADERS', 'x-shinzo-api-key: ${shinzoApiKey}', 'User')`
 
   // Anthropic SDK - Environment variables setup
   const envVarsSetup = `export ANTHROPIC_API_KEY="${shinzoApiKey}"
