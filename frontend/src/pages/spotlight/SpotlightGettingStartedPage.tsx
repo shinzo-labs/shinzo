@@ -611,6 +611,29 @@ print(message.content)`
                 copyId="run-claude"
                 inline
               />
+              <Callout.Root color="blue">
+                <Callout.Icon>
+                  <Icons.InfoCircledIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  <Text size="2" weight="medium" style={{ display: 'block', marginBottom: '8px' }}>
+                    You'll see several login screens. Follow these steps:
+                  </Text>
+                  <Flex direction="column" gap="2" style={{ paddingLeft: '8px' }}>
+                    <Text size="2">
+                      1. When prompted to choose a login method, select{' '}
+                      <Text weight="medium" style={{ fontFamily: 'monospace' }}>2. Anthropic Console account · API usage billing</Text>
+                    </Text>
+                    <Text size="2">
+                      2. When you see "Detected a custom API key in your environment... Do you want to use this API key?", select{' '}
+                      <Text weight="medium" style={{ fontFamily: 'monospace' }}>No (Recommended)</Text>
+                    </Text>
+                    <Text size="2">
+                      3. You may need to restart <Text style={{ fontFamily: 'monospace' }}>claude</Text> after completing login for Shinzo observability to take effect.
+                    </Text>
+                  </Flex>
+                </Callout.Text>
+              </Callout.Root>
             </Flex>
           )}
           <Flex direction="column" gap="2" style={{ paddingLeft: '20px', marginTop: selectedIntegration === 'claude-code' ? '16px' : '0' }}>
