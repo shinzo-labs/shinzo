@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { AppLayout } from '../../components/layout/AppLayout'
-import { Flex, Text, Tabs, Button, Callout, Spinner, Badge } from '@radix-ui/themes'
+import { Flex, Text, Tabs, Button, Callout, Spinner, Badge, TextField } from '@radix-ui/themes'
 import * as Icons from '@radix-ui/react-icons'
 import { useAuth } from '../../contexts/AuthContext'
 import { useHasSpotlightData } from '../../hooks/useHasSpotlightData'
 import { spotlightService } from '../../backendService'
 import { OnboardingHeader, OnboardingStep, CodeSnippet } from '../../components/onboarding'
 import { BACKEND_URL } from '../../config'
+import axios from 'axios'
 
 type IntegrationType = 'claude-code' | 'anthropic-sdk' | 'codex'
 
@@ -19,6 +20,14 @@ export const SpotlightGettingStartedPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const { hasSpotlightData } = useHasSpotlightData()
   const [sdkType, setSdkType] = useState<SdkType>('typescript')
+
+  // Provider API key state
+  const [providerApiKey, setProviderApiKey] = useState<string>('')
+  const [hasProviderKey, setHasProviderKey] = useState<boolean>(false)
+  const [testingProviderKey, setTestingProviderKey] = useState<boolean>(false)
+  const [savingProviderKey, setSavingProviderKey] = useState<boolean>(false)
+  const [providerKeyError, setProviderKeyError] = useState<string | null>(null)
+  const [providerKeySuccess, setProviderKeySuccess] = useState<boolean>(false)
 
   useEffect(() => {
     const fetchOrCreateShinzoKey = async () => {
@@ -38,6 +47,17 @@ export const SpotlightGettingStartedPage: React.FC = () => {
           })
           setShinzoApiKey(createResponse.api_key)
         }
+
+        // Check if user already has a provider key
+        const providerKeysResponse = await axios.get(`${BACKEND_URL}/spotlight/provider_keys`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const providerKeys = providerKeysResponse.data.provider_keys || []
+        const hasActiveAnthropicKey = providerKeys.some((k: any) => k.provider === 'anthropic' && k.status === 'active')
+        setHasProviderKey(hasActiveAnthropicKey)
+        if (hasActiveAnthropicKey) {
+          setProviderKeySuccess(true)
+        }
       } catch (error) {
         console.error('Failed to fetch or create Shinzo API key:', error)
       } finally {
@@ -49,6 +69,48 @@ export const SpotlightGettingStartedPage: React.FC = () => {
       fetchOrCreateShinzoKey()
     }
   }, [token])
+
+  const handleTestProviderKey = async () => {
+    setTestingProviderKey(true)
+    setProviderKeyError(null)
+    try {
+      const response = await axios.post(`${BACKEND_URL}/spotlight/provider_keys/test`, {
+        provider: 'anthropic',
+        provider_api_key: providerApiKey
+      })
+      if (response.data.success) {
+        setProviderKeyError(null)
+        // Auto-save after successful test
+        await handleSaveProviderKey()
+      } else {
+        setProviderKeyError(response.data.message || 'Invalid API key')
+      }
+    } catch (error: any) {
+      setProviderKeyError(error.response?.data?.message || 'Failed to test API key')
+    } finally {
+      setTestingProviderKey(false)
+    }
+  }
+
+  const handleSaveProviderKey = async () => {
+    setSavingProviderKey(true)
+    setProviderKeyError(null)
+    try {
+      await axios.post(`${BACKEND_URL}/spotlight/provider_keys`, {
+        provider: 'anthropic',
+        provider_api_key: providerApiKey,
+        label: 'Onboarding Key'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setHasProviderKey(true)
+      setProviderKeySuccess(true)
+    } catch (error: any) {
+      setProviderKeyError(error.response?.data?.error || 'Failed to save API key')
+    } finally {
+      setSavingProviderKey(false)
+    }
+  }
 
   const claudeCodeSetupMacOS = `echo 'export ANTHROPIC_BASE_URL="${BACKEND_URL}/spotlight/anthropic"' >> ~/.zshrc
 echo 'export ANTHROPIC_CUSTOM_HEADERS="x-shinzo-api-key: ${shinzoApiKey}"' >> ~/.zshrc
@@ -155,10 +217,79 @@ print(message.content)`
           )}
         </OnboardingStep>
 
-        {/* Step 2: Configure Your Integration */}
+        {/* Step 2: Enter Your Anthropic API Key */}
+        <OnboardingStep
+          stepNumber={providerKeySuccess ? <Icons.CheckIcon width="20" height="20" /> : 2}
+          title="Enter Your Anthropic API Key"
+          description="Your API key is required to proxy requests through Shinzo. It will be stored securely."
+          variant={providerKeySuccess ? 'success' : 'default'}
+        >
+          {providerKeySuccess ? (
+            <Callout.Root color="green">
+              <Callout.Icon>
+                <Icons.CheckCircledIcon />
+              </Callout.Icon>
+              <Callout.Text>
+                Your Anthropic API key has been saved securely. You can manage your keys in the API Keys settings page.
+              </Callout.Text>
+            </Callout.Root>
+          ) : (
+            <>
+              <Callout.Root color="blue">
+                <Callout.Icon>
+                  <Icons.InfoCircledIcon />
+                </Callout.Icon>
+                <Callout.Text>
+                  Shinzo requires your own Anthropic API key to proxy requests. Get your API key from the{' '}
+                  <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>
+                    Anthropic Console
+                  </a>.
+                </Callout.Text>
+              </Callout.Root>
+              <Flex direction="column" gap="3">
+                <TextField.Root
+                  type="password"
+                  placeholder="sk-ant-api03-..."
+                  value={providerApiKey}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    setProviderApiKey(e.target.value)
+                    setProviderKeyError(null)
+                  }}
+                />
+                {providerKeyError && (
+                  <Callout.Root color="red" size="1">
+                    <Callout.Icon>
+                      <Icons.ExclamationTriangleIcon />
+                    </Callout.Icon>
+                    <Callout.Text>{providerKeyError}</Callout.Text>
+                  </Callout.Root>
+                )}
+                <Button
+                  onClick={handleTestProviderKey}
+                  disabled={!providerApiKey || testingProviderKey || savingProviderKey}
+                  style={{ alignSelf: 'flex-start', cursor: 'pointer' }}
+                >
+                  {testingProviderKey || savingProviderKey ? (
+                    <>
+                      <Spinner size="1" />
+                      {testingProviderKey ? 'Testing...' : 'Saving...'}
+                    </>
+                  ) : (
+                    <>
+                      <Icons.CheckIcon />
+                      Verify & Save API Key
+                    </>
+                  )}
+                </Button>
+              </Flex>
+            </>
+          )}
+        </OnboardingStep>
+
+        {/* Step 3: Configure Your Integration */}
         {selectedIntegration === 'claude-code' && (
           <OnboardingStep
-            stepNumber={2}
+            stepNumber={3}
             title="Configure Environment Variables"
             description="Set environment variables for your operating system"
           >
@@ -214,7 +345,7 @@ print(message.content)`
         {selectedIntegration === 'anthropic-sdk' && (
           <>
             <OnboardingStep
-              stepNumber={2}
+              stepNumber={3}
               title="Choose Your SDK Language"
               description="Select the programming language for your application"
             >
@@ -284,9 +415,9 @@ print(message.content)`
             </OnboardingStep>
 
             <OnboardingStep
-              stepNumber={3}
+              stepNumber={4}
               title="Configure Your Environment"
-              description="Set the environment variables for your application. You can add or update API keys later in the settings page."
+              description="Set the environment variables for your application."
             >
               <CodeSnippet
                 code={`export ANTHROPIC_API_KEY="${shinzoApiKey}" && export ANTHROPIC_BASE_URL="${BACKEND_URL}/spotlight/anthropic"`}
@@ -296,7 +427,7 @@ print(message.content)`
             </OnboardingStep>
 
             <OnboardingStep
-              stepNumber={4}
+              stepNumber={5}
               title="Configure Your Client"
               description="Initialize the Anthropic client with Shinzo routing"
             >
@@ -318,9 +449,9 @@ print(message.content)`
           </>
         )}
 
-        {/* Step 3/6: Run and Verify */}
+        {/* Step 4/6: Run and Verify */}
         <OnboardingStep
-          stepNumber={selectedIntegration === 'anthropic-sdk' ? 5 : 3}
+          stepNumber={selectedIntegration === 'anthropic-sdk' ? 6 : 4}
           title="Run Your Application & Verify"
           description="Start making AI requests and your analytics will appear automatically"
         >
@@ -340,13 +471,13 @@ print(message.content)`
           </Flex>
         </OnboardingStep>
 
-        {/* Step 4/7: Success State */}
+        {/* Step 5/7: Success State */}
         <OnboardingStep
           stepNumber={
             hasSpotlightData ? (
               <Icons.CheckIcon width="20" height="20" />
             ) : (
-              selectedIntegration === 'anthropic-sdk' ? 6 : 4
+              selectedIntegration === 'anthropic-sdk' ? 7 : 5
             )
           }
           title="See Live Analytics via the Dashboard"

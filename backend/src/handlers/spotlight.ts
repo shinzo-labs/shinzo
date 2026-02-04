@@ -492,6 +492,26 @@ export const handleModelProxy = async (
     const { apiKeyUuid, userUuid } = shinzoCredentials
     const { providerKeyUuid, authType } = providerCredentials
 
+    // Block subscription-based access (OAuth tokens from Claude subscriptions)
+    // This is temporarily disabled due to unclear terms and conditions with Anthropic's API
+    if (authType === 'subscription') {
+      logger.warn({
+        message: 'Subscription-based access blocked',
+        userUuid,
+        authType
+      })
+      return {
+        response: {
+          error: {
+            type: 'subscription_not_supported',
+            message: 'Shinzo Platform is currently only compatible with API key-based access. Please add your Anthropic API key in the settings page to continue. Subscription-based access (using Claude subscription OAuth tokens) is not supported at this time.'
+          }
+        },
+        error: true,
+        status: 403
+      }
+    }
+
     let session: any = null
     const sessionId = requestBody.metadata?.user_id || 'default-session'
 
@@ -798,6 +818,26 @@ export const handleCountTokens = async (
   try {
     const { apiKeyUuid, userUuid } = shinzoCredentials
     const { providerKeyUuid, authType } = providerCredentials
+
+    // Block subscription-based access (OAuth tokens from Claude subscriptions)
+    if (authType === 'subscription') {
+      logger.warn({
+        message: 'Subscription-based access blocked for count tokens',
+        userUuid,
+        authType
+      })
+      return {
+        response: {
+          error: {
+            type: 'subscription_not_supported',
+            message: 'Shinzo Platform is currently only compatible with API key-based access. Please add your Anthropic API key in the settings page to continue. Subscription-based access (using Claude subscription OAuth tokens) is not supported at this time.'
+          }
+        },
+        error: true,
+        status: 403
+      }
+    }
+
     const requestTimestamp = new Date()
     const messageCount = requestBody.messages?.length || 0
     const hasSystemPrompt = !!requestBody.system
@@ -910,7 +950,27 @@ export const handleEventLogging = async (
 ) => {
   try {
     const { apiKeyUuid, userUuid } = shinzoCredentials
-    
+    const { authType } = providerCredentials
+
+    // Block subscription-based access (OAuth tokens from Claude subscriptions)
+    if (authType === 'subscription') {
+      logger.warn({
+        message: 'Subscription-based access blocked for event logging',
+        userUuid,
+        authType
+      })
+      return {
+        response: {
+          error: {
+            type: 'subscription_not_supported',
+            message: 'Shinzo Platform is currently only compatible with API key-based access. Please add your Anthropic API key in the settings page to continue. Subscription-based access (using Claude subscription OAuth tokens) is not supported at this time.'
+          }
+        },
+        error: true,
+        status: 403
+      }
+    }
+
     const headers = constructModelAPIHeaders(requestHeaders)
 
     const url = `${modelProviderBaseURL[provider]}${modelAPISpec[provider].eventLogging}`
