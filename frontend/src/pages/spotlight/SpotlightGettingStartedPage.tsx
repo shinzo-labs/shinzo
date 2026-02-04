@@ -23,7 +23,7 @@ export const SpotlightGettingStartedPage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const { hasSpotlightData } = useHasSpotlightData()
   const [sdkType, setSdkType] = useState<SdkType>('typescript')
-  const [configMethod, setConfigMethod] = useState<ConfigMethod>('env-vars')
+  const [configMethod, setConfigMethod] = useState<ConfigMethod>('library-params')
 
   // Provider API key state
   const [providerApiKey, setProviderApiKey] = useState<string>('')
@@ -558,11 +558,23 @@ print(message.content)`
 
                 <Tabs.Root value={configMethod} onValueChange={(value) => setConfigMethod(value as ConfigMethod)}>
                   <Tabs.List>
+                    <Tabs.Trigger value="library-params" style={{ cursor: 'pointer' }}>Class Params (Recommended)</Tabs.Trigger>
                     <Tabs.Trigger value="env-vars" style={{ cursor: 'pointer' }}>Environment Variables</Tabs.Trigger>
-                    <Tabs.Trigger value="library-params" style={{ cursor: 'pointer' }}>Library Parameters</Tabs.Trigger>
                   </Tabs.List>
 
                   <Flex direction="column" gap="3" style={{ marginTop: '16px' }}>
+                    <Tabs.Content value="library-params">
+                      <Flex direction="column" gap="3">
+                        <Text size="2" color="gray">
+                          Pass the configuration directly to the SDK constructor:
+                        </Text>
+                        <CodeSnippet
+                          code={sdkType === 'typescript' ? libraryParamsTypescript : libraryParamsPython}
+                          copyId="library-params-code"
+                        />
+                      </Flex>
+                    </Tabs.Content>
+
                     <Tabs.Content value="env-vars">
                       <Flex direction="column" gap="3">
                         <Text size="2" color="gray">
@@ -575,18 +587,6 @@ print(message.content)`
                         <CodeSnippet
                           code={sdkType === 'typescript' ? envVarsCodeTypescript : envVarsCodePython}
                           copyId="env-vars-code"
-                        />
-                      </Flex>
-                    </Tabs.Content>
-
-                    <Tabs.Content value="library-params">
-                      <Flex direction="column" gap="3">
-                        <Text size="2" color="gray">
-                          Pass the configuration directly to the SDK constructor:
-                        </Text>
-                        <CodeSnippet
-                          code={sdkType === 'typescript' ? libraryParamsTypescript : libraryParamsPython}
-                          copyId="library-params-code"
                         />
                       </Flex>
                     </Tabs.Content>
