@@ -187,8 +187,6 @@ async def shutdown():
         <OnboardingHeader
           title="Getting Started"
           description="Set up your MCP server with Shinzo Platform in under 60 seconds"
-          successMessage="Your ingest token has been automatically generated! Copy the code below and start sending telemetry data."
-          showSuccess={!!ingestToken}
           videoUrl="https://www.youtube.com/embed/ngv4QTURY6c"
           videoTitle="Get Onboarded to the Shinzo Analytics Platform in 60 Seconds or Less"
         />

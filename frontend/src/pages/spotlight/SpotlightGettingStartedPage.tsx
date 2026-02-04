@@ -263,8 +263,6 @@ print(message.content)`
         <OnboardingHeader
           title="AI Analytics Setup"
           description="Connect your AI application to start tracking usage, costs, and performance"
-          successMessage="Your Shinzo API key has been automatically generated! Follow the steps below to start sending analytics data."
-          showSuccess={!!shinzoApiKey}
         />
 
         {/* Step 1: Enter Your Anthropic API Key */}
