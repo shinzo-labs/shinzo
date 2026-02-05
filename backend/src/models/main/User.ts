@@ -12,9 +12,6 @@ export class User extends CommonModel {
   public last_counter_reset!: Date
   public subscription_tier_uuid!: string
   public subscribed_on!: Date | null
-  public oauth_provider!: string | null
-  public oauth_id!: string | null
-  public oauth_profile_data!: Record<string, any> | null
 
   static initialize(sequelize: Sequelize) {
     User.init(
@@ -63,18 +60,6 @@ export class User extends CommonModel {
         },
         subscribed_on: {
           type: DataTypes.DATE,
-          allowNull: true,
-        },
-        oauth_provider: {
-          type: DataTypes.TEXT,
-          allowNull: true,
-        },
-        oauth_id: {
-          type: DataTypes.TEXT,
-          allowNull: true,
-        },
-        oauth_profile_data: {
-          type: DataTypes.JSONB,
           allowNull: true,
         },
       },

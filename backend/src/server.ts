@@ -35,6 +35,12 @@ import {
 } from './handlers/oauth'
 
 import {
+  handleGetAuthMethods,
+  handleGetOAuthAccounts,
+  handleUnlinkOAuthProvider
+} from './handlers/oauthAccount'
+
+import {
   handleFetchResources,
   handleFetchTraces,
   handleFetchSpans,
@@ -368,6 +374,47 @@ app.post('/auth/oauth/github/callback', async (request: FastifyRequest, reply: F
     } else {
       reply.status(500).send({ error: 'Internal server error' })
     }
+  }
+})
+
+// OAuth account management endpoints
+app.get('/auth/methods', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleGetAuthMethods(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Get auth methods error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.get('/auth/oauth/accounts', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const result = await handleGetOAuthAccounts(request.user!.uuid)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Get OAuth accounts error', error })
+    reply.status(500).send({ error: 'Internal server error' })
+  }
+})
+
+app.delete('/auth/oauth/accounts/:provider', async (request: AuthenticatedRequest, reply: FastifyReply) => {
+  const authenticated = await authenticateJWT(request, reply)
+  if (!authenticated) return
+
+  try {
+    const { provider } = request.params as { provider: string }
+    const result = await handleUnlinkOAuthProvider(request.user!.uuid, provider)
+    reply.status(result.status || 200).send(result.response)
+  } catch (error: any) {
+    logger.error({ message: 'Unlink OAuth provider error', error })
+    reply.status(500).send({ error: 'Internal server error' })
   }
 })
 

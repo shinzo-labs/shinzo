@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { API_BASE_URL } from '../config'
+import { oauthAccountService } from '../backendService'
 
 interface User {
   uuid: string
@@ -7,6 +8,19 @@ interface User {
   verified: boolean
   created_at: string
   updated_at: string
+}
+
+interface OAuthAccount {
+  uuid: string
+  oauth_provider: 'google' | 'github'
+  oauth_email: string | null
+  linked_at: string
+  created_at: string
+}
+
+interface AuthMethods {
+  hasPassword: boolean
+  oauthProviders: string[]
 }
 
 interface AuthContextType {
@@ -22,6 +36,10 @@ interface AuthContextType {
   logout: () => void
   loading: boolean
   isAuthenticated: boolean
+  fetchAuthMethods: () => Promise<AuthMethods>
+  fetchOAuthAccounts: () => Promise<OAuthAccount[]>
+  unlinkOAuthProvider: (provider: string) => Promise<void>
+  linkOAuthProvider: (provider: 'google' | 'github', returnTo?: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -239,6 +257,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setToken(authToken)
     setUser(userData)
 
+    // Wait for React to flush state updates before returning
+    // This prevents race conditions where protected routes try to make API calls
+    // before the token is fully available in the context
+    await new Promise(resolve => setTimeout(resolve, 100))
+
     return { returnTo }
   }
 
@@ -248,6 +271,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setToken(null)
     setUser(null)
     window.location.href = '/login'
+  }
+
+  const fetchAuthMethods = async (): Promise<AuthMethods> => {
+    if (!token) {
+      throw new Error('Not authenticated')
+    }
+    return oauthAccountService.fetchAuthMethods(token)
+  }
+
+  const fetchOAuthAccounts = async (): Promise<OAuthAccount[]> => {
+    if (!token) {
+      throw new Error('Not authenticated')
+    }
+    const result = await oauthAccountService.fetchOAuthAccounts(token)
+    return result.accounts
+  }
+
+  const unlinkOAuthProvider = async (provider: string): Promise<void> => {
+    if (!token) {
+      throw new Error('Not authenticated')
+    }
+    await oauthAccountService.unlinkOAuthProvider(token, provider)
+  }
+
+  const linkOAuthProvider = async (provider: 'google' | 'github', returnTo?: string): Promise<void> => {
+    // Use the existing OAuth login methods to initiate linking
+    if (provider === 'google') {
+      await loginWithGoogle(returnTo)
+    } else if (provider === 'github') {
+      await loginWithGithub(returnTo)
+    }
   }
 
   const value = {
@@ -263,6 +317,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     loading,
     isAuthenticated: !!token && !!user,
+    fetchAuthMethods,
+    fetchOAuthAccounts,
+    unlinkOAuthProvider,
+    linkOAuthProvider,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

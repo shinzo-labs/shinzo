@@ -42,7 +42,8 @@ interface IngestToken {
 }
 
 export const SettingsPage: React.FC = () => {
-  const { token, user, logout } = useAuth()
+  const auth = useAuth()
+  const { token, user, logout } = auth
   const queryClient = useQueryClient()
 
   const [activeTab, setActiveTab] = useState('profile')
@@ -96,6 +97,24 @@ export const SettingsPage: React.FC = () => {
     { enabled: !!token }
   )
 
+  const { data: authMethods, isLoading: authMethodsLoading } = useQuery(
+    ['authMethods'],
+    async () => {
+      if (!token) return null
+      return await auth.fetchAuthMethods()
+    },
+    { enabled: !!token }
+  )
+
+  const { data: oauthAccounts, isLoading: oauthAccountsLoading } = useQuery(
+    ['oauthAccounts'],
+    async () => {
+      if (!token) return []
+      return await auth.fetchOAuthAccounts()
+    },
+    { enabled: !!token }
+  )
+
   // Stub out settings update until backend implements these endpoints
   const updateSettingsMutation = useMutation(
     async (newSettings: Partial<Settings>) => {
@@ -145,6 +164,18 @@ export const SettingsPage: React.FC = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries(['ingestTokens'])
+      },
+    }
+  )
+
+  const unlinkOAuthMutation = useMutation(
+    async (provider: string) => {
+      return await auth.unlinkOAuthProvider(provider)
+    },
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['authMethods'])
+        queryClient.invalidateQueries(['oauthAccounts'])
       },
     }
   )
@@ -208,6 +239,10 @@ export const SettingsPage: React.FC = () => {
               <Icons.PersonIcon />
               Profile
             </Tabs.Trigger>
+            <Tabs.Trigger value="accounts">
+              <Icons.Link1Icon />
+              Connected Accounts
+            </Tabs.Trigger>
             <Tabs.Trigger value="tokens">
               <Icons.TokensIcon />
               Ingest Tokens
@@ -264,6 +299,151 @@ export const SettingsPage: React.FC = () => {
             </Flex>
           </Tabs.Content>
 
+          <Tabs.Content value="accounts">
+            <Flex direction="column" gap="6">
+              <Card>
+                <Flex direction="column" gap="4">
+                  <Heading size="4">Connected Accounts</Heading>
+                  <Text size="2" color="gray">
+                    Link multiple login methods to your account for convenient access.
+                  </Text>
+
+                  {/* Warning if only one auth method remains */}
+                  {authMethods && (authMethods.oauthProviders.length + (authMethods.hasPassword ? 1 : 0)) <= 1 && (
+                    <Box style={{ backgroundColor: 'var(--yellow-2)', padding: '12px', borderRadius: '8px', border: '1px solid var(--yellow-6)' }}>
+                      <Flex gap="2" align="start">
+                        <Icons.ExclamationTriangleIcon color="var(--yellow-11)" />
+                        <Flex direction="column" gap="1">
+                          <Text size="2" weight="medium" style={{ color: 'var(--yellow-11)' }}>
+                            Only one authentication method
+                          </Text>
+                          <Text size="2" style={{ color: 'var(--yellow-11)' }}>
+                            Add another login method before removing your current one to prevent being locked out.
+                          </Text>
+                        </Flex>
+                      </Flex>
+                    </Box>
+                  )}
+
+                  {authMethodsLoading || oauthAccountsLoading ? (
+                    <Flex direction="column" gap="3">
+                      {[1, 2, 3].map(i => (
+                        <Box key={i} className="animate-pulse" style={{ padding: '16px', backgroundColor: 'var(--gray-2)', borderRadius: '8px' }}>
+                          <Box style={{ height: '16px', backgroundColor: 'var(--gray-3)', borderRadius: '4px', width: '40%' }} />
+                        </Box>
+                      ))}
+                    </Flex>
+                  ) : (
+                    <Flex direction="column" gap="3">
+                      {/* Google Account */}
+                      <Card>
+                        <Flex justify="between" align="center">
+                          <Flex align="center" gap="3">
+                            <Box style={{ fontSize: '24px' }}>🔵</Box>
+                            <Flex direction="column" gap="1">
+                              <Text size="3" weight="medium">Google</Text>
+                              {oauthAccounts?.find(a => a.oauth_provider === 'google') ? (
+                                <Text size="2" color="gray">
+                                  {oauthAccounts.find(a => a.oauth_provider === 'google')?.oauth_email}
+                                </Text>
+                              ) : (
+                                <Text size="2" color="gray">Not connected</Text>
+                              )}
+                            </Flex>
+                          </Flex>
+                          {oauthAccounts?.find(a => a.oauth_provider === 'google') ? (
+                            <Button
+                              size="2"
+                              variant="soft"
+                              color="red"
+                              onClick={() => unlinkOAuthMutation.mutate('google')}
+                              disabled={unlinkOAuthMutation.isLoading}
+                            >
+                              <Icons.Cross2Icon />
+                              Disconnect
+                            </Button>
+                          ) : (
+                            <Button
+                              size="2"
+                              variant="soft"
+                              onClick={() => auth.linkOAuthProvider('google', '/settings')}
+                            >
+                              <Icons.Link1Icon />
+                              Connect
+                            </Button>
+                          )}
+                        </Flex>
+                      </Card>
+
+                      {/* GitHub Account */}
+                      <Card>
+                        <Flex justify="between" align="center">
+                          <Flex align="center" gap="3">
+                            <Box style={{ fontSize: '24px' }}>⚫</Box>
+                            <Flex direction="column" gap="1">
+                              <Text size="3" weight="medium">GitHub</Text>
+                              {oauthAccounts?.find(a => a.oauth_provider === 'github') ? (
+                                <Text size="2" color="gray">
+                                  {oauthAccounts.find(a => a.oauth_provider === 'github')?.oauth_email}
+                                </Text>
+                              ) : (
+                                <Text size="2" color="gray">Not connected</Text>
+                              )}
+                            </Flex>
+                          </Flex>
+                          {oauthAccounts?.find(a => a.oauth_provider === 'github') ? (
+                            <Button
+                              size="2"
+                              variant="soft"
+                              color="red"
+                              onClick={() => unlinkOAuthMutation.mutate('github')}
+                              disabled={unlinkOAuthMutation.isLoading}
+                            >
+                              <Icons.Cross2Icon />
+                              Disconnect
+                            </Button>
+                          ) : (
+                            <Button
+                              size="2"
+                              variant="soft"
+                              onClick={() => auth.linkOAuthProvider('github', '/settings')}
+                            >
+                              <Icons.Link1Icon />
+                              Connect
+                            </Button>
+                          )}
+                        </Flex>
+                      </Card>
+
+                      {/* Password */}
+                      <Card>
+                        <Flex justify="between" align="center">
+                          <Flex align="center" gap="3">
+                            <Box style={{ fontSize: '24px' }}>🔑</Box>
+                            <Flex direction="column" gap="1">
+                              <Text size="3" weight="medium">Password</Text>
+                              {authMethods?.hasPassword ? (
+                                <Text size="2" color="gray">Password is set</Text>
+                              ) : (
+                                <Text size="2" color="gray">No password set</Text>
+                              )}
+                            </Flex>
+                          </Flex>
+                          <Button
+                            size="2"
+                            variant="soft"
+                            disabled
+                          >
+                            {authMethods?.hasPassword ? 'Change Password' : 'Set Password'}
+                          </Button>
+                        </Flex>
+                      </Card>
+                    </Flex>
+                  )}
+                </Flex>
+              </Card>
+            </Flex>
+          </Tabs.Content>
 
           <Tabs.Content value="tokens">
             <Card>

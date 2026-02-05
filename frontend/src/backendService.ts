@@ -205,6 +205,43 @@ export const authService = {
   }
 }
 
+interface OAuthAccount {
+  uuid: string
+  oauth_provider: 'google' | 'github'
+  oauth_email: string | null
+  linked_at: string
+  created_at: string
+}
+
+interface AuthMethods {
+  hasPassword: boolean
+  oauthProviders: string[]
+}
+
+export const oauthAccountService = {
+  async fetchAuthMethods(token: string): Promise<AuthMethods> {
+    const response = await fetch(`${API_BASE_URL}/auth/methods`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async fetchOAuthAccounts(token: string): Promise<{ accounts: OAuthAccount[] }> {
+    const response = await fetch(`${API_BASE_URL}/auth/oauth/accounts`, {
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  },
+
+  async unlinkOAuthProvider(token: string, provider: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/auth/oauth/accounts/${provider}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(token)
+    })
+    return handleResponse(response)
+  }
+}
+
 export const ingestTokenService = {
   async generate(token: string): Promise<{ token: string; uuid: string; status: string; created_at: string }> {
     const response = await fetch(`${API_BASE_URL}/auth/generate_ingest_token`, {

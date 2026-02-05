@@ -2,6 +2,7 @@ import { User } from './main/User'
 import { SubscriptionTier } from './main/SubscriptionTier'
 import { UserPreferences } from './main/UserPreferences'
 import { UserSurvey } from './main/UserSurvey'
+import { OAuthAccount } from './main/OAuthAccount'
 import { Resource } from './open_telemetry/Resource'
 import { ResourceAttribute } from './open_telemetry/ResourceAttribute'
 import { IngestToken } from './open_telemetry/IngestToken'
@@ -28,6 +29,7 @@ export {
   SubscriptionTier,
   UserPreferences,
   UserSurvey,
+  OAuthAccount,
   Resource,
   ResourceAttribute,
   IngestToken,
