@@ -6,6 +6,7 @@ import {
   SubscriptionTier,
   UserPreferences,
   UserSurvey,
+  OAuthAccount,
   Resource,
   ResourceAttribute,
   IngestToken,
@@ -93,6 +94,7 @@ User.initialize(sequelize)
 SubscriptionTier.initialize(sequelize)
 UserPreferences.initialize(sequelize)
 UserSurvey.initialize(sequelize)
+OAuthAccount.initialize(sequelize)
 Resource.initialize(sequelize)
 ResourceAttribute.initialize(sequelize)
 IngestToken.initialize(sequelize)
@@ -121,6 +123,9 @@ User.hasMany(Resource, { foreignKey: 'user_uuid', as: 'resources' })
 User.hasMany(IngestToken, { foreignKey: 'user_uuid', as: 'ingestTokens' })
 User.belongsTo(SubscriptionTier, { foreignKey: 'subscription_tier_uuid', as: 'subscriptionTier' })
 User.hasMany(UserPreferences, { foreignKey: 'user_uuid', as: 'preferences' })
+User.hasMany(OAuthAccount, { foreignKey: 'user_uuid', as: 'oauthAccounts' })
+
+OAuthAccount.belongsTo(User, { foreignKey: 'user_uuid', as: 'user' })
 
 SubscriptionTier.hasMany(User, { foreignKey: 'subscription_tier_uuid', as: 'users' })
 

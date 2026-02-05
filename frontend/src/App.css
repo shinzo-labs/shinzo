@@ -107,6 +107,107 @@ html {
   background: linear-gradient(90deg, rgb(194, 229, 255) 0%, rgb(153, 255, 248) 50%, rgb(92, 122, 255) 100%);
 }
 
+/* Two-column auth layout */
+.auth-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 80px;
+  width: 100%;
+  max-width: 1400px;
+  padding: 40px;
+}
+
+/* Feature checklist panel (left side) */
+.feature-checklist-panel {
+  flex-shrink: 0;
+}
+
+.feature-card {
+  width: 580px;
+  padding: 24px;
+  background-color: rgb(130, 160, 255);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Auth form container (right side) */
+.auth-form-container {
+  flex-shrink: 0;
+}
+
+/* Auth page hyperlinks */
+.auth-link {
+  color: #1a56db;
+  text-decoration: underline;
+  transition: color 0.15s ease;
+}
+
+.auth-link:hover {
+  color: #1e40af;
+}
+
+.auth-link:active {
+  color: #7c3aed;
+}
+
+/* Feature panel items */
+.feature-item {
+  padding: 12px;
+  background-color: white;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  transition: all 0.2s ease;
+  cursor: default;
+}
+
+.feature-item:hover {
+  background-color: #f8fafc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.feature-item:hover .feature-icon {
+  transform: scale(1.05);
+}
+
+.feature-icon {
+  transition: all 0.2s ease;
+}
+
+.feature-item .rt-Text {
+  color: #1e293b;
+}
+
+.feature-item .rt-Text[data-accent-color="gray"] {
+  color: #64748b;
+}
+
+/* Hide feature panel on mobile/tablet, show only on larger screens */
+@media (max-width: 1024px) {
+  .auth-layout {
+    gap: 40px;
+    padding: 20px;
+  }
+
+  .feature-checklist-panel {
+    display: none;
+  }
+
+  .auth-form-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+}
+
+/* Adjust feature grid to single column on medium screens */
+@media (max-width: 1200px) and (min-width: 1025px) {
+  .feature-checklist-panel {
+    max-width: 400px;
+  }
+}
+
 /* Loading states */
 .loading-skeleton {
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);

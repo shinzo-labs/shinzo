@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Flex, Spinner, Text, Card, Callout } from '@radix-ui/themes'
@@ -9,9 +9,14 @@ export const OAuthCallbackPage: React.FC = () => {
   const { handleOAuthCallback } = useAuth()
   const navigate = useNavigate()
   const [error, setError] = useState('')
+  const processingRef = useRef(false)
 
   useEffect(() => {
     const processCallback = async () => {
+      // Prevent duplicate processing (React strict mode causes double mount)
+      if (processingRef.current) return
+      processingRef.current = true
+
       const code = searchParams.get('code')
       const state = searchParams.get('state')
       const provider = window.location.pathname.includes('google') ? 'google' : 'github'

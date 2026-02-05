@@ -1,6 +1,6 @@
-\restrict SLydAwJHmyNGe4zsmCJkjrIePyeopFw5LrRpxPbTzFp5uVZiiGIXJPTrMrwLppc
+\restrict cDZmRydbPYsa0iLq7nvZEhmdTFQH6l3vaDWoyIZPJMoHhSYq9n3m8HkzeUwDw5r
 
--- Dumped from database version 17.6
+-- Dumped from database version 15.14 (Homebrew)
 -- Dumped by pg_dump version 17.6
 
 SET statement_timeout = 0;
@@ -55,6 +55,23 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: oauth_account; Type: TABLE; Schema: main; Owner: -
+--
+
+CREATE TABLE main.oauth_account (
+    uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    user_uuid uuid NOT NULL,
+    oauth_provider text NOT NULL,
+    oauth_id text NOT NULL,
+    oauth_email text,
+    oauth_profile_data jsonb,
+    linked_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: subscription_tier; Type: TABLE; Schema: main; Owner: -
 --
 
@@ -85,10 +102,7 @@ CREATE TABLE main."user" (
     monthly_counter integer DEFAULT 0 NOT NULL,
     last_counter_reset timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     subscription_tier_uuid uuid NOT NULL,
-    subscribed_on timestamp without time zone,
-    oauth_provider text,
-    oauth_id text,
-    oauth_profile_data jsonb
+    subscribed_on timestamp without time zone
 );
 
 
@@ -662,6 +676,22 @@ CREATE TABLE spotlight.user_analytics (
 
 
 --
+-- Name: oauth_account oauth_account_oauth_provider_oauth_id_key; Type: CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.oauth_account
+    ADD CONSTRAINT oauth_account_oauth_provider_oauth_id_key UNIQUE (oauth_provider, oauth_id);
+
+
+--
+-- Name: oauth_account oauth_account_pkey; Type: CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.oauth_account
+    ADD CONSTRAINT oauth_account_pkey PRIMARY KEY (uuid);
+
+
+--
 -- Name: subscription_tier subscription_tier_pkey; Type: CONSTRAINT; Schema: main; Owner: -
 --
 
@@ -998,17 +1028,24 @@ ALTER TABLE ONLY spotlight.user_analytics
 
 
 --
+-- Name: idx_oauth_account_provider_id; Type: INDEX; Schema: main; Owner: -
+--
+
+CREATE INDEX idx_oauth_account_provider_id ON main.oauth_account USING btree (oauth_provider, oauth_id);
+
+
+--
+-- Name: idx_oauth_account_user; Type: INDEX; Schema: main; Owner: -
+--
+
+CREATE INDEX idx_oauth_account_user ON main.oauth_account USING btree (user_uuid);
+
+
+--
 -- Name: idx_user_last_counter_reset; Type: INDEX; Schema: main; Owner: -
 --
 
 CREATE INDEX idx_user_last_counter_reset ON main."user" USING btree (last_counter_reset);
-
-
---
--- Name: idx_user_oauth_provider_id; Type: INDEX; Schema: main; Owner: -
---
-
-CREATE UNIQUE INDEX idx_user_oauth_provider_id ON main."user" USING btree (oauth_provider, oauth_id) WHERE ((oauth_provider IS NOT NULL) AND (oauth_id IS NOT NULL));
 
 
 --
@@ -1747,6 +1784,14 @@ CREATE TRIGGER updated_at_user_analytics BEFORE UPDATE ON spotlight.user_analyti
 
 
 --
+-- Name: oauth_account oauth_account_user_uuid_fkey; Type: FK CONSTRAINT; Schema: main; Owner: -
+--
+
+ALTER TABLE ONLY main.oauth_account
+    ADD CONSTRAINT oauth_account_user_uuid_fkey FOREIGN KEY (user_uuid) REFERENCES main."user"(uuid) ON DELETE CASCADE;
+
+
+--
 -- Name: user_preferences user_preferences_user_uuid_fkey; Type: FK CONSTRAINT; Schema: main; Owner: -
 --
 
@@ -2062,7 +2107,7 @@ ALTER TABLE ONLY spotlight.user_analytics
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SLydAwJHmyNGe4zsmCJkjrIePyeopFw5LrRpxPbTzFp5uVZiiGIXJPTrMrwLppc
+\unrestrict cDZmRydbPYsa0iLq7nvZEhmdTFQH6l3vaDWoyIZPJMoHhSYq9n3m8HkzeUwDw5r
 
 
 --
@@ -2085,4 +2130,5 @@ INSERT INTO public.schema_migrations (version) VALUES
     ('20251218000000'),
     ('20251218100000'),
     ('20251218100001'),
-    ('20251218100002');
+    ('20251218100002'),
+    ('20260204000000');

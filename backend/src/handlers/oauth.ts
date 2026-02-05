@@ -1,6 +1,6 @@
 import * as yup from 'yup'
 import axios from 'axios'
-import { User, SubscriptionTier } from '../models'
+import { User, SubscriptionTier, OAuthAccount } from '../models'
 import { logger } from '../logger'
 import * as jwt from 'jsonwebtoken'
 import { JWT_SECRET } from '../config'
@@ -126,28 +126,44 @@ export const handleGoogleOAuthCallback = async (request: yup.InferType<typeof oa
       }
     }
 
-    // Check if user exists with this OAuth provider + ID
-    let user = await User.findOne({
+    // Check if OAuth identity already exists in oauth_account table
+    const existingOAuthAccount = await OAuthAccount.findOne({
       where: {
         oauth_provider: 'google',
         oauth_id: oauthId
-      }
+      },
+      include: [{ model: User, as: 'user' }]
     })
 
-    // If not found by OAuth, check if email exists (for linking existing accounts)
-    if (!user) {
-      user = await User.findOne({ where: { email } })
+    let user: User
 
-      if (user) {
-        // Link OAuth to existing account
-        await user.update({
+    if (existingOAuthAccount) {
+      // OAuth account already linked - log them in
+      user = (existingOAuthAccount as any).user
+      logger.info({ message: 'User logged in via existing Google OAuth account', email, uuid: user.uuid })
+    } else {
+      // Check if email exists in user table (for linking to existing account)
+      const existingUser = await User.findOne({ where: { email } })
+
+      if (existingUser) {
+        // Link new OAuth provider to existing account
+        await OAuthAccount.create({
+          user_uuid: existingUser.uuid,
           oauth_provider: 'google',
           oauth_id: oauthId,
+          oauth_email: email,
           oauth_profile_data: profile,
-          verified: true // OAuth emails are verified by the provider
         })
+
+        // Ensure user is verified (OAuth emails are verified by provider)
+        if (!existingUser.verified) {
+          await existingUser.update({ verified: true })
+        }
+
+        user = existingUser
+        logger.info({ message: 'Google OAuth linked to existing account', email, uuid: user.uuid })
       } else {
-        // Create new user
+        // Create new user + OAuth account
         const emailToken = generateEmailToken()
         const emailTokenExpiry = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
@@ -158,10 +174,15 @@ export const handleGoogleOAuthCallback = async (request: yup.InferType<typeof oa
           email_token: emailToken,
           email_token_expiry: emailTokenExpiry,
           verified: true, // OAuth emails are verified by the provider
+          subscription_tier_uuid: freeTier.uuid,
+        })
+
+        await OAuthAccount.create({
+          user_uuid: user.uuid,
           oauth_provider: 'google',
           oauth_id: oauthId,
+          oauth_email: email,
           oauth_profile_data: profile,
-          subscription_tier_uuid: freeTier.uuid,
         })
 
         logger.info({ message: 'User created via Google OAuth', email, uuid: user.uuid })
@@ -317,28 +338,44 @@ export const handleGithubOAuthCallback = async (request: yup.InferType<typeof oa
       }
     }
 
-    // Check if user exists with this OAuth provider + ID
-    let user = await User.findOne({
+    // Check if OAuth identity already exists in oauth_account table
+    const existingOAuthAccount = await OAuthAccount.findOne({
       where: {
         oauth_provider: 'github',
         oauth_id: oauthId
-      }
+      },
+      include: [{ model: User, as: 'user' }]
     })
 
-    // If not found by OAuth, check if email exists (for linking existing accounts)
-    if (!user) {
-      user = await User.findOne({ where: { email } })
+    let user: User
 
-      if (user) {
-        // Link OAuth to existing account
-        await user.update({
+    if (existingOAuthAccount) {
+      // OAuth account already linked - log them in
+      user = (existingOAuthAccount as any).user
+      logger.info({ message: 'User logged in via existing GitHub OAuth account', email, uuid: user.uuid })
+    } else {
+      // Check if email exists in user table (for linking to existing account)
+      const existingUser = await User.findOne({ where: { email } })
+
+      if (existingUser) {
+        // Link new OAuth provider to existing account
+        await OAuthAccount.create({
+          user_uuid: existingUser.uuid,
           oauth_provider: 'github',
           oauth_id: oauthId,
+          oauth_email: email,
           oauth_profile_data: profile,
-          verified: true // OAuth emails are verified by the provider
         })
+
+        // Ensure user is verified (OAuth emails are verified by provider)
+        if (!existingUser.verified) {
+          await existingUser.update({ verified: true })
+        }
+
+        user = existingUser
+        logger.info({ message: 'GitHub OAuth linked to existing account', email, uuid: user.uuid })
       } else {
-        // Create new user
+        // Create new user + OAuth account
         const emailToken = generateEmailToken()
         const emailTokenExpiry = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
 
@@ -349,10 +386,15 @@ export const handleGithubOAuthCallback = async (request: yup.InferType<typeof oa
           email_token: emailToken,
           email_token_expiry: emailTokenExpiry,
           verified: true, // OAuth emails are verified by the provider
+          subscription_tier_uuid: freeTier.uuid,
+        })
+
+        await OAuthAccount.create({
+          user_uuid: user.uuid,
           oauth_provider: 'github',
           oauth_id: oauthId,
+          oauth_email: email,
           oauth_profile_data: profile,
-          subscription_tier_uuid: freeTier.uuid,
         })
 
         logger.info({ message: 'User created via GitHub OAuth', email, uuid: user.uuid })
